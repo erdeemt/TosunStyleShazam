@@ -17,6 +17,14 @@ export const GAMES = [
     load: () => import('./shazam.js'),
   },
   {
+    id: 'wordle',
+    name: 'Wordle TR',
+    icon: '🟩',
+    desc: '5 harfli kelimeyi 6 denemede bul',
+    categories: ['single'],
+    load: () => import('./games/wordle.js'),
+  },
+  {
     id: 'spyfall',
     name: 'Casus Kim?',
     icon: '🕵️',

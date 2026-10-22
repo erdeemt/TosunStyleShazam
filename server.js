@@ -4,7 +4,9 @@ import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { attachLobby } from './server/lobby.js';
+import { attachLobby, resolveIdentity, verifyIdentity } from './server/lobby.js';
+import * as wordle from './server/wordle.js';
+import { GameError } from './server/errors.js';
 
 const PORT = process.env.PORT != null && process.env.PORT !== '' ? Number(process.env.PORT) : 3000;
 const PUBLIC_DIR = join(fileURLToPath(new URL('.', import.meta.url)), 'public');
@@ -221,9 +223,66 @@ function sendJson(res, status, body) {
   res.end(JSON.stringify(body));
 }
 
-async function handleApi(url, res) {
+const MAX_BODY_BYTES = 2048;
+
+// Küçük JSON gövdeleri (günlük bulmaca uçları). Sınırı aşan istek kesilir.
+function readJson(req) {
+  return new Promise((resolve, reject) => {
+    if (req.method !== 'POST') return reject(new GameError('POST bekleniyor.'));
+    if (Number(req.headers['content-length']) > MAX_BODY_BYTES) {
+      req.resume(); // gövdeyi okumadan at; yanıt gönderilince bağlantı kapanır
+      return reject(new GameError('İstek çok büyük.'));
+    }
+    let size = 0;
+    let tooBig = false;
+    const chunks = [];
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > MAX_BODY_BYTES * 32) return req.destroy(); // durmayan gönderici
+      if (size > MAX_BODY_BYTES) { tooBig = true; return; }
+      chunks.push(c);
+    });
+    req.on('end', () => {
+      if (tooBig) return reject(new GameError('İstek çok büyük.'));
+      try {
+        const body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+        if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error();
+        resolve(body);
+      } catch { reject(new GameError('Geçersiz istek.')); }
+    });
+    req.on('error', () => reject(new GameError('Geçersiz istek.')));
+  });
+}
+
+function requireIdentity(body) {
+  const identity = verifyIdentity(body.playerId, body.token);
+  if (!identity) throw new GameError('Kimlik doğrulanamadı, sayfayı yenile.');
+  return identity;
+}
+
+async function handleApi(url, res, req) {
   const q = url.searchParams;
   switch (url.pathname) {
+    // ---------- Kimlik + günlük bulmacalar ----------
+    case '/api/identity': {
+      const body = await readJson(req);
+      const identity = resolveIdentity({ playerId: body.playerId, token: body.token, name: body.name });
+      return sendJson(res, 200, { playerId: identity.id, token: identity.token, name: identity.name });
+    }
+    case '/api/wordle/start': {
+      const body = await readJson(req);
+      return sendJson(res, 200, wordle.startGame(requireIdentity(body), body.mode === 'free' ? 'free' : 'daily'));
+    }
+    case '/api/wordle/guess': {
+      const body = await readJson(req);
+      return sendJson(res, 200, wordle.guess(requireIdentity(body), body.mode === 'free' ? 'free' : 'daily', body.gameId, body.word));
+    }
+    case '/api/wordle/leaderboard': {
+      const body = await readJson(req);
+      const identity = requireIdentity(body);
+      return sendJson(res, 200, wordle.leaderboard(wordle.todayIstanbul(), identity.id));
+    }
+    // ---------- Müzik kaynakları (Shazam) ----------
     case '/api/resolve':
       return sendJson(res, 200, await resolve(q.get('url') ?? ''));
     case '/api/yt-meta': {
@@ -260,10 +319,10 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   try {
-    if (url.pathname.startsWith('/api/')) await handleApi(url, res);
+    if (url.pathname.startsWith('/api/')) await handleApi(url, res, req);
     else await serveStatic(url.pathname, res);
   } catch (err) {
-    sendJson(res, 400, { error: err.message ?? String(err) });
+    if (!res.headersSent) sendJson(res, 400, { error: err instanceof GameError ? err.message : err.message ?? String(err) });
   }
 });
 

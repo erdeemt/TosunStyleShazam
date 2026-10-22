@@ -4,6 +4,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import { createRng } from './rng.js';
 import { GameError } from './errors.js';
+import { jsonStore } from './store.js';
 import { GAMES } from './games/index.js';
 
 const TIME_SCALE = Number(process.env.TIME_SCALE) > 0 ? Number(process.env.TIME_SCALE) : 1;
@@ -26,7 +27,17 @@ const CODE_ALPHABET = 'ABCDEFGHJKLMNPRSTUVYZ';
 
 export { GameError };
 
-const identities = new Map(); // playerId -> { id, token, name, socket, roomCode, lastSeen }
+// Kimlikler data/identities.json'da kalıcı (sunucu yeniden başlasa da aynı kişi aynı kişi; günlük sıralama buna dayanır).
+// socket ve roomCode sadece çalışma zamanı alanları, dosyaya yazılmaz.
+const identityStore = jsonStore('identities', {});
+const identities = new Map(
+  Object.values(identityStore.data).map((i) => [i.id, { ...i, socket: null, roomCode: null }]),
+); // playerId -> { id, token, name, socket, roomCode, lastSeen }
+
+function persistIdentity(identity) {
+  identityStore.data[identity.id] = { id: identity.id, token: identity.token, name: identity.name, lastSeen: identity.lastSeen };
+  identityStore.save();
+}
 const rooms = new Map(); // code -> room
 let roomCounter = 0;
 
@@ -334,6 +345,7 @@ const handlers = {
   },
   rename(identity, msg) {
     identity.name = sanitizeName(msg.name);
+    persistIdentity(identity);
     const room = identity.roomCode && rooms.get(identity.roomCode);
     if (room) {
       if (room.phase !== 'lobby') throw new GameError('Ad sadece bekleme odasında değişir.');
@@ -354,14 +366,28 @@ const handlers = {
   },
 };
 
-function handleHello(socket, msg) {
-  let identity = msg.playerId && identities.get(String(msg.playerId));
-  if (!identity || typeof msg.token !== 'string' || identity.token !== msg.token) {
+// playerId + token doğruysa mevcut kimlik, değilse yeni kimlik. HTTP uçları (günlük bulmacalar) da bunu kullanır.
+export function resolveIdentity({ playerId, token, name } = {}) {
+  let identity = playerId && identities.get(String(playerId));
+  if (!identity || typeof token !== 'string' || identity.token !== token) {
     if (identities.size >= LIMITS.maxIdentities) pruneIdentities();
     identity = { id: randomUUID(), token: randomBytes(16).toString('hex'), name: 'Oyuncu', socket: null, roomCode: null, lastSeen: Date.now() };
     identities.set(identity.id, identity);
   }
-  if (msg.name != null) identity.name = sanitizeName(msg.name);
+  if (name != null) identity.name = sanitizeName(name);
+  identity.lastSeen = Date.now();
+  persistIdentity(identity);
+  return identity;
+}
+
+// Sadece doğrulama: yeni kimlik üretmez.
+export function verifyIdentity(playerId, token) {
+  const identity = typeof playerId === 'string' && identities.get(playerId);
+  return identity && typeof token === 'string' && identity.token === token ? identity : null;
+}
+
+function handleHello(socket, msg) {
+  const identity = resolveIdentity(msg);
   // Aynı kimlikle ikinci sekme açılırsa eskisi kapanır.
   if (identity.socket && identity.socket !== socket) {
     send(identity.socket, { t: 'error', code: 'replaced', message: 'Başka bir sekmeden bağlandın.' });
@@ -377,11 +403,17 @@ function handleHello(socket, msg) {
   else send(socket, { t: 'room', room: null });
 }
 
+// Kimlik sayısı sınıra ulaşınca: önce 60 günden eski olanlar, yetmezse en eski bağlı olmayanlar silinir.
 function pruneIdentities() {
-  const cutoff = Date.now() - 24 * 3600_000;
-  for (const [id, ident] of identities) {
-    if (!ident.socket && !ident.roomCode && ident.lastSeen < cutoff) identities.delete(id);
+  const idle = [...identities.values()].filter((i) => !i.socket && !i.roomCode).sort((a, b) => a.lastSeen - b.lastSeen);
+  const cutoff = Date.now() - 60 * 24 * 3600_000;
+  const drop = idle.filter((i) => i.lastSeen < cutoff);
+  if (identities.size - drop.length >= LIMITS.maxIdentities) drop.push(...idle.slice(drop.length, drop.length + 100));
+  for (const i of drop) {
+    identities.delete(i.id);
+    delete identityStore.data[i.id];
   }
+  identityStore.save();
 }
 
 function handleMessage(socket, raw) {

@@ -1,13 +1,18 @@
 // Testler için sunucuyu boş bir portta başlatır, gerçek portu stdout'tan okur.
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 
-export async function startServer({ timeScale = 0.02, seed = 1, env = {} } = {}) {
+export async function startServer({ timeScale = 0.02, seed = 1, env = {}, dataDir } = {}) {
+  // Her test sunucusu kendi geçici veri klasörünü kullanır (data/ kirlenmesin). Aynı klasörle yeniden başlatma testi için dataDir verilebilir.
+  const dir = dataDir ?? mkdtempSync(join(tmpdir(), 'tss-data-'));
   const child = spawn(process.execPath, ['server.js'], {
     cwd: ROOT,
-    env: { ...process.env, PORT: '0', TIME_SCALE: String(timeScale), SEED: String(seed), TEST_GAMES: '1', ...env },
+    env: { ...process.env, PORT: '0', TIME_SCALE: String(timeScale), SEED: String(seed), TEST_GAMES: '1', DATA_DIR: dir, ...env },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let log = '';
@@ -23,6 +28,7 @@ export async function startServer({ timeScale = 0.02, seed = 1, env = {} } = {})
   });
   return {
     port,
+    dataDir: dir,
     url: `http://localhost:${port}`,
     wsUrl: `ws://localhost:${port}/ws`,
     log: () => log,
