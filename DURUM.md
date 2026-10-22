@@ -2,7 +2,7 @@
 
 Bir sonraki oturum buradan devam eder. Ayrıntılı şartname: `PLAN.md`.
 
-## Bitenler (yerelde commit'li, GitHub'a henüz gönderilmedi — `main` 5 commit önde)
+## Bitenler (yerelde commit'li, GitHub'a henüz gönderilmedi — `main` 8 commit önde)
 
 - **P0 altyapı:** WebSocket lobi (`server/lobby.js`), kalıcı kimlik (`data/identities.json`), bot kütüphanesi,
   Playwright testleri, IP başına sınırlar (`server/limits.js`), CSP.
