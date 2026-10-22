@@ -1,0 +1,6 @@
+# Hand-picked everyday / culturally Turkish words that are below the subtitle frequency cut-off
+# (OpenSubtitles under-represents food, home and local culture). Each must be a valid 5-letter word.
+bohça kroki mizaç reyon tüzük abide akran esans soket kefal törpü demli gazel halay nükte kasko
+dünür golcü kakül efkar milat servi bünye faraş fitne tahin rende takke petek budak irmik kopça
+nüans hokka cezve kesir körük ayraç kıvam kırat payet lavaş sumak zekat iftar sahur aşure salep
+kefir hoşaf kombi tiraj havza

@@ -16,4 +16,12 @@ export const GAMES = [
     categories: ['single', 'multi'],
     load: () => import('./shazam.js'),
   },
+  {
+    id: 'spyfall',
+    name: 'Casus Kim?',
+    icon: '🕵️',
+    desc: 'Aranızdaki casusu bulun',
+    categories: ['multi'],
+    load: () => import('./games/spyfall.js'),
+  },
 ];

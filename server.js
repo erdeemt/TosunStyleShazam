@@ -4,8 +4,9 @@ import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { attachLobby } from './server/lobby.js';
 
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = process.env.PORT != null && process.env.PORT !== '' ? Number(process.env.PORT) : 3000;
 const PUBLIC_DIR = join(fileURLToPath(new URL('.', import.meta.url)), 'public');
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36';
 
@@ -254,14 +255,21 @@ async function serveStatic(pathname, res) {
   }
 }
 
-http.createServer(async (req, res) => {
+const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
   try {
     if (url.pathname.startsWith('/api/')) await handleApi(url, res);
     else await serveStatic(url.pathname, res);
   } catch (err) {
     sendJson(res, 400, { error: err.message ?? String(err) });
   }
-}).listen(PORT, '0.0.0.0', () => {
-  console.log(`🎵 Tosun Style Shazam → http://localhost:${PORT}`);
+});
+
+attachLobby(server);
+
+// PORT=0 → işletim sistemi boş bir port seçer (testler bunu kullanır, gerçek portu stdout'tan okur).
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`🎮 Tosun Style → http://localhost:${server.address().port}`);
 });

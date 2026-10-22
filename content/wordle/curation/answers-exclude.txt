@@ -1,0 +1,82 @@
+# Hand-curated exclusions from the answer candidates (one or more words per line, # = comment).
+# Candidates = 5-letter Wiktionary lemmas / verb stems that also appear >= MIN_FREQ times in
+# OpenSubtitles. Excluded words stay valid guesses (if they are in valid.json); they just never
+# become the answer.
+
+# --- proper nouns / names / places / brands that slipped in as lowercase lemmas ---
+allah frank carla ellen tokyo mason malik murat kemal mesut kadir hakan cemal selim yeşim erika
+aydın burcu begüm rambo selen şaban recep fatih ferdi cemil kamil ihsan celal latif kerim mirza
+ismet ceren tolga akemi hızır elgin kerem nesim refik yekta marya malta canan yavuz seyit baran
+devin halim sevim pelin karun eflak hazar fanta habeş titan cihan hurra marki laden nazım
+
+# --- inflected / conjugated forms (not base words) ---
+bende ondan orada oraya orası onlar olmuş verdi çıktı gelen bakın adama bilir kalan olmaz ölmüş
+kalbi günde girdi çıkan bunda yolun yerin bilen fikri çıkın bulun testi geçer denen tutun birer
+yüzde aşkın sorum yemiş gözle sesle gücün giren elden sudan çalar barda geçin çekin çeker keser
+saçlı bulma kaçın koşun görün kaçta yaşar duyar dönen vurun bilin bulan doğan dünkü kaplı hissi
+onsuz gözlü boylu koyar kaçar bastı barın başlı kanla taşın yüzlü kışın taşır takın bizle bindi
+hakla allan yakar çaplı üzeri katlı yönlü dönük kesen dolan ölmez çözün taşla dilin kalım kıran
+değin zihni kollu ruhlu devri azdır huylu basar odalı biner kızar uymaz bozar veriş çöker gülün
+allak karla cinsi koyul kırın yurdu kayan ermiş sonla sarın bağın sevin yağar dizim yüzer batar
+gurup andır yüzle varan sarar kayar öbürü dilli silin üsten yükün bağım kazın sıkın dökün fonda
+örtün buzla günle saplı ölçer taşlı telli bitli dökük kelli şunda bükük yaslı yasta yılla telin
+isten camlı kaşlı varda kısın sadik sıkış solun geren dalan çakın ölçün cebin aldır taşım tüple
+camla bölen balla kılın lifli kopek mumla harbe tıkan hisli sırla dolum sağın kızan dedir tiple
+süzül kasın taran katım benli ağıla özeni tüplü tutuk üçler yaşan dikim namlı yemle adalı yanlı
+donan terle kaşla butlu çatın ağılı dağlı haçla cinli dişle örülü yatım bölün dalla killi taçlı
+ipsiz donlu sokul ütülü çökük gayri gayrı mersi hayda yaren basık dişle
+
+# --- verbal nouns / negative imperatives / infinitives that read as conjugations ---
+bakma yapma gitme verme gelme durma kalma sorma kızma sanma gülme dönme girme kaçma tutma çekme
+çıkma görme geçme seçme koyma vurma bulma yatma kesme sıkma sokma yazma düşme bozma kurma yakma
+çalma kırma sürme uyuma kısma giyme yorma duyma basma bölme koşma biçme doğma yanma çözme sevme
+sayma binme bilme silme kayma bükme savma sızma gömme erime dalma kovma varma boğma yetme donma
+yıkma kapma çökme susma katma yenme delme yutma yayma sunma tatma soyma gezme tepme kanma bitme
+batma sıçma kasma ölçme kopma yarma kılma şaşma tapma örtme sağma taşma sekme kakma işeme üşüme
+uluma yatış tutuş çekiş üreme acıma salma
+asmak aşmak anmak emmek ermek eğmek ummak itmek uymak örmek övmek
+
+# --- causatives / odd verb stems / fragments ---
+ettir ittir açtır attır aldır kutsa sarpa sökül yağla katla oturt buruş dövün sürün kıvır salın
+tıkın kökle yönel ovala tuşla yedir sıyır boşal kapış tıkış güdüm yumul kükre soğur tüzel birle
+arala kapla çitle kakış sökün yasla bezle telle defet dikme boyla basil sapla
+lafla yetin sapta
+
+# --- vulgar / sexual / slurs / possibly offensive ---
+porno penis sperm taşak boklu yarak kahpe nonoş zenci sidik fuhuş seviş sikke bokla dışkı geber
+becer gavur avrat haspa yosma kafir hadım iğdiş iğfal götüm puşt
+
+# --- archaic / Ottoman / religious-technical / obscure / dialect / too technical ---
+mösyö papel yaver etmen tabip flora mahal ladin azize ramak ikmal sahra yakin liret dinar yarda
+pines nazir şilin gurup geyşa kadem tümen merci tapan içkin cicim duyum andaç tuzla mambo cihat
+kerim nazır largo amade kesat idame batır yollu neşir pullu nezih melon tugay biniş humma tatar
+kinin konur medet gerin ifrit irfan mehdi kırım sunak telef çatma mahir büküm horst topak hacet
+helak fünye kelam güdük meyan oymak zeval uğrak polka parsa rumba bakla imalı hancı piyes pruva
+satım yüküm istem dinci gauss iskan pelte ardıç germe lando şahım hakir kiriş koşum mavna işlek
+körpe salık iffet kısas nasir seyis kazım hidra radon azman boyar argon zilli kırış mesul uçarı
+muhit keski genom ahkam kulun ilmik molla seher doyum hertz samur sebat memat revan basur sükse
+çırpı halef tamah vaşak alaca beşer bıdık bemol efsun içici tımar tifüs çakar libre hodri tenya
+türüm limbo salvo yonga zahir bobin sağım seren kelek tezek borda zabıt ester derme ismen ivedi
+mukus topaz melun fesih lahit övünç banko kanto nizam tonga yayım krank lavaj paçoz gayda sükut
+vakur likit pişik oktan mevzi yanal otlak çakır metil hayta palas tacir çıyan finiş hiciv tiran
+barak terek umman vatoz softa hudut ilahe istif aside semiz tecil göçer banço borat naçiz adale
+funda nakdi tırıs akmaz güleç mübah paraf turla anjin nakip sunuş aklen duacı tayın çiroz pigme
+porte semer emare delgi erbaş çivit beniz dozer ötücü salah zıbar kabza lıkır niyaz steno viran
+cazcı itina kasem meşum randa depar figan makat dürzü endam güruh hapşu şilep geçek diyez elyaf
+esnet hafız ikici kolik aşevi geviş amper ataşe sekte tarik burgu uçman yatık zloti ablak ibare
+ibraz kağnı muşta mümin ariza bütan çelen kuşan meyil boyna kesif mürit nifak runik secde akide
+arıcı melas otçul yumuk haham porto sonda manga kabil şayan düşes uçsuz aksam kalım tokuş
+katar burma saçık
+
+# --- second pass: inflected / odd forms that survived the first pass ---
+açıcı bakir belle çalın gazla geçen ikile kumla kusma maile merek masöz sever tıfıl yapın yıkan
+yazın takim safça kodla şekli yaran kinci emici halis ister
+
+# --- second pass: correct but too technical / too rare for a daily answer (keeps list <= 2000) ---
+aleni amele anemi artçı balya bitap bloke bucak cebir cenin cıvık çarpı çeşni çomak dakik denek
+dogma donat dozaj elips emsal enlem eşkal etçil etken fahri fedai felek fevri folyo gafil gedik
+gıdım habis haciz hazne hüner ilmek ithaf kalas kaniş kasti künye lehim levye matah metan metot
+milis minör moloz muska muson nikel nöron nüsha oksit oktav öznel özdeş özerk pagan pelüş perma
+pinti puset rakım ruble saban safha sanrı sedir sicim siğil sinüs siroz spazm statü sufle süngü
+sürgü takoz tekil tenor tıkaç tiner toner tortu totem trafo türev uçucu umumi ünite üslup vezne
+yazıt yitik zirai

@@ -2,13 +2,21 @@
   "name": "tosun-style-shazam",
   "version": "0.1.0",
   "private": true,
-  "description": "Arkadaşlarla oynanan şarkı tahmin oyunu (Spotify / YouTube / Deezer linkleri)",
+  "description": "Arkadaşlarla oynanan oyun salonu: Tosun Shazam, Casus Kim?, Wordle TR ve daha fazlası",
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "test": "node --test --test-concurrency=1 \"tests/swarm/**/*.test.mjs\" \"tests/unit/**/*.test.mjs\"",
+    "e2e": "node --test --test-concurrency=1 \"tests/e2e/**/*.test.mjs\""
   },
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.64.1"
   }
 }

@@ -1,0 +1,9 @@
+# Words removed from valid.json even though a source contains them.
+# Mainly personal first names that the hunspell dictionary / subtitles contain in lowercase
+# (names that are also ordinary Turkish words, e.g. deniz, umut, kerem, murat, aydın, are NOT listed).
+ahmet aykut ilker ayşen berna berta emine fatma kübra merve zehra yusuf hasan halil osman ercan
+erkan ersin erdal erhan gülen harun hayri hilmi kamil kenan melih orhan rahmi rasim rıfat sabri
+salih selin sevil sezer sinan şenol şükrü talat tamer vedat yeliz yunus aysel aynur aysun cansu
+didem ecrin emrah enver gülce ilkay leyla melis nalan ilyas idris ayhan berke ferit fırat hamza
+hüsnü kutay oktay özkan recai soner şener taner alper alpay bekir fehmi hakkı mesud münir necmi
+remzi rüştü sadri tahir yahya aytaç nuran aylin sezen susan karen carla ellen

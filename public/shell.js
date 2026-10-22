@@ -46,6 +46,11 @@ let active = null; // { game, module }
 
 async function route() {
   const [categoryId, gameId] = location.hash.replace(/^#\/?/, '').split('/');
+  // Davet linki: #/join/KOD → odaya katıl, sonra odanın oyununa geçilir.
+  if (categoryId === 'join' && gameId) {
+    const { joinFromLink } = await import('./lobby.js');
+    return joinFromLink(gameId);
+  }
   const category = CATEGORIES.find((c) => c.id === categoryId);
   const game = category && gamesIn(category.id).find((g) => g.id === gameId);
 
