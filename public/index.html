@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tosun Style Shazam</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
+</head>
+<body>
+  <header class="topbar">
+    <div class="logo">🎵 <span>TOSUN</span> STYLE SHAZAM</div>
+  </header>
+
+  <!-- ============ KURULUM ============ -->
+  <main id="screen-setup" class="screen active">
+    <section class="mode-pick" id="mode-pick">
+      <button type="button" class="mode-card" data-mode="contest">
+        <span class="mode-icon">🏆</span><b>Yarışma</b><small>Sırayla tahmin, puan, skor tablosu</small>
+      </button>
+      <button type="button" class="mode-card" data-mode="free">
+        <span class="mode-icon">🎧</span><b>Serbest</b><small>Puan yok — dinle, cevabı gör, geç</small>
+      </button>
+    </section>
+
+    <section class="card contest-only">
+      <h2>👥 Oyuncular</h2>
+      <form id="player-form" class="row">
+        <input id="player-input" type="text" placeholder="Oyuncu adı" maxlength="20" autocomplete="off">
+        <button type="submit" class="btn">Ekle</button>
+      </form>
+      <ul id="player-list" class="chips"></ul>
+      <p class="hint">Oyuncular sırayla tahmin eder. Tek başına da oynayabilirsin.</p>
+    </section>
+
+    <section class="card">
+      <h2>🎶 Şarkılar</h2>
+      <form id="source-form">
+        <textarea id="source-input" rows="3" placeholder="Spotify / YouTube / Deezer linki — playlist, albüm veya tek şarkı. Her satıra bir link."></textarea>
+        <div class="row end">
+          <button type="submit" class="btn" id="source-add">Linkleri yükle</button>
+        </div>
+      </form>
+      <ul id="source-list" class="sources"></ul>
+      <p class="hint" id="track-total">Henüz şarkı yok.</p>
+    </section>
+
+    <section class="card">
+      <h2>⚙️ Ayarlar</h2>
+      <div class="settings">
+        <label class="contest-only">Kişi başı şarkı
+          <input id="set-per-player" type="number" min="1" max="50" value="5">
+        </label>
+        <label>Başlangıç noktası
+          <select id="set-start">
+            <option value="random">Rastgele yer</option>
+            <option value="begin">Şarkının başı</option>
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <button id="start-btn" class="btn big primary" disabled>Oyunu başlat</button>
+  </main>
+
+  <!-- ============ OYUN ============ -->
+  <main id="screen-game" class="screen">
+    <div class="game-head">
+      <div class="round" id="round-label">Tur 1 / 10</div>
+      <div class="turn contest-only">Sıra: <strong id="turn-name">—</strong></div>
+      <div class="turn free-only">🎧 Serbest mod</div>
+      <ul class="mini-scores contest-only" id="mini-scores"></ul>
+    </div>
+
+    <section class="card game-card">
+      <ol class="guesses" id="guesses"></ol>
+
+      <div class="stagebar" id="stagebar">
+        <div class="stagebar-unlocked" id="stagebar-unlocked"></div>
+        <div class="stagebar-progress" id="stagebar-progress"></div>
+        <div class="stagebar-ticks" id="stagebar-ticks"></div>
+      </div>
+      <div class="stagebar-labels"><span>0 sn</span><span id="stagebar-max">5 sn</span></div>
+
+      <div class="play-wrap">
+        <button id="play-btn" class="play-btn" disabled aria-label="Çal">
+          <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <div class="play-label" id="play-label">Yükleniyor…</div>
+      </div>
+
+      <!-- Serbest mod: istediğin süreyi çal, cevabı istediğin an aç, geç -->
+      <div id="free-controls" class="free-controls free-only">
+        <div class="stage-chips" id="stage-chips"></div>
+        <div class="row">
+          <button type="button" id="free-reveal-btn" class="btn ghost">👀 Cevabı göster</button>
+        </div>
+      </div>
+
+      <form id="guess-form" class="guess-form">
+        <div class="ac-wrap">
+          <input id="guess-input" type="text" placeholder="Şarkının adı ne? (boş Enter = çal)" autocomplete="off"
+                 role="combobox" aria-autocomplete="list" aria-controls="ac-list">
+          <ul id="ac-list" class="ac-list hidden" role="listbox"></ul>
+        </div>
+        <div class="row">
+          <button type="button" id="skip-btn" class="btn ghost contest-only">Geç</button>
+          <button type="submit" class="btn primary">Tahmin et</button>
+        </div>
+      </form>
+
+      <button type="button" id="free-next-btn" class="btn skip-song free-only">Şarkıyı atla ⏭</button>
+
+      <!-- Tur sonu -->
+      <div id="reveal" class="reveal hidden">
+        <div id="result-msg" class="result-msg"></div>
+        <div class="reveal-media">
+          <img id="reveal-cover" alt="">
+          <div id="yt-slot" class="yt-slot"></div>
+        </div>
+        <div class="reveal-title" id="reveal-title"></div>
+        <div class="reveal-artist" id="reveal-artist"></div>
+        <div class="row center">
+          <button id="pause-btn" class="btn ghost">⏸ Durdur</button>
+          <button id="next-btn" class="btn primary">Sonraki →</button>
+        </div>
+      </div>
+    </section>
+
+    <button id="quit-btn" class="btn link">Oyunu bitir</button>
+  </main>
+
+  <!-- ============ SONUÇ ============ -->
+  <main id="screen-end" class="screen">
+    <section class="card">
+      <h2>🏆 Sonuçlar</h2>
+      <ol id="final-scores" class="final-scores"></ol>
+      <div class="row center">
+        <button id="again-btn" class="btn primary">Tekrar oyna</button>
+        <button id="menu-btn" class="btn ghost">Ana menü</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- YouTube oynatıcı: tahmin sırasında gizli, tur sonunda görünür. DOM'da taşınmaz, sadece CSS ile gösterilir. -->
+  <div id="yt-wrap" class="yt-wrap masked"><div id="yt-player"></div></div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

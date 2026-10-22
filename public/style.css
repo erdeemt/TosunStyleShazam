@@ -1,0 +1,246 @@
+:root {
+  --bg: #120a1f;
+  --bg2: #1d1030;
+  --card: #241638;
+  --card2: #2e1d47;
+  --line: #3d2a5c;
+  --text: #f3ecff;
+  --muted: #a996c7;
+  --accent: #ff4d8d;
+  --accent2: #ffb547;
+  --good: #3ee08f;
+  --bad: #ff5d5d;
+  --radius: 16px;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; }
+
+body {
+  min-height: 100vh;
+  background: radial-gradient(1200px 600px at 10% -10%, #3a1a5e 0%, transparent 60%),
+              radial-gradient(900px 500px at 110% 10%, #5a1640 0%, transparent 55%),
+              var(--bg);
+  color: var(--text);
+  font-family: 'Rubik', system-ui, sans-serif;
+  font-size: 16px;
+}
+
+.topbar { padding: 18px 16px 4px; text-align: center; }
+.logo { font-weight: 900; letter-spacing: .04em; font-size: 22px; }
+.logo span {
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+.screen { display: none; max-width: 640px; margin: 0 auto; padding: 16px; flex-direction: column; gap: 16px; }
+.screen.active { display: flex; }
+
+.card {
+  background: linear-gradient(180deg, var(--card), var(--bg2));
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px;
+}
+.card h2 { margin: 0 0 12px; font-size: 18px; }
+
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row.end { justify-content: flex-end; margin-top: 8px; }
+.row.center { justify-content: center; }
+
+input, textarea, select {
+  width: 100%;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 11px 12px;
+  font: inherit;
+  outline: none;
+}
+input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+textarea { resize: vertical; }
+.row > input { flex: 1; width: auto; min-width: 0; }
+
+.btn {
+  border: 1px solid var(--line);
+  background: var(--card2);
+  color: var(--text);
+  padding: 11px 18px;
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform .08s, filter .15s, opacity .15s;
+}
+.btn:hover:not(:disabled) { filter: brightness(1.15); }
+.btn:active:not(:disabled) { transform: scale(.97); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn.primary { background: linear-gradient(90deg, var(--accent), #ff7a5c); border-color: transparent; font-weight: 700; }
+.btn.ghost { background: transparent; }
+.btn.link { background: none; border: none; color: var(--muted); align-self: center; text-decoration: underline; }
+.btn.big { padding: 16px; font-size: 18px; }
+
+.hint { color: var(--muted); font-size: 14px; margin: 10px 0 0; }
+
+.chips { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.chips li {
+  background: var(--card2); border: 1px solid var(--line); border-radius: 999px;
+  padding: 6px 8px 6px 14px; display: flex; align-items: center; gap: 6px;
+}
+.chips button, .sources button {
+  background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px; padding: 2px 6px;
+}
+.chips button:hover, .sources button:hover { color: var(--bad); }
+
+.sources { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 6px; }
+.sources li {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px;
+}
+.sources .src-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sources .src-count { color: var(--muted); font-size: 14px; white-space: nowrap; }
+.badge { font-size: 11px; font-weight: 700; padding: 3px 7px; border-radius: 6px; text-transform: uppercase; }
+.badge.spotify { background: #1db95433; color: #1ed760; }
+.badge.youtube { background: #ff000033; color: #ff6b6b; }
+.badge.deezer { background: #a238ff33; color: #c58bff; }
+
+.settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.settings label { display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--muted); }
+
+/* ---------- Oyun ---------- */
+
+.game-head { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.round { color: var(--muted); font-size: 14px; }
+.turn { font-size: 22px; }
+.turn strong { color: var(--accent2); }
+.mini-scores { list-style: none; padding: 0; margin: 4px 0 0; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.mini-scores li { background: var(--card2); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: 14px; }
+.mini-scores li.current { border-color: var(--accent2); }
+.mini-scores b { color: var(--accent2); margin-left: 4px; }
+
+.game-card { display: flex; flex-direction: column; gap: 16px; }
+
+.guesses { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.guesses li {
+  min-height: 40px; border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px;
+  display: flex; gap: 8px; align-items: center; font-size: 15px; color: var(--muted);
+}
+.guesses li.wrong { border-color: #ff5d5d55; color: var(--text); }
+.guesses li.skip { color: var(--muted); }
+.guesses li.right { border-color: var(--good); color: var(--good); font-weight: 700; }
+.guesses li.active { border-color: var(--accent); }
+
+.stagebar { position: relative; height: 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.stagebar-unlocked { position: absolute; inset: 0 auto 0 0; background: #ffffff1a; transition: width .3s; }
+.stagebar-progress { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+.stagebar-ticks { position: absolute; inset: 0; }
+.stagebar-ticks i { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line); }
+.stagebar-labels { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-top: -10px; }
+
+.play-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.play-btn {
+  width: 84px; height: 84px; border-radius: 50%; border: none; cursor: pointer;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  box-shadow: 0 8px 30px #ff4d8d55; display: grid; place-items: center;
+  transition: transform .1s, opacity .2s;
+}
+.play-btn svg { width: 40px; height: 40px; fill: #fff; margin-left: 4px; }
+.play-btn:active:not(:disabled) { transform: scale(.94); }
+.play-btn:disabled { opacity: .35; cursor: wait; }
+.play-btn.playing { animation: pulse .6s ease-in-out infinite alternate; }
+@keyframes pulse { to { box-shadow: 0 8px 50px #ffb547aa; transform: scale(1.04); } }
+.play-label { color: var(--muted); font-size: 14px; }
+
+.guess-form { display: flex; flex-direction: column; gap: 10px; }
+.guess-form .row { justify-content: space-between; }
+.guess-form .row .btn { flex: 1; }
+
+.reveal { display: flex; flex-direction: column; gap: 10px; align-items: center; text-align: center; }
+.result-msg { font-size: 22px; font-weight: 900; }
+.result-msg.good { color: var(--good); }
+.result-msg.bad { color: var(--bad); }
+.reveal-media { width: 100%; display: flex; justify-content: center; }
+.reveal-media img { width: 220px; height: 220px; object-fit: cover; border-radius: 12px; box-shadow: 0 10px 40px #0008; }
+.reveal-media img:not([src]), .reveal-media img[src=""] { display: none; }
+.yt-slot { width: 100%; max-width: 480px; aspect-ratio: 16 / 9; display: none; }
+.yt-slot.on { display: block; }
+.reveal-title { font-size: 22px; font-weight: 700; }
+.reveal-artist { color: var(--muted); }
+
+/* YouTube oynatıcı body seviyesinde yaşar; tur sonunda yt-slot'un üstüne konumlanır. */
+.yt-wrap { position: absolute; z-index: 5; border-radius: 12px; overflow: hidden; }
+.yt-wrap iframe { width: 100%; height: 100%; display: block; }
+.yt-wrap.masked { left: -10000px; top: 0; width: 320px; height: 180px; opacity: 0; pointer-events: none; }
+
+.hidden { display: none !important; }
+
+/* ---------- Sonuç ---------- */
+
+.final-scores { list-style: none; padding: 0; margin: 0 0 16px; display: flex; flex-direction: column; gap: 8px; }
+.final-scores li {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; font-size: 18px;
+}
+.final-scores li:first-child { border-color: var(--accent2); font-size: 22px; font-weight: 700; }
+.final-scores b { color: var(--accent2); }
+
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 40px);
+  background: var(--card2); border: 1px solid var(--line); border-radius: 10px;
+  padding: 12px 18px; opacity: 0; pointer-events: none; transition: all .25s; max-width: calc(100% - 32px); z-index: 10;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------- Mod seçimi ---------- */
+
+body[data-mode="free"] .contest-only,
+body[data-mode="contest"] .free-only { display: none !important; }
+
+.mode-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.mode-card {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center;
+  background: linear-gradient(180deg, var(--card), var(--bg2));
+  border: 2px solid var(--line); border-radius: var(--radius);
+  padding: 18px 12px; color: var(--text); font: inherit; cursor: pointer;
+  transition: border-color .15s, transform .08s, box-shadow .15s;
+}
+.mode-card:active { transform: scale(.98); }
+.mode-card b { font-size: 18px; }
+.mode-card small { color: var(--muted); font-size: 13px; }
+.mode-icon { font-size: 30px; }
+.mode-card.selected { border-color: var(--accent); box-shadow: 0 0 0 4px #ff4d8d22; }
+
+/* ---------- Serbest mod ---------- */
+
+.free-controls { display: flex; flex-direction: column; gap: 12px; }
+.free-controls .row .btn { flex: 1; }
+.stage-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.stage-chips .btn { padding: 8px 14px; min-width: 64px; }
+.stage-chips .btn.active { border-color: var(--accent2); color: var(--accent2); }
+
+/* ---------- Tahmin önerileri ---------- */
+
+.ac-wrap { position: relative; }
+.ac-list {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 6;
+  list-style: none; margin: 0; padding: 4px;
+  background: var(--card2); border: 1px solid var(--line); border-radius: 10px;
+  max-height: 300px; overflow-y: auto; box-shadow: 0 12px 30px #0009;
+}
+.ac-list li {
+  padding: 9px 12px; border-radius: 8px; cursor: pointer;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.ac-list li.active, .ac-list li:hover { background: #ffffff14; }
+.ac-list .ac-title { font-weight: 500; }
+.ac-list .ac-artist { color: var(--muted); font-size: 13px; }
+
+/* Şarkıyı atla: "Tahmin et" ile karışmasın diye ayrı ve soluk */
+.btn.skip-song {
+  align-self: center; margin-top: 6px;
+  background: transparent; border-color: transparent;
+  color: var(--muted); font-size: 14px; padding: 8px 16px; opacity: .75;
+}
+.btn.skip-song:hover { opacity: 1; border-color: var(--line); }

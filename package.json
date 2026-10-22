@@ -1,0 +1,14 @@
+{
+  "name": "tosun-style-shazam",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Arkadaşlarla oynanan şarkı tahmin oyunu (Spotify / YouTube / Deezer linkleri)",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

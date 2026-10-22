@@ -1,0 +1,3 @@
+farklı playlistlerde aynı şarkı var ona bakıalcak.
+rpi üzerinde deploy et.
+kategorize ett.
