@@ -340,12 +340,23 @@ function renderPlayers() {
     }, '×'))));
 }
 
+// Aynı şarkı farklı kaynaklarda/albümlerde farklı ID ile gelebilir: ad + ilk sanatçı ile eşleştir.
+// Sanatçısı bilinmeyen şarkılar birleştirilmez (aynı adlı farklı şarkılar karışmasın).
+function trackKey(t) {
+  const artist = norm((t.artist ?? '').split(/,|&|\s+(?:feat\.?|ft\.?|x|ve|and|with)\s+/i)[0]);
+  const title = norm(t.title);
+  return artist && title ? `${title.replace(/ /g, '')}|${artist.replace(/ /g, '')}` : t.id;
+}
+
 function allTracks() {
   const seen = new Set();
   const out = [];
   for (const s of state.sources) {
     for (const t of s.tracks ?? []) {
-      if (!seen.has(t.id)) { seen.add(t.id); out.push(t); }
+      const key = trackKey(t);
+      if (!seen.has(t.id) && !seen.has(key)) out.push(t);
+      seen.add(t.id);
+      seen.add(key);
     }
   }
   return out;
@@ -365,8 +376,10 @@ function renderSources() {
       }, '×'));
   }));
   const total = allTracks().length;
+  const dupes = state.sources.reduce((n, s) => n + (s.tracks?.length ?? 0), 0) - total;
   const loading = state.sources.some((s) => s.loading);
-  $('track-total').textContent = total ? `Toplam ${total} şarkı.` : 'Henüz şarkı yok.';
+  $('track-total').textContent = !total ? 'Henüz şarkı yok.'
+    : `Toplam ${total} şarkı.${dupes > 0 ? ` (${dupes} tekrar eden şarkı bir kez sayıldı)` : ''}`;
   $('start-btn').disabled = !total || loading;
 }
 
