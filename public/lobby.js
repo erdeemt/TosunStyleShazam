@@ -10,17 +10,26 @@ export function mountLobby(root, game) {
   GAME_NAMES[game.id] = `${game.icon} ${game.name}`;
   let active = true;
   let joinCode = '';
+  let draftName = net.name;
 
   const render = () => {
     if (!active) return;
     const room = net.room;
-    if (room && room.game === game.id) root.replaceChildren(roomScreen(room));
-    else root.replaceChildren(entryScreen(room));
+    const screen = room && room.game === game.id ? roomScreen(room) : entryScreen(room);
+    if (net.replaced) {
+      screen.prepend(el('section', { class: 'card warn' },
+        '📱 Bu oyuna başka bir sekmeden (veya cihazdan) bağlandın; bu sekme durduruldu.',
+        el('button', { class: 'btn primary', onclick: () => net.takeover() }, 'Bu sekmede devam et')));
+    }
+    root.replaceChildren(screen);
   };
 
   // ---------- Giriş: ad + oda kur / katıl ----------
   function entryScreen(otherRoom) {
-    const nameInput = el('input', { type: 'text', maxlength: '16', placeholder: 'Takma adın', value: net.name, autocomplete: 'nickname' });
+    const nameInput = el('input', {
+      type: 'text', maxlength: '16', placeholder: 'Takma adın', value: draftName, autocomplete: 'nickname',
+      oninput: (e) => { draftName = e.target.value; },
+    });
     const codeInput = el('input', {
       type: 'text', maxlength: '4', placeholder: 'KOD', value: joinCode, class: 'code-input',
       autocapitalize: 'characters', autocomplete: 'off', inputmode: 'text',
@@ -71,6 +80,8 @@ export function mountLobby(root, game) {
       serverOffset: net.serverOffset,
       act: (action) => net.action(action),
       name: (id) => room.players.find((p) => p.id === id)?.name ?? 'Biri',
+      connected: (id) => room.players.find((p) => p.id === id)?.connected !== false,
+      hostId: room.hostId,
     };
 
     if (room.phase === 'lobby') return waitingRoom(room, ctx);
@@ -147,6 +158,7 @@ export function mountLobby(root, game) {
     net.on('room', render),
     net.on('view', render),
     net.on('status', render),
+    net.on('replaced', render),
     net.on('error', (e) => toast(e.message)),
     net.on('kicked', () => toast('Oda sahibi seni odadan çıkardı.')),
   ];
@@ -162,10 +174,21 @@ export function mountLobby(root, game) {
   };
 }
 
-// #/join/KOD linki: bağlan, katıl, odanın oyununa geç.
-export function joinFromLink(code) {
+// #/join/KOD linki: bağlan, (gerekirse onay al) katıl, odanın oyununa geç.
+export async function joinFromLink(code) {
   const clean = String(code).toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
-  net.connect();
+  await net.whenReady();
+  const current = net.room;
+  if (current?.code === clean) return location.replace(`#/multi/${current.game}`);
+  if (current && current.phase === 'playing'
+    && !confirm(`Şu an ${GAME_NAMES[current.game] ?? 'bir'} oyunundasın (oda ${current.code}). Oyundan çıkıp bu odaya katılmak istiyor musun?`)) {
+    return location.replace(`#/multi/${current.game}`);
+  }
+  if (!net.name) {
+    const name = prompt('Odaya katılmak için takma adın?')?.trim();
+    if (!name) { toast('Katılmak için bir ad gerekli.'); return location.replace('#/'); }
+    net.setName(name);
+  }
   const offRoom = net.on('room', (room) => {
     if (room?.code !== clean) return;
     offRoom(); offErr();
@@ -176,9 +199,5 @@ export function joinFromLink(code) {
     toast(e.message);
     location.replace('#/');
   });
-  if (!net.name) {
-    const name = prompt('Takma adın?')?.trim();
-    if (name) net.setName(name);
-  }
   net.send({ t: 'join', code: clean });
 }

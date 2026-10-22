@@ -83,7 +83,7 @@ function publicGame(entry, { reveal }) {
 function dailyEntry(date, identity, create) {
   const day = (daily.data[date] ??= {});
   if (!day[identity.id] && create) {
-    day[identity.id] = { name: identity.name, guesses: [], done: false, won: false, finishedAt: null };
+    day[identity.id] = { name: identity.name ?? 'Oyuncu', guesses: [], done: false, won: false, finishedAt: null };
   }
   return day[identity.id];
 }
@@ -140,7 +140,7 @@ export function guess(identity, mode, gameId, rawWord) {
   const word = checkGuess(rawWord);
   const answer = dailyAnswer(date);
   const marks = score(word, answer);
-  entry.name = identity.name;
+  entry.name = identity.name ?? 'Oyuncu';
   entry.guesses.push({ word, marks });
   entry.won = word === answer;
   entry.done = entry.won || entry.guesses.length >= MAX_GUESSES;

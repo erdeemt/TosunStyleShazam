@@ -4,7 +4,7 @@ import { $, el, countdown } from '../ui.js';
 
 let lobby = null;
 let cardVisible = false; // rol kartı varsayılan gizli (yandaki görmesin)
-let cardRound = 0;
+let cardKey = '';
 let crossed = new Set(); // casusun/köylünün elendi diye işaretlediği mekânlar (sadece bu cihazda)
 let guessOpen = false;
 
@@ -34,7 +34,8 @@ function settingsUI(settings, { editable, change, playerCount }) {
 }
 
 function roleCard(view) {
-  if (cardRound !== view.round) { cardRound = view.round; cardVisible = false; crossed = new Set(); guessOpen = false; }
+  const key = `${view.gameKey}:${view.round}`;
+  if (cardKey !== key) { cardKey = key; cardVisible = false; crossed = new Set(); guessOpen = false; }
   if (!view.me) return null;
   const toggle = () => { cardVisible = !cardVisible; lobby.rerender(); };
   if (!cardVisible) {
@@ -97,11 +98,13 @@ function playerList(view, ctx, { mode }) {
         class: `btn small ${chosen ? 'primary' : 'ghost'}`,
         disabled: view.finalVote.myVote != null,
         onclick: () => ctx.act({ type: 'finalVote', targetId: p.id }),
-      }, chosen ? '✓ Oyun' : 'Casus bu');
+      }, chosen ? '✓ Oyunu verdin' : 'Casus bu');
     }
-    return el('li', {},
+    return el('li', { class: ctx.connected(p.id) ? '' : 'offline' },
       el('span', { class: 'player-name' }, p.name),
       me ? el('span', { class: 'tag' }, 'sen') : null,
+      p.id === ctx.hostId ? el('span', { class: 'tag' }, '👑') : null,
+      ctx.connected(p.id) ? null : el('span', { class: 'tag' }, '📴 bağlantı yok'),
       p.id === view.firstAskerId && view.phase === 'play' ? el('span', { class: 'tag' }, '❓ ilk soran') : null,
       el('span', { class: 'score' }, `${p.score} puan`),
       action);
@@ -126,8 +129,10 @@ function renderGame(view, ctx) {
       view.result ? resultCard(view, ctx) : null,
       el('section', { class: 'card' },
         el('h2', {}, '🏆 Final skorları'),
-        el('ol', { class: 'final-scores' }, ranked.map((p, i) =>
-          el('li', {}, el('span', {}, `${medals[i] ?? `${i + 1}.`} ${p.name}`), el('b', {}, `${p.score} puan`))))));
+        el('ol', { class: 'final-scores' }, ranked.map((p) => {
+          const rank = ranked.findIndex((x) => x.score === p.score); // eşit puan = eşit sıra
+          return el('li', {}, el('span', {}, `${medals[rank] ?? `${rank + 1}.`} ${p.name}`), el('b', {}, `${p.score} puan`));
+        }))));
   }
 
   // ---------- Tur sonu ----------
@@ -146,14 +151,18 @@ function renderGame(view, ctx) {
     parts.push(el('section', { class: 'card center' },
       el('p', {}, '❓ İlk soruyu ', el('b', {}, name(view.firstAskerId)), ' soruyor.'),
       el('p', { class: 'hint' }, 'Sırayla birbirinize mekânla ilgili sorular sorun. Casusu bulunca suçlayın!')));
+    if (view.me?.spy && guessOpen) {
+      const grid = locationGrid(view, ctx);
+      parts.push(el('button', { class: 'btn ghost', onclick: () => { guessOpen = false; lobby.rerender(); } }, '✕ Vazgeç, tahmin etmeyeceğim'), grid);
+      requestAnimationFrame(() => grid.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+      return el('div', { class: 'stack' }, parts);
+    }
     if (view.me?.spy) {
-      parts.push(guessOpen
-        ? el('button', { class: 'btn ghost', onclick: () => { guessOpen = false; lobby.rerender(); } }, 'Vazgeç')
-        : el('button', { class: 'btn big spy-btn', onclick: () => { guessOpen = true; lobby.rerender(); } }, '📍 Mekânı tahmin et'));
+      parts.push(el('button', { class: 'btn big spy-btn', onclick: () => { guessOpen = true; lobby.rerender(); } }, '📍 Mekânı tahmin et'));
     }
     parts.push(el('section', { class: 'card' },
       el('h2', {}, '👥 Oyuncular'),
-      view.canAccuse ? null : el('p', { class: 'hint' }, 'Bu turdaki suçlama hakkını kullandın.'),
+      view.me && !view.canAccuse ? el('p', { class: 'hint' }, 'Bu turdaki suçlama hakkını kullandın.') : null,
       playerList(view, ctx, { mode: 'accuse' })));
     parts.push(locationGrid(view, ctx));
   }
@@ -164,14 +173,14 @@ function renderGame(view, ctx) {
     parts.push(el('section', { class: 'card alert center' },
       el('h2', {}, '🚨 Suçlama!'),
       el('p', {}, el('b', {}, name(acc.byId)), ', ', el('b', {}, name(acc.targetId)), ' adlı oyuncuyu casus olmakla suçluyor.'),
-      el('p', { class: 'hint' }, `Saat durdu. Herkes "Evet" derse ${name(acc.targetId)} açıklanır. Tek bir "Hayır" yeterli. (${acc.votedCount}/${acc.voterCount} oy)`),
+      el('p', { class: 'hint' }, `Tur saati durdu; üstteki sayaç oylama süresi. Herkes "Evet" derse ${name(acc.targetId)} açıklanır, tek bir "Hayır" suçlamayı düşürür. Oy vermeyen "Hayır" sayılır. (${acc.votedCount}/${acc.voterCount} oy)`),
       amTarget
         ? el('p', {}, '😰 Suçlanan sensin. Kendini savun!')
         : acc.myVote == null && view.me
           ? el('div', { class: 'row center' },
             el('button', { class: 'btn primary', onclick: () => ctx.act({ type: 'vote', yes: true }) }, '👍 Evet, casus'),
             el('button', { class: 'btn ghost', onclick: () => ctx.act({ type: 'vote', yes: false }) }, '👎 Hayır'))
-          : el('p', {}, acc.myVote ? 'Oyun: Evet' : acc.myVote === false ? 'Oyun: Hayır' : '')));
+          : el('p', {}, acc.myVote ? 'Verdiğin oy: 👍 Evet' : acc.myVote === false ? 'Verdiğin oy: 👎 Hayır' : '')));
   }
 
   if (view.phase === 'final') {
@@ -196,6 +205,8 @@ function resultCard(view, ctx) {
     el('p', {}, `${res.spyIds.length > 1 ? 'Casuslar' : 'Casus'}: `, el('b', {}, spies)),
     el('p', {}, 'Mekân: ', el('b', {}, `${res.location.emoji} ${res.location.name}`)),
     res.guess ? el('p', { class: 'hint' }, `Casusun tahmini: ${res.guess.emoji} ${res.guess.name}`) : null,
+    res.accuserId ? el('p', { class: 'hint' }, `${ctx.name(res.accuserId)}, ${ctx.name(res.accusedId)} adlı oyuncuyu suçladı.`) : null,
+    Object.keys(res.finalVotes ?? {}).length ? el('p', { class: 'hint' }, 'Oylar: ' + Object.entries(res.finalVotes).map(([v, t]) => `${ctx.name(v)} → ${ctx.name(t)}`).join(', ')) : null,
     el('ul', { class: 'player-list roles' }, view.players.map((p) =>
       el('li', {},
         el('span', { class: 'player-name' }, p.name),

@@ -21,9 +21,12 @@ class Net {
     this.queue = [];
     this.retry = 0;
     this.stopped = false;
+    this.replaced = false; // aynı kimlik başka sekmede açıldı; kullanıcı onaylamadan geri bağlanma
+    this.gotRoom = false; // bağlandıktan sonra ilk oda bilgisi geldi mi
   }
 
-  get name() { return this.identity.name ?? ''; }
+  // Eski sürümler ad seçilmeden "Oyuncu" kaydediyordu; onu seçilmemiş say.
+  get name() { const n = this.identity.name ?? ''; return n === 'Oyuncu' ? '' : n; }
   get playerId() { return this.identity.playerId ?? null; }
 
   on(type, fn) {
@@ -38,6 +41,7 @@ class Net {
   }
 
   connect() {
+    if (this.replaced) return;
     if (this.ws && this.ws.readyState <= 1) return;
     this.stopped = false;
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -52,7 +56,7 @@ class Net {
       if (this.ws !== ws) return;
       this.connected = false;
       this.emit('status', { connected: false });
-      if (e.code === 4000) { this.stopped = true; return; } // başka sekmeden bağlanıldı
+      if (e.code === 4000) { this.stopped = true; this.replaced = true; this.emit('replaced'); return; } // başka sekmeden bağlanıldı
       if (this.stopped) return;
       const delay = Math.min(8000, 500 * 2 ** this.retry++);
       setTimeout(() => this.connect(), delay);
@@ -71,6 +75,7 @@ class Net {
       }
       case 'room':
         this.room = msg.room;
+        this.gotRoom = true;
         if (!msg.room || msg.room.phase === 'lobby') this.view = null;
         this.emit('room', msg.room);
         break;
@@ -102,6 +107,19 @@ class Net {
     this.identity.name = name;
     saveIdentity(this.identity);
     if (this.connected) this.send({ t: 'rename', name });
+  }
+
+  // "Bu sekmede devam et": diğer sekmeyi düşürüp burada bağlan.
+  takeover() {
+    this.replaced = false;
+    this.connect();
+  }
+
+  // İlk oda bilgisi gelene kadar bekle (davet linki kararları için).
+  whenReady() {
+    if (this.gotRoom && this.connected) return Promise.resolve();
+    this.connect();
+    return new Promise((resolve) => { const off = this.on('room', () => { off(); resolve(); }); });
   }
 
   action(action) {

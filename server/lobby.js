@@ -5,6 +5,7 @@ import { WebSocketServer } from 'ws';
 import { createRng } from './rng.js';
 import { GameError } from './errors.js';
 import { jsonStore } from './store.js';
+import { IP_LIMITS, clientIp, identityLimiter } from './limits.js';
 import { GAMES } from './games/index.js';
 
 const TIME_SCALE = Number(process.env.TIME_SCALE) > 0 ? Number(process.env.TIME_SCALE) : 1;
@@ -20,7 +21,10 @@ export const LIMITS = {
   maxIdentities: 5000,
   nameMaxLength: 16,
   seatHoldMs: 120_000, // bağlantısı kopan oyuncunun yeri bu kadar korunur
+  hostHandoffMs: 15_000, // host bu kadar kopuk kalırsa oda sahipliği bağlı birine geçer
   emptyRoomMs: 600_000, // herkes kopmuşsa oda bu süre sonra silinir
+  idleRoomMs: Number(process.env.ROOM_IDLE_MS) || 2 * 3600_000, // 2 saat hiç mesaj yoksa oda silinir
+  hellosPerSocket: 3, // tek bağlantıdan sınırsız kimlik üretilmesin
 };
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPRSTUVYZ';
@@ -165,11 +169,13 @@ function runTick(room, token) {
 
 // ---------- Oda işlemleri ----------
 
-function createRoom(identity, gameId) {
-  const game = GAMES[gameId];
+function createRoom(identity, gameId, ip) {
+  const game = Object.hasOwn(GAMES, gameId) ? GAMES[gameId] : null;
   if (!game) throw new GameError('Böyle bir oyun yok.');
-  if (rooms.size >= LIMITS.maxRooms) throw new GameError('Sunucu dolu, biraz sonra tekrar dene.');
   leaveRoom(identity, 'switch');
+  if (rooms.size >= LIMITS.maxRooms) throw new GameError('Sunucu dolu, biraz sonra tekrar dene.');
+  const fromIp = [...rooms.values()].filter((r) => r.creatorIp === ip).length;
+  if (fromIp >= IP_LIMITS.roomsPerIp) throw new GameError('Bu ağdan çok fazla oda açık. Eski odaları kapatın.');
   const code = newCode();
   roomCounter++;
   const room = {
@@ -177,6 +183,8 @@ function createRoom(identity, gameId) {
     gameId,
     game,
     hostId: identity.id,
+    creatorIp: ip,
+    lastActivity: Date.now(),
     phase: 'lobby',
     players: new Map(),
     settings: game.validateSettings({ ...game.defaultSettings }),
@@ -195,7 +203,7 @@ function createRoom(identity, gameId) {
 function addPlayer(room, identity, { spectator = false } = {}) {
   room.players.set(identity.id, {
     id: identity.id,
-    name: uniqueName(room, identity.name, identity.id),
+    name: uniqueName(room, identity.name ?? 'Oyuncu', identity.id),
     connected: true,
     joinedAt: Date.now() + room.players.size, // aynı ms'de katılanlar için sıra
     spectator,
@@ -254,6 +262,7 @@ function removePlayer(room, playerId, reason) {
 
 function deleteRoom(room) {
   clearTimeout(room.timer);
+  clearTimeout(room.hostTimer);
   clearTimeout(room.emptyTimer);
   for (const p of room.players.values()) clearTimeout(p.leaveTimer);
   rooms.delete(room.code);
@@ -272,6 +281,14 @@ function onDisconnect(identity) {
   if (!p) return;
   p.connected = false;
   p.leaveTimer = setTimeout(() => removePlayer(room, identity.id, 'timeout'), scaled(LIMITS.seatHoldMs));
+  if (room.hostId === identity.id) {
+    clearTimeout(room.hostTimer);
+    room.hostTimer = setTimeout(() => {
+      if (!rooms.has(room.code) || room.hostId !== identity.id || room.players.get(identity.id)?.connected) return;
+      const next = [...room.players.values()].filter((x) => x.connected).sort((a, b) => a.joinedAt - b.joinedAt)[0];
+      if (next) { room.hostId = next.id; broadcast(room); }
+    }, scaled(LIMITS.hostHandoffMs));
+  }
   if (![...room.players.values()].some((x) => x.connected)) {
     clearTimeout(room.emptyTimer);
     room.emptyTimer = setTimeout(() => deleteRoom(room), scaled(LIMITS.emptyRoomMs));
@@ -292,8 +309,8 @@ function requireHost(room, identity) {
 }
 
 const handlers = {
-  create(identity, msg) {
-    const room = createRoom(identity, String(msg.game ?? ''));
+  create(identity, msg, socket) {
+    const room = createRoom(identity, String(msg.game ?? ''), socket.ip);
     broadcast(room);
   },
   join(identity, msg) {
@@ -367,14 +384,15 @@ const handlers = {
 };
 
 // playerId + token doğruysa mevcut kimlik, değilse yeni kimlik. HTTP uçları (günlük bulmacalar) da bunu kullanır.
-export function resolveIdentity({ playerId, token, name } = {}) {
+export function resolveIdentity({ playerId, token, name } = {}, ip = null) {
   let identity = playerId && identities.get(String(playerId));
   if (!identity || typeof token !== 'string' || identity.token !== token) {
+    if (ip && !identityLimiter.hit(ip)) throw new GameError('Bu ağdan çok fazla yeni oyuncu oluşturuldu. Biraz sonra tekrar dene.');
     if (identities.size >= LIMITS.maxIdentities) pruneIdentities();
-    identity = { id: randomUUID(), token: randomBytes(16).toString('hex'), name: 'Oyuncu', socket: null, roomCode: null, lastSeen: Date.now() };
+    identity = { id: randomUUID(), token: randomBytes(16).toString('hex'), name: null, socket: null, roomCode: null, lastSeen: Date.now() };
     identities.set(identity.id, identity);
   }
-  if (name != null) identity.name = sanitizeName(name);
+  if (name != null && String(name).trim()) identity.name = sanitizeName(name);
   identity.lastSeen = Date.now();
   persistIdentity(identity);
   return identity;
@@ -387,7 +405,20 @@ export function verifyIdentity(playerId, token) {
 }
 
 function handleHello(socket, msg) {
-  const identity = resolveIdentity(msg);
+  socket.hellos = (socket.hellos ?? 0) + 1;
+  if (socket.hellos > LIMITS.hellosPerSocket) return socket.close(1008, 'too many hellos');
+  let identity;
+  try {
+    identity = resolveIdentity(msg, socket.ip);
+  } catch (err) {
+    if (err instanceof GameError) return sendError(socket, 'identity', err.message);
+    throw err;
+  }
+  // Aynı bağlantıda kimlik değişirse eski kimliğin bağlantısı kopmuş sayılır.
+  if (socket.identity && socket.identity !== identity && socket.identity.socket === socket) {
+    socket.identity.socket = null;
+    onDisconnect(socket.identity);
+  }
   // Aynı kimlikle ikinci sekme açılırsa eskisi kapanır.
   if (identity.socket && identity.socket !== socket) {
     send(identity.socket, { t: 'error', code: 'replaced', message: 'Başka bir sekmeden bağlandın.' });
@@ -442,6 +473,8 @@ function handleMessage(socket, raw) {
   const handler = Object.hasOwn(handlers, msg.t) ? handlers[msg.t] : null;
   if (!handler) return sendError(socket, 'unknown', 'Bilinmeyen mesaj.');
   identity.lastSeen = now;
+  const activeRoom = identity.roomCode && rooms.get(identity.roomCode);
+  if (activeRoom) activeRoom.lastActivity = now;
   try {
     handler(identity, msg, socket);
   } catch (err) {
@@ -458,8 +491,19 @@ function handleMessage(socket, raw) {
 export function attachLobby(server) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: LIMITS.maxMessageBytes });
 
+  const socketsByIp = new Map();
   server.on('upgrade', (req, socket, head) => {
-    const url = new URL(req.url, 'http://x');
+    let url;
+    try { url = new URL(req.url, 'http://x'); } catch { url = null; }
+    if (!url) {
+      socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+      return socket.destroy();
+    }
+    const ip = clientIp(req);
+    if ((socketsByIp.get(ip) ?? 0) >= IP_LIMITS.socketsPerIp) {
+      socket.write('HTTP/1.1 429 Too Many Requests\r\n\r\n');
+      return socket.destroy();
+    }
     // Başka sitelerden gelen WebSocket bağlantılarını reddet (Origin varsa Host ile aynı olmalı).
     const origin = req.headers.origin;
     let sameOrigin = true;
@@ -470,10 +514,11 @@ export function attachLobby(server) {
       socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
       return socket.destroy();
     }
-    wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
+    wss.handleUpgrade(req, socket, head, (ws) => { ws.ip = ip; wss.emit('connection', ws, req); });
   });
 
   wss.on('connection', (socket) => {
+    socketsByIp.set(socket.ip, (socketsByIp.get(socket.ip) ?? 0) + 1);
     socket.rate = { start: Date.now(), count: 0, warned: false };
     socket.isAlive = true;
     socket.on('pong', () => { socket.isAlive = true; });
@@ -482,6 +527,8 @@ export function attachLobby(server) {
       handleMessage(socket, data.toString());
     });
     socket.on('close', () => {
+      const n = (socketsByIp.get(socket.ip) ?? 1) - 1;
+      if (n > 0) socketsByIp.set(socket.ip, n); else socketsByIp.delete(socket.ip);
       const identity = socket.identity;
       if (identity && identity.socket === socket) {
         identity.socket = null;
@@ -498,6 +545,16 @@ export function attachLobby(server) {
       if (!socket.isAlive) { socket.terminate(); continue; }
       socket.isAlive = false;
       socket.ping();
+    }
+    const idleCutoff = Date.now() - LIMITS.idleRoomMs;
+    for (const room of rooms.values()) {
+      if (room.lastActivity < idleCutoff) {
+        for (const p of room.players.values()) {
+          const ident = identities.get(p.id);
+          if (ident?.roomCode === room.code) { ident.roomCode = null; send(ident.socket, { t: 'room', room: null }); }
+        }
+        deleteRoom(room);
+      }
     }
   }, 15_000);
   wss.on('close', () => clearInterval(heartbeat));

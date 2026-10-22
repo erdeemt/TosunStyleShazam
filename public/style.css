@@ -441,3 +441,9 @@ body { display: flex; }
 .w-mini { grid-column: 2 / 4; white-space: pre; font-size: 11px; line-height: 1.15; letter-spacing: -1px; }
 .howto-box summary { cursor: pointer; font-weight: 700; }
 .howto-box .howto { margin-top: 10px; }
+
+/* Dokunma hedefleri ≥ 44 px (QA) */
+.btn.small { min-height: 44px; }
+.icon-btn { width: 44px; height: 44px; }
+select, input { min-height: 44px; }
+.btn.link { min-height: 44px; }

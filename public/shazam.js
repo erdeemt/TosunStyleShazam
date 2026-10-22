@@ -395,8 +395,8 @@ async function loadSource(source) {
       const ids = await yt.playlistIds(res.youtubePlaylist);
       source.name = res.name ?? 'YouTube playlist';
       source.tracks = [];
-      for (let i = 0; i < ids.length; i += 100) {
-        const { tracks } = await api(`/api/yt-meta?ids=${ids.slice(i, i + 100).join(',')}`);
+      for (let i = 0; i < ids.length; i += 50) {
+        const { tracks } = await api(`/api/yt-meta?ids=${ids.slice(i, i + 50).join(',')}`);
         source.tracks.push(...tracks);
         renderSources();
       }

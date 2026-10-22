@@ -1,5 +1,4 @@
-// Tosun Style Shazam — küçük, bağımlılıksız sunucu.
-// Statik dosyaları sunar + Spotify/Deezer/YouTube linklerini şarkı listesine çevirir.
+// Tosun Style sunucusu: statik dosyalar, müzik linki çözümleme (Shazam), günlük bulmacalar ve WebSocket lobi.
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
@@ -7,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { attachLobby, resolveIdentity, verifyIdentity } from './server/lobby.js';
 import * as wordle from './server/wordle.js';
 import { GameError } from './server/errors.js';
+import { clientIp, httpLimiter, upstreamLimiter } from './server/limits.js';
 
 const PORT = process.env.PORT != null && process.env.PORT !== '' ? Number(process.env.PORT) : 3000;
 const PUBLIC_DIR = join(fileURLToPath(new URL('.', import.meta.url)), 'public');
@@ -25,12 +25,12 @@ const MIME = {
 
 async function spotifyEmbed(type, id) {
   const res = await fetch(`https://open.spotify.com/embed/${type}/${id}`, { headers: { 'User-Agent': UA } });
-  if (!res.ok) throw new Error(`Spotify ${res.status}`);
+  if (!res.ok) throw new GameError(res.status === 404 ? "Spotify'da bulunamadı (gizli olabilir)." : 'Spotify şu an yanıt vermiyor.');
   const html = await res.text();
   const m = html.match(/<script id="__NEXT_DATA__"[^>]*>(.*?)<\/script>/s);
-  if (!m) throw new Error('Spotify sayfası okunamadı');
+  if (!m) throw new GameError('Spotify sayfası okunamadı.');
   const entity = JSON.parse(m[1])?.props?.pageProps?.state?.data?.entity;
-  if (!entity) throw new Error('Spotify içeriği bulunamadı');
+  if (!entity) throw new GameError('Spotify içeriği bulunamadı.');
   return entity;
 }
 
@@ -85,7 +85,7 @@ const deezerTrack = (t) => ({
 async function deezer(path) {
   const res = await fetch(`https://api.deezer.com/${path}`);
   const j = await res.json();
-  if (j.error) throw new Error(`Deezer: ${j.error.message ?? 'hata'}`);
+  if (j.error) throw new GameError("Deezer'da bulunamadı.");
   return j;
 }
 
@@ -136,7 +136,19 @@ function parseYoutubeTitle(rawTitle, author) {
   return { artist: channel, title: cleaned, alt: [cleaned] };
 }
 
+const ytCache = new Map(); // videoId -> meta | null
+const YT_CACHE_MAX = 5000;
+
 async function youtubeMeta(videoId) {
+  if (!/^[w-]{6,20}$/.test(videoId)) return null;
+  if (ytCache.has(videoId)) return ytCache.get(videoId);
+  const meta = await youtubeMetaUncached(videoId);
+  if (ytCache.size >= YT_CACHE_MAX) ytCache.delete(ytCache.keys().next().value);
+  ytCache.set(videoId, meta);
+  return meta;
+}
+
+async function youtubeMetaUncached(videoId) {
   const url = `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}`;
   const res = await fetch(url, { headers: { 'User-Agent': UA } });
   if (!res.ok) return null; // gizli / silinmiş / gömülemez
@@ -201,7 +213,7 @@ function parseLink(raw) {
 
 async function resolve(rawUrl) {
   const link = parseLink(rawUrl);
-  if (!link) throw new Error('Tanınmayan link. Spotify, YouTube veya Deezer linki gir.');
+  if (!link) throw new GameError('Tanınmayan link. Spotify, YouTube veya Deezer linki gir.');
   if (link.src === 'spotify') return resolveSpotify(link.type, link.id);
   if (link.src === 'deezer') return resolveDeezer(link.type, link.id);
   if (link.type === 'playlist') {
@@ -212,7 +224,7 @@ async function resolve(rawUrl) {
     return { youtubePlaylist: link.id, name };
   }
   const t = await youtubeMeta(link.id);
-  if (!t) throw new Error('YouTube videosu bulunamadı (gizli veya silinmiş olabilir).');
+  if (!t) throw new GameError('YouTube videosu bulunamadı (gizli veya silinmiş olabilir).');
   return { name: t.rawTitle, tracks: [t] };
 }
 
@@ -260,13 +272,20 @@ function requireIdentity(body) {
   return identity;
 }
 
+const UPSTREAM_PATHS = new Set(['/api/resolve', '/api/yt-meta', '/api/deezer-search', '/api/spotify-cover']);
+
 async function handleApi(url, res, req) {
   const q = url.searchParams;
+  const ip = clientIp(req);
+  if (!httpLimiter.hit(ip)) return sendJson(res, 429, { error: 'Çok fazla istek, biraz yavaşla.' });
+  if (UPSTREAM_PATHS.has(url.pathname) && !upstreamLimiter.hit(ip)) {
+    return sendJson(res, 429, { error: 'Çok fazla link isteği, bir dakika sonra tekrar dene.' });
+  }
   switch (url.pathname) {
     // ---------- Kimlik + günlük bulmacalar ----------
     case '/api/identity': {
       const body = await readJson(req);
-      const identity = resolveIdentity({ playerId: body.playerId, token: body.token, name: body.name });
+      const identity = resolveIdentity({ playerId: body.playerId, token: body.token, name: body.name }, ip);
       return sendJson(res, 200, { playerId: identity.id, token: identity.token, name: identity.name });
     }
     case '/api/wordle/start': {
@@ -286,14 +305,16 @@ async function handleApi(url, res, req) {
     case '/api/resolve':
       return sendJson(res, 200, await resolve(q.get('url') ?? ''));
     case '/api/yt-meta': {
-      const ids = (q.get('ids') ?? '').split(',').filter(Boolean).slice(0, 300);
+      const ids = (q.get('ids') ?? '').split(',').filter(Boolean).slice(0, 50);
       const tracks = (await mapLimit(ids, 8, youtubeMeta)).filter(Boolean);
       return sendJson(res, 200, { tracks });
     }
     case '/api/deezer-search':
       return sendJson(res, 200, { track: await deezerSearch(q.get('q') ?? '') });
     case '/api/spotify-cover': {
-      const e = await spotifyEmbed('track', q.get('id') ?? '');
+      const id = q.get('id') ?? '';
+      if (!/^[A-Za-z0-9]{10,30}$/.test(id)) throw new GameError('Geçersiz şarkı.');
+      const e = await spotifyEmbed('track', id);
       return sendJson(res, 200, { cover: pickImage(e.visualIdentity) });
     }
     default:
@@ -314,19 +335,52 @@ async function serveStatic(pathname, res) {
   }
 }
 
+// YouTube iframe API, Google Fonts, müzik kapakları/önizlemeleri (https) dışında dış kaynak yok.
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' https://www.youtube.com https://s.ytimg.com",
+  'frame-src https://www.youtube.com https://www.youtube-nocookie.com',
+  "img-src 'self' data: https:",
+  "media-src 'self' https:",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  'font-src https://fonts.gstatic.com',
+  "connect-src 'self'",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join('; ');
+
 const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host}`);
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin'); // YouTube gömme için referrer gerekli
+  let url;
+  try {
+    url = new URL(req.url, 'http://localhost'); // Host başlığına güvenme
+  } catch {
+    res.writeHead(400);
+    return res.end();
+  }
+  if (!url.pathname.startsWith('/api/')) res.setHeader('Content-Security-Policy', CSP);
   try {
     if (url.pathname.startsWith('/api/')) await handleApi(url, res, req);
     else await serveStatic(url.pathname, res);
   } catch (err) {
-    if (!res.headersSent) sendJson(res, 400, { error: err instanceof GameError ? err.message : err.message ?? String(err) });
+    if (!(err instanceof GameError)) console.error(`${req.method} ${url.pathname} hatası:`, err);
+    if (!res.headersSent) sendJson(res, 400, { error: err instanceof GameError ? err.message : 'İstek işlenemedi, tekrar dene.' });
   }
 });
 
+// Yavaş istemcilerle bağlantı tüketilmesin.
+server.headersTimeout = 10_000;
+server.requestTimeout = 15_000;
+server.keepAliveTimeout = 5_000;
+
 attachLobby(server);
+
+// Beklenmeyen bir hata tek bir isteği düşürsün, tüm sunucuyu değil.
+process.on('uncaughtException', (err) => console.error('Yakalanmamış hata:', err));
+process.on('unhandledRejection', (err) => console.error('Yakalanmamış söz (promise):', err));
 
 // PORT=0 → işletim sistemi boş bir port seçer (testler bunu kullanır, gerçek portu stdout'tan okur).
 server.listen(PORT, '0.0.0.0', () => {

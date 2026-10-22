@@ -8,7 +8,9 @@ const LOCATION_LIST = LOCATIONS.map(({ id, name, emoji }) => ({ id, name, emoji 
 
 const ACCUSE_VOTE_MS = 45_000; // suçlama oylaması süresi
 const FINAL_VOTE_MS = 60_000; // süre bitince zorunlu oylama
-const POINTS = { spyWin: 2, spyGuess: 4, townWin: 1, accuserBonus: 1 };
+// Spyfall standardı: casus süre dolup kimse mahkûm edilmezse 2, masum mahkûm edilirse veya mekânı bilirse 4.
+const POINTS = { spyWin: 2, spyBig: 4, townWin: 1, accuserBonus: 1 };
+const SPY_BIG_REASONS = new Set(['guess', 'wrong_accuse', 'final_wrong']);
 
 const active = (state) => state.players.filter((p) => !p.left);
 const isSpy = (state, id) => state.round.spyIds.includes(id);
@@ -51,7 +53,7 @@ function finishRound(state, ctx, { winner, reason, accuserId = null, accusedId =
   for (const p of active(state)) {
     const spy = r.spyIds.includes(p.id);
     let pts = 0;
-    if (winner === 'spy' && spy) pts = reason === 'guess' ? POINTS.spyGuess : POINTS.spyWin;
+    if (winner === 'spy' && spy) pts = SPY_BIG_REASONS.has(reason) ? POINTS.spyBig : POINTS.spyWin;
     if (winner === 'town' && !spy) pts = POINTS.townWin + (p.id === accuserId ? POINTS.accuserBonus : 0);
     points[p.id] = pts;
     p.score += pts;
@@ -135,6 +137,7 @@ export default {
     const state = {
       settings,
       players: players.map((p) => ({ id: p.id, name: p.name, score: 0, left: false })),
+      gameKey: ctx.rng.int(1e9), // istemci yeni oyunu ayırt etsin (kart yeniden gizlensin)
       usedLocations: [],
       round: null,
       over: false,
@@ -250,6 +253,7 @@ export default {
     const location = LOCATIONS.find((l) => l.id === r.locationId);
 
     const view = {
+      gameKey: state.gameKey,
       round: r.number,
       totalRounds: state.settings.rounds,
       phase: r.phase,

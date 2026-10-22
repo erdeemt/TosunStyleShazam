@@ -5,6 +5,9 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+// Botlar aynı IP'den bağlandığı için IP sınırları testlerde gevşek; güvenlik testleri env ile sıkılaştırır.
+const LOOSE_LIMITS = { LIMIT_HTTP_PER_MIN: '100000', LIMIT_UPSTREAM_PER_MIN: '100000', LIMIT_IDENTITIES_PER_HOUR: '100000', LIMIT_SOCKETS_PER_IP: '100000', LIMIT_ROOMS_PER_IP: '100000' };
+
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 
 export async function startServer({ timeScale = 0.02, seed = 1, env = {}, dataDir } = {}) {
@@ -12,7 +15,7 @@ export async function startServer({ timeScale = 0.02, seed = 1, env = {}, dataDi
   const dir = dataDir ?? mkdtempSync(join(tmpdir(), 'tss-data-'));
   const child = spawn(process.execPath, ['server.js'], {
     cwd: ROOT,
-    env: { ...process.env, PORT: '0', TIME_SCALE: String(timeScale), SEED: String(seed), TEST_GAMES: '1', DATA_DIR: dir, ...env },
+    env: { ...process.env, PORT: '0', TIME_SCALE: String(timeScale), SEED: String(seed), TEST_GAMES: '1', DATA_DIR: dir, ...LOOSE_LIMITS, ...env },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let log = '';

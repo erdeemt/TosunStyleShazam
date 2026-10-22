@@ -158,7 +158,9 @@ Mobil öncelikli tasarım: 360 px genişlikte kusursuz çalışmalı, butonlar �
   - Herhangi bir oyuncu turda bir kez birini suçlayabilir → herkes Evet/Hayır oylar (suçlanan hariç). Oybirliği Evet ise suçlanan açıklanır.
   - Süre dolarsa zorunlu oylama: herkes bir şüpheli seçer, en çok oy alan açıklanır (eşitlikte casus kazanır).
   - Casus istediği an "Mekânı tahmin et" der → doğruysa casus kazanır, yanlışsa kaybeder.
-- Puan (Spyfall standardı): casus kazanırsa 2–4, köylüler kazanırsa her biri 1 (+1 doğru suçlamayı başlatan).
+- Puan (Spyfall standardı): casus süre dolup kimse mahkûm edilmezse (eşitlik/oy yok) 2; masum biri mahkûm edilirse veya mekânı doğru tahmin ederse 4. Köylüler kazanırsa her biri 1, casusu yakalayan suçlamayı başlatan +1.
+- 2 casuslu oyunda casuslar birbirini bilmez; casuslardan biri yakalanınca tur köylülerin olur ve iki casus da açıklanır.
+- Rol kartı her yeni turda ve yeni oyunda gizli başlar (dokununca açılır).
 - Kabul: mekân/rol bilgisi casusun görünümünde **hiçbir alanda** yok; casusun kimliği diğerlerinin görünümünde yok (sonuç açıklanana kadar).
 
 ### 4.2 🟩 Wordle TR (P1)
