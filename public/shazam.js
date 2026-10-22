@@ -317,7 +317,8 @@ const media = {
 
 const state = {
   players: store.load('players', []),
-  mode: 'contest', // 'contest' | 'free'
+  category: 'single', // 'single' | 'multi' — menüden gelir
+  mode: 'free', // single: 'free' | 'solo', multi: 'contest' (| 'online' ileride)
   sources: [], // { url, src, name, tracks, loading, error }
   game: null,
 };
@@ -447,7 +448,7 @@ function restoreSettings() {
 // ======================================================================
 
 function show(screen) {
-  for (const s of document.querySelectorAll('.screen')) s.classList.toggle('active', s.id === `screen-${screen}`);
+  for (const s of document.querySelectorAll('#game-shazam .screen')) s.classList.toggle('active', s.id === `screen-${screen}`);
   window.scrollTo(0, 0);
 }
 
@@ -455,10 +456,12 @@ function startGame() {
   const settings = readSettings();
   const tracks = allTracks();
   const mode = state.mode;
-  const names = mode === 'free' ? [] : state.players.length ? state.players : ['Oyuncu'];
+  const names = mode === 'free' ? []
+    : mode === 'solo' ? ['Sen']
+    : state.players.length ? state.players : ['Oyuncu'];
   const n = names.length;
   let total = Infinity; // serbest mod bitmez
-  if (mode === 'contest') {
+  if (mode !== 'free') {
     total = Math.min(settings.perPlayer * n, tracks.length);
     if (total >= n) total -= total % n; // herkes eşit sayıda şarkı alsın
   }
@@ -473,17 +476,66 @@ function startGame() {
     current: null,
   };
   buildSuggestionPool(tracks);
-  $('quit-btn').textContent = mode === 'free' ? 'Ana menü' : 'Oyunu bitir';
+  $('quit-btn').textContent = mode === 'free' ? 'Ayarlara dön' : 'Oyunu bitir';
   show('game');
   nextRound();
 }
 
+// ---------- Kategoriye göre modlar (menüden: Tek Oyunculu / Çok Oyunculu) ----------
+
+const MODES = {
+  single: [
+    { id: 'free', icon: '🎧', name: 'Serbest', desc: 'Puan yok — dinle, tahmin et, geç', start: 'Serbest dinlemeye başla' },
+    { id: 'solo', icon: '🎯', name: 'Puanlı', desc: 'Tek kişilik skor, ne kadar erken o kadar puan', start: 'Oyunu başlat' },
+  ],
+  multi: [
+    { id: 'contest', icon: '🏆', name: 'Yarışma', desc: 'Tek ekran, sırayla tahmin, skor tablosu', start: 'Yarışmayı başlat' },
+    { id: 'online', icon: '🌐', name: 'Online', desc: 'Herkes kendi telefonundan — yakında', disabled: true },
+  ],
+};
+
 function setMode(mode) {
+  const info = MODES[state.category].find((m) => m.id === mode);
+  if (!info || info.disabled) return;
   state.mode = mode;
-  store.save('mode', mode);
+  store.save(`mode:${state.category}`, mode);
   document.body.dataset.mode = mode;
   for (const card of document.querySelectorAll('.mode-card')) card.classList.toggle('selected', card.dataset.mode === mode);
-  $('start-btn').textContent = mode === 'free' ? 'Serbest dinlemeye başla' : 'Yarışmayı başlat';
+  $('start-btn').textContent = info.start;
+  $('per-player-label').textContent = mode === 'solo' ? 'Şarkı sayısı' : 'Kişi başı şarkı';
+}
+
+function renderModes() {
+  $('mode-pick').replaceChildren(...MODES[state.category].map((m) =>
+    el('button', {
+      type: 'button',
+      class: `mode-card${m.disabled ? ' disabled' : ''}`,
+      'data-mode': m.id,
+      ...(m.disabled ? { disabled: '' } : {}),
+      onclick: () => setMode(m.id),
+    }, el('span', { class: 'mode-icon' }, m.icon), el('b', {}, m.name), el('small', {}, m.desc))));
+}
+
+function stopGame() {
+  media.stop();
+  hideReveal();
+  state.game = null;
+}
+
+// Kabuk (shell.js) bu oyunu bir kategoriden açınca çağırır.
+export function enter(category) {
+  stopGame();
+  state.category = MODES[category] ? category : 'single';
+  renderModes();
+  const saved = store.load(`mode:${state.category}`, null);
+  const fallback = MODES[state.category].find((m) => !m.disabled).id;
+  setMode(MODES[state.category].some((m) => m.id === saved && !m.disabled) ? saved : fallback);
+  show('setup');
+}
+
+// Başka bir sayfaya geçince sesi kes, oyunu kapat.
+export function leave() {
+  stopGame();
 }
 
 // ---------- Serbest mod ----------
@@ -741,7 +793,8 @@ function renderResult() {
     msg.textContent = r.won ? '🎉 Bildin!' : '';
     return;
   }
-  msg.textContent = r.won ? `🎉 ${currentPlayer().name} +${r.points} puan!` : '😬 Bilemedin';
+  const who = state.game.mode === 'solo' ? '' : `${currentPlayer().name} `;
+  msg.textContent = r.won ? `🎉 ${who}+${r.points} puan!` : '😬 Bilemedin';
 }
 
 function showReveal() {
@@ -925,9 +978,6 @@ $('quit-btn').addEventListener('click', () => {
 });
 $('free-reveal-btn').addEventListener('click', revealFree);
 $('free-next-btn').addEventListener('click', () => { state.game.round++; nextRound(); });
-for (const card of document.querySelectorAll('.mode-card')) {
-  card.addEventListener('click', () => setMode(card.dataset.mode));
-}
 $('again-btn').addEventListener('click', startGame);
 $('menu-btn').addEventListener('click', () => show('setup'));
 window.addEventListener('resize', placeYoutube);
@@ -939,7 +989,6 @@ window.addEventListener('resize', placeYoutube);
 if (new URLSearchParams(location.search).has('debug')) Object.assign(window, { tss: { state, media, yt } });
 
 yt.init();
-setMode(store.load('mode', 'contest') === 'free' ? 'free' : 'contest');
 restoreSettings();
 renderPlayers();
 renderSources();
