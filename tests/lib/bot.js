@@ -15,18 +15,27 @@ export class Bot {
     this.errors = [];
     this.waiters = [];
     this.closed = null;
+    this.taps = []; // her gelen mesajda çağrılır: (msg, bot) => void (değişmez/invariant kontrolleri için)
+    this.connections = 0; // kaçıncı bağlantı; yeniden bağlanınca artar
+  }
+
+  get isOpen() {
+    return this.ws?.readyState === 1;
   }
 
   async connect({ origin } = {}) {
-    this.ws = new WebSocket(this.wsUrl, origin ? { headers: { Origin: origin } } : undefined);
+    const ws = new WebSocket(this.wsUrl, origin ? { headers: { Origin: origin } } : undefined);
+    this.ws = ws;
     this.closed = null;
-    this.ws.on('message', (data) => this.#onMessage(JSON.parse(String(data))));
-    this.ws.on('close', (code, reason) => { this.closed = { code, reason: String(reason) }; this.#check(); });
-    this.ws.on('error', () => {});
+    this.connections++;
+    // Eski (kopmuş) soketten geç gelen mesaj/kapanış yeni bağlantının durumunu bozmasın.
+    ws.on('message', (data) => { if (this.ws === ws) this.#onMessage(JSON.parse(String(data))); });
+    ws.on('close', (code, reason) => { if (this.ws !== ws) return; this.closed = { code, reason: String(reason) }; this.#check(); });
+    ws.on('error', () => {});
     await new Promise((resolve, reject) => {
-      this.ws.once('open', resolve);
-      this.ws.once('error', reject);
-      this.ws.once('unexpected-response', (_req, res) => reject(new Error(`HTTP ${res.statusCode}`)));
+      ws.once('open', resolve);
+      ws.once('error', reject);
+      ws.once('unexpected-response', (_req, res) => reject(new Error(`HTTP ${res.statusCode}`)));
     });
     this.sendRaw({ t: 'hello', playerId: this.playerId, token: this.token, name: this.name });
     const welcome = await this.waitFor((m) => m.t === 'welcome');
@@ -42,6 +51,7 @@ export class Bot {
     if (msg.t === 'room') this.room = msg.room;
     if (msg.t === 'view') this.view = msg.view;
     if (msg.t === 'error') this.errors.push(msg);
+    for (const tap of this.taps) tap(msg, this);
     this.#check();
   }
 
@@ -80,8 +90,11 @@ export class Bot {
     return (await this.waitFor((m) => m.t === 'room' && m.room && pred(m.room), opts)).room;
   }
 
+  // Bağlantı açık değilse sessizce düşer (kaos testlerinde kopuk bot da eylem denemeye devam eder).
   sendRaw(obj) {
+    if (!this.isOpen) return false;
     this.ws.send(typeof obj === 'string' ? obj : JSON.stringify(obj));
+    return true;
   }
 
   send(obj) {
