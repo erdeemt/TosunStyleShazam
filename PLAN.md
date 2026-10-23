@@ -104,6 +104,7 @@ export default {
 | `action` | `action` | Oyuna özel eylem, `{ type, ... }`. |
 | `kick` | `playerId` | Host: oyuncuyu çıkar. |
 | `rename` | `name` | Ad değiştir (bekleme odasında). |
+| `prep` | `data` | Host: bekleme odasında oyuna özel hazırlık verisi (ör. Shazam şarkı listesi). Oyun modülü `prep(prev, data)` ile doğrular; `room.prep` alanında sadece `prepInfo` özeti herkese gider. |
 | `backToLobby` | — | Host: oyun **bittikten sonra** bekleme odasına dön (oyun sürerken reddedilir). |
 
 Sunucu → istemci:
@@ -228,7 +229,28 @@ Mobil öncelikli tasarım: 360 px genişlikte kusursuz çalışmalı, butonlar �
 - Ölüm duyurusunda rol yok; ölü oyuncunun görünümünde de diğer roller yok.
 - Doktor aynı kişiyi üst üste koruyamaz; vampir vampiri seçemez; ölü kimse eylem yapamaz.
 
-### 4.4 🎨 Nüans (renk hafızası) — kullanıcı ile netleşti (2026-10-24)
+### 4.4 🎵 Tosun Shazam — Online (lobili) mod — kullanıcı ile netleşti (2026-10-23)
+
+- Menü: Çok Oyunculu → Tosun Shazam → 🌐 Online. 2–12 oyuncu, herkes kendi telefonundan; **ses her telefonda çalar**.
+- **Şarkıları sadece oda sahibi ekler** (bekleme odasında Spotify/YouTube/Deezer linkleri veya tek oyunculu modda kayıtlı
+  listeleri). Linkler host'un tarayıcısında çözülür, `prep` mesajıyla parça parça (≤ 60 şarkı/mesaj) sunucuya gider.
+  Sunucu doğrular: ses/kapak adresleri sadece bilinen CDN'ler (p.scdn.co, *.dzcdn.net, i.ytimg.com, Spotify görsel CDN'i),
+  metinler kısaltılır, aynı şarkı (ad + ilk sanatçı) bir kez, en fazla 300 şarkı. Önizlemesi olmayan Spotify şarkısı alınmaz.
+  En az 4 şarkı gerekir; havuzda her zaman en az 3 şarkı çalınmadan kalır (son turun cevabı elemeyle bulunamasın), yani
+  tur sayısı = min(ayar, şarkı − 3). Şarkılar bayt boyutuna göre parçalanarak gönderilir (≤ 6 KB/mesaj). Host odadaki listeyi temizleyebilir.
+- Ayarlar: şarkı sayısı (3–30, varsayılan 10), tur süresi (45–180 sn, varsayılan 90), başlangıç noktası (rastgele / baştan).
+- **Akış — herkes aynı anda, kendi hızında:** her turda herkese aynı şarkı ve aynı başlangıç noktası gelir. Herkes kendi
+  telefonunda 0.5 → 1.5 → 5 → 10 → 20 sn ilerler: Çal, tahmin et (yanlışsa bir sonraki süre açılır), Geç veya Pes et.
+  Şarkı yüklenince **kendiliğinden 3-2-1 geri sayım ve çalma** (butona basmadan; tarayıcı izin vermezse bir kez ▶). Pes et her
+  adımda var. Yazarken odadaki şarkı listesinden öneri çıkar. Herkes bitirince veya tur süresi dolunca cevap açılır; host
+  "Sonraki şarkı" der ya da 30 sn sonra kendiliğinden geçilir. Klip süresi medyanın kendi saatiyle ölçülür (Mac/Safari gecikmesi).
+- **Puan:** bildiği adıma göre 5, 4, 3, 2, 1; o adımda **ilk bilen +1**. Bilemeyen 0.
+- Oyun sırasında diğer oyuncuların sadece ilerlemesi görünür (kaçıncı adımda, bitirdi mi, bildi mi) — tahmin metinleri görünmez.
+- **Gizlilik:** şarkı adı, sanatçı, kapak ve Spotify kimliği tur açıklanana kadar hiçbir istemciye gitmez; tahmin sunucuda
+  kontrol edilir (`server/matcher.js`, tek oyunculu kontrolle aynı). Sınırlama: ses telefonda çaldığı için YouTube video kimliği
+  istemciye gider — geliştirici araçlarıyla bakan biri YouTube şarkısını bulabilir (arkadaş ortamı için kabul edildi).
+
+### 4.5 🎨 Nüans (renk hafızası) — kullanıcı ile netleşti (2026-10-24)
 
 Ortak motor: `server/recall.js` (Ton Avı ile aynı), saf matematik `public/recall-math.js` (sunucu ve istemci aynı dosyayı kullanır),
 istemci `public/games/recall-client.js` + `public/games/nuance.js`, lobi modülü `server/games/nuance.js`.
@@ -253,7 +275,7 @@ istemci `public/games/recall-client.js` + `public/games/nuance.js`, lobi modül�
 **Sonuç ekranı**: her tur hedef karesi + oyuncunun karesi, iki hex, tur puanı; toplam + seviye; paylaşım
 `Tosun Nüans #12 · 812/1000 (Uzman)`.
 
-### 4.5 🔊 Ton Avı (perde hafızası) — kullanıcı ile netleşti (2026-10-24)
+### 4.6 🔊 Ton Avı (perde hafızası) — kullanıcı ile netleşti (2026-10-24)
 
 İstemci `public/games/tone.js` (+ `tone-audio.js`), lobi modülü `server/games/tone.js`; motor §4.4 ile ortak.
 
@@ -278,7 +300,7 @@ istemci `public/games/recall-client.js` + `public/games/nuance.js`, lobi modül�
 **Sonuç ekranı**: her tur hedef Hz – senin Hz, işaretli sent farkı + yorum ("Biraz pes", "Yarım ton tiz", "Yaklaşık bir oktav pes"…),
 tur puanı; **sadece sonuç ekranında** hedefi/kendi tonunu tekrar çalma düğmeleri (▶); paylaşım `Tosun Ton Avı · 38.42/50`.
 
-### 4.4–4.5 ortak: modlar, protokol ve kabul kriterleri
+### 4.5–4.6 ortak: modlar, protokol ve kabul kriterleri
 
 **Tek oyunculu (HTTP, Wordle gibi; `server/recall.js`)** — 📅 Günlük (İstanbul günü, herkese aynı hedefler, tek hak,
 arkadaş sıralaması) ve ♾️ Sınırsız (rastgele, zorluk seçilir, sıralama yok). Uçlar `POST /api/recall/<nuance|tone>/<uç>`,
@@ -317,13 +339,12 @@ herkes gönderince hemen biter) → `reveal` (hedef + herkesin cevabı ve puanı
 - Günlük: kişi başı günde bir deneme; sunucu yeniden başlasa da ilerleme korunur.
 - 360 px'te yatay kaydırma yok, dokunma hedefleri ≥ 44 px; e2e'de konsol hatası yok.
 
-### 4.6 Sonraki aşamalar (P2 kalanı – P4)
+### 4.7 Sonraki aşamalar (P2 kalanı – P4)
 
 Her biri başlamadan önce bu bölüm, aynı ayrıntıda kural + kabul kriteriyle genişletilecek (kullanıcıya danışılarak).
 Ön notlar:
 - **Tabu:** iki takım; anlatanın telefonunda kart; rakip takımdan bir "gözcü"nün telefonunda da kart + "Yasak!" butonu.
 - **Kod Adı:** liderlerin telefonunda renk haritası; takım üyelerinde sadece kelimeler.
-- **Online Shazam:** sunucu şarkıyı ve başlangıç anını seçer; istemciler sesi kendileri çalar (sunucu saati ile senkron).
 - **Çiz Bakalım:** çizgiler sıkıştırılmış nokta paketleri halinde, ≤ 8 KB/mesaj.
 
 ## 5. Test ve kalite

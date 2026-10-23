@@ -10,10 +10,13 @@ let env;
 before(async () => { env = await setup({ timeScale: 0.2 }); });
 after(async () => { await env?.close(); });
 
-const issues = [];
+// Her test kendi bulgularını tutar. (Eskiden tek ortak dizi vardı ve sadece son test assert ediyordu: 1. ve 2. testin
+// zamanlamaya duyarlı yumuşak kontrolleri — ör. geçersiz davette ad sorusu — "6 kişi" testini rastgele düşürüyordu.)
+let issues = [];
 const soft = (ok, msg) => { if (!ok) { issues.push(msg); console.log('  ✗', msg); } };
 
 test('kabuk: ana sayfa, menü, rotalar', async () => {
+  issues = [];
   const p = await phone(env, 'X', { hash: '#/' });
   await p.page.waitForSelector('.game-card-link');
   await shot(p, 'rb-00-home-mobile');
@@ -23,6 +26,8 @@ test('kabuk: ana sayfa, menü, rotalar', async () => {
   await shot(p, 'rb-01-menu-open-mobile');
   await p.page.click('.nav-item:has-text("Casus Kim?")');
   await p.page.waitForSelector('input[placeholder="Takma adın"]');
+  // Adı kaydet: geçersiz davet kontrolü ad sorusuna (prompt) takılmasın — o akış 2. testte ayrıca deneniyor.
+  await p.page.evaluate(async () => { (await import('/net.js')).net.setName('X'); });
   soft(!(await p.page.evaluate(() => document.body.classList.contains('nav-open'))), 'menü seçimden sonra kapanmadı');
   await shot(p, 'rb-02-spyfall-entry-mobile');
   // Shazam hâlâ açılıyor mu
@@ -52,6 +57,7 @@ test('kabuk: ana sayfa, menü, rotalar', async () => {
 });
 
 test('davet linki (adı olmayan yeni kullanıcı), yenileme, host yenileme, atma, izleyici, menü gezintisi, iki sekme', async () => {
+  issues = [];
   const host = await phone(env, 'Host');
   const code = await createRoom(host);
   const b = await phone(env, 'Bora');
@@ -159,6 +165,7 @@ test('davet linki (adı olmayan yeni kullanıcı), yenileme, host yenileme, atma
 });
 
 test('6 kişi: host oyun ortası ayrılır → host devri; suçlanan ayrılır; casus ayrılır', async () => {
+  issues = [];
   const names = ['Ece', 'Fatih', 'Gül', 'Hakan', 'İpek', 'Şule'];
   const ps = [];
   for (const nm of names) ps.push(await phone(env, nm, { desktop: nm === 'Şule' }));

@@ -3,6 +3,7 @@
 // Ctrl+C ikisini birden kapatır. Link her açılışta değişir.
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -16,7 +17,14 @@ function findCloudflared() {
     '/usr/local/bin/cloudflared',
     '/usr/bin/cloudflared',
   ].filter(Boolean);
-  return candidates.find((p) => existsSync(p)) ?? 'cloudflared'; // PATH'te varsa
+  const known = candidates.find((p) => existsSync(p));
+  if (known) return known;
+  // PATH'te tam yolu kendimiz bul: düz "cloudflared" adı Windows'ta önce çalışma klasörüne bakabilir.
+  const exe = process.platform === 'win32' ? 'cloudflared.exe' : 'cloudflared';
+  for (const dir of String(process.env.PATH ?? '').split(delimiter)) {
+    if (dir && existsSync(join(dir, exe))) return join(dir, exe);
+  }
+  return null;
 }
 
 const children = [];
@@ -28,7 +36,13 @@ const server = spawn(process.execPath, ['server.js'], { cwd: ROOT, env: { ...pro
 children.push(server);
 server.on('exit', (code) => { console.error(`Sunucu kapandı (${code}).`); stopAll(); process.exit(code ?? 1); });
 
-const tunnel = spawn(findCloudflared(), ['tunnel', '--no-autoupdate', '--url', `http://localhost:${PORT}`], { stdio: ['ignore', 'pipe', 'pipe'] });
+const cloudflared = findCloudflared();
+if (!cloudflared) {
+  console.error('cloudflared bulunamadı. Kurmak için:  winget install Cloudflare.cloudflared');
+  stopAll();
+  process.exit(1);
+}
+const tunnel = spawn(cloudflared, ['tunnel', '--no-autoupdate', '--url', `http://localhost:${PORT}`], { stdio: ['ignore', 'pipe', 'pipe'] });
 children.push(tunnel);
 tunnel.on('error', () => {
   console.error('\ncloudflared bulunamadı. Kurmak için:  winget install Cloudflare.cloudflared\n');

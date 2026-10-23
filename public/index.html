@@ -34,10 +34,15 @@
 
   <!-- ============ TOSUN SHAZAM ============ -->
   <div id="game-shazam" class="hidden">
+  <!-- Ses seviyesi: tek oyunculu ve online modun ortak kaydırıcısı (yeniden çizilen alanların dışında) -->
+  <div class="volume-bar"><label>🔉 Ses <input type="range" id="volume-range" min="0" max="100" step="5" aria-label="Ses seviyesi"></label></div>
   <!-- KURULUM -->
   <main id="screen-setup" class="screen active">
     <!-- Mod kartları kategoriye göre shazam.js'te oluşur -->
     <section class="mode-pick" id="mode-pick"></section>
+
+    <!-- Online mod: ortak lobi ekranı (public/lobby.js) buraya çizilir -->
+    <div id="shazam-online" class="online-only"></div>
 
     <section class="card players-only">
       <h2>👥 Oyuncular</h2>
@@ -49,7 +54,7 @@
       <p class="hint">Oyuncular sırayla tahmin eder. Tek başına oynamak için soldan “Tek Oyunculu”yu seç.</p>
     </section>
 
-    <section class="card">
+    <section class="card offline-only">
       <h2>🎶 Şarkılar</h2>
       <form id="source-form">
         <textarea id="source-input" rows="3" placeholder="Spotify / YouTube / Deezer linki — playlist, albüm veya tek şarkı. Her satıra bir link."></textarea>
@@ -61,7 +66,7 @@
       <p class="hint" id="track-total">Henüz şarkı yok.</p>
     </section>
 
-    <section class="card">
+    <section class="card offline-only">
       <h2>⚙️ Ayarlar</h2>
       <div class="settings">
         <label class="scored-only"><span id="per-player-label">Kişi başı şarkı</span>
@@ -76,7 +81,7 @@
       </div>
     </section>
 
-    <button id="start-btn" class="btn big primary" disabled>Oyunu başlat</button>
+    <button id="start-btn" class="btn big primary offline-only" disabled>Oyunu başlat</button>
   </main>
 
   <!-- ============ OYUN ============ -->
