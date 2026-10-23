@@ -140,7 +140,7 @@ const ytCache = new Map(); // videoId -> meta | null
 const YT_CACHE_MAX = 5000;
 
 async function youtubeMeta(videoId) {
-  if (!/^[w-]{6,20}$/.test(videoId)) return null;
+  if (!/^[\w-]{6,20}$/.test(videoId)) return null;
   if (ytCache.has(videoId)) return ytCache.get(videoId);
   const meta = await youtubeMetaUncached(videoId);
   if (ytCache.size >= YT_CACHE_MAX) ytCache.delete(ytCache.keys().next().value);
@@ -342,7 +342,7 @@ const CSP = [
   'frame-src https://www.youtube.com https://www.youtube-nocookie.com',
   // Kapaklar ve önizlemeler sadece müzik servislerinin CDN'lerinden (host tarafından eklenen şarkılar dahil).
   "img-src 'self' data: https://i.scdn.co https://*.spotifycdn.com https://i.ytimg.com https://*.dzcdn.net",
-  "media-src 'self' https://p.scdn.co https://*.dzcdn.net",
+  "media-src 'self' data: https://p.scdn.co https://*.dzcdn.net", // data: → ses kilidini açan sessiz klip
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   'font-src https://fonts.gstatic.com',
   "connect-src 'self'",

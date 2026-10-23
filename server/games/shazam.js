@@ -172,6 +172,7 @@ export default {
   action(state, playerId, action, ctx) {
     const r = state.round;
     if (action.type === 'next') {
+      if (action.round != null && num(action.round) !== r.number) return; // çift tık / bayat: sessizce yok say
       if (r.phase !== 'reveal') throw new GameError('Tur henüz bitmedi.');
       if (playerId !== ctx.hostId) throw new GameError('Sonraki şarkıyı oda sahibi başlatır.');
       return nextRound(state, ctx);
@@ -180,6 +181,10 @@ export default {
     const prog = r.progress[playerId];
     if (!prog) throw new GameError('Bu turda oynamıyorsun.');
     if (prog.done) throw new GameError('Bu şarkıyı bitirdin.');
+    // İstemci hangi adım için gönderdiğini söyler; çift dokunuşta ikinci eylem eski adıma aittir → yok say.
+    if (action.stage != null && num(action.stage) !== prog.stage) return;
+    // Tur değişirken yolda kalmış eylem yeni şarkıya uygulanmasın (yeni şarkı da 0. adımdan başlar).
+    if (action.round != null && num(action.round) !== r.number) return;
 
     switch (action.type) {
       case 'guess': {

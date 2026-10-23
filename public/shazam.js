@@ -298,7 +298,7 @@ const media = {
         if (token !== this.clipToken) return;
         const elapsed = Math.max(0, clock() - base);
         onProgress(Math.min(elapsed, dur));
-        if (elapsed >= dur) return finish();
+        if (elapsed >= dur || (this.kind === 'audio' && this.audio.ended)) return finish(); // önizleme kısa olabilir
         this.raf = requestAnimationFrame(tick);
       };
       tick();
@@ -485,7 +485,8 @@ function restoreSettings() {
 // ======================================================================
 
 function show(screen) {
-  for (const s of document.querySelectorAll('#game-shazam .screen')) s.classList.toggle('active', s.id === `screen-${screen}`);
+  // Sadece Shazam'ın kendi ekranları (online lobinin iç .screen'i değil)
+  for (const s of document.querySelectorAll('#game-shazam > main.screen')) s.classList.toggle('active', s.id === `screen-${screen}`);
   window.scrollTo(0, 0);
 }
 
@@ -567,8 +568,10 @@ export function enter(category) {
   renderModes();
   const saved = store.load(`mode:${state.category}`, null);
   const fallback = MODES[state.category].find((m) => !m.disabled).id;
-  setMode(MODES[state.category].some((m) => m.id === saved && !m.disabled) ? saved : fallback);
-  show('setup');
+  show('setup'); // önce: setMode('online') lobi ekranını çizer, show onu kapatmasın
+  // Bir Shazam odasındaysa (ör. davet linkiyle gelindi) doğrudan online moda geç.
+  const inShazamRoom = state.category === 'multi' && net.room?.game === 'shazam';
+  setMode(inShazamRoom ? 'online' : MODES[state.category].some((m) => m.id === saved && !m.disabled) ? saved : fallback);
 }
 
 // Başka bir sayfaya geçince sesi kes, oyunu kapat.
@@ -1045,6 +1048,7 @@ const ol = {
   coverFor: null,
   cover: null,
   countdown: null, // 3-2-1 geri sayımı (her şarkının ilk çalınışında)
+  pending: null, // gönderilmiş ama cevabı gelmemiş eylem (çift dokunuş koruması)
   countedKey: null,
 };
 
@@ -1065,6 +1069,8 @@ function mountOnline() {
     renderGame: onlineGame,
   });
   offRoomWatch = net.on('room', syncModePick);
+  document.addEventListener('pointerdown', unlockAudio, { capture: true });
+  document.addEventListener('keydown', unlockAudio, { capture: true });
   syncModePick();
 }
 
@@ -1093,10 +1099,24 @@ async function syncPrep(sendPrep) {
     for (const s of state.sources) {
       const tracks = (s.tracks ?? []).filter((t) => (t.ytId || t.audio) && !seen.has(trackKey(t)));
       tracks.forEach((t) => seen.add(trackKey(t)));
-      for (let i = 0; i < tracks.length; i += 25) {
-        sendPrep({ op: 'add', source: s.name ?? s.url, tracks: tracks.slice(i, i + 25).map(compactTrack) });
+      // Parçalar şarkı sayısına değil bayt boyutuna göre: sunucu 8 KB üstü mesajda bağlantıyı keser
+      // (gerçek Deezer önizleme adresleri ~280 karakter → 25 şarkı ~10 KB ediyordu).
+      let chunk = [];
+      let size = 0;
+      const flush = async () => {
+        if (!chunk.length) return;
+        sendPrep({ op: 'add', source: s.name ?? s.url, tracks: chunk });
+        chunk = [];
+        size = 0;
         await sleep(200); // hız sınırına takılmasın
+      };
+      for (const t of tracks.map(compactTrack)) {
+        const bytes = new TextEncoder().encode(JSON.stringify(t)).length + 1;
+        if (size + bytes > 6000) await flush();
+        chunk.push(t);
+        size += bytes;
       }
+      await flush();
     }
   } finally {
     ol.syncing = false;
@@ -1143,7 +1163,12 @@ function onlineSettings(settings, { editable, change, room, sendPrep }) {
           },
         }, loading ? 'Yükleniyor…' : 'Linkleri yükle'),
         uiEl('button', { class: 'btn primary', disabled: loading || ol.syncing || !local, onclick: () => syncPrep(sendPrep) },
-          ol.syncing ? 'Gönderiliyor…' : `🔄 Odaya gönder (${local})`)),
+          ol.syncing ? 'Gönderiliyor…' : `🔄 Odaya gönder (${local})`),
+        prep.trackCount ? uiEl('button', {
+          class: 'btn ghost',
+          disabled: ol.syncing,
+          onclick: () => { if (confirm('Odadaki şarkı listesi temizlensin mi?')) sendPrep({ op: 'reset' }); },
+        }, '🗑️ Odadaki listeyi temizle') : null),
       state.sources.length
         ? uiEl('ul', { class: 'sources' }, state.sources.map((s, i) => uiEl('li', {},
           uiEl('span', { class: `badge ${sourceKind(s.url)}` }, sourceKind(s.url)),
@@ -1158,7 +1183,7 @@ function onlineSettings(settings, { editable, change, room, sendPrep }) {
     summary,
     hostTools,
     uiEl('div', { class: 'settings' },
-      select('rounds', [5, 10, 15, 20, 30].map((n) => [n, `${n} şarkı`]), 'Şarkı sayısı'),
+      select('rounds', [3, 5, 10, 15, 20, 30].map((n) => [n, `${n} şarkı`]), 'Şarkı sayısı'),
       select('roundSeconds', [45, 60, 90, 120, 180].map((n) => [n, `${n} saniye`]), 'Tur süresi'),
       select('start', [['random', 'Rastgele yer'], ['begin', 'Şarkının başı']], 'Başlangıç noktası')));
 }
@@ -1188,6 +1213,9 @@ function prepareOnlineMedia(view) {
       ol.start = start;
       ol.ready = true;
       online?.rerender();
+      // Butona basmadan: hazır olunca 3-2-1 geri sayım ve otomatik çalma
+      const v = net.view;
+      if (v?.phase === 'play' && v.me && !v.me.done && v.media?.key === m.key) playOnlineClip(v);
     })
     .catch(() => {
       if (ol.key !== m.key) return;
@@ -1213,6 +1241,7 @@ async function playOnlineClip(view) {
     if (!view?.me || view.me.done || view.phase !== 'play') { online?.rerender(); return; }
   }
   ol.playing = true;
+  ol.needsTap = false;
   online?.rerender();
   const dur = view.stages[view.me.stage];
   try {
@@ -1220,11 +1249,39 @@ async function playOnlineClip(view) {
       const bar = document.getElementById('ol-bar-fill');
       if (bar) bar.style.width = `${(t / view.stages.at(-1)) * 100}%`;
     });
-  } catch {
-    toast('Şarkı çalınamadı.');
+  } catch (err) {
+    // Tarayıcı dokunmadan sese izin vermedi (Safari): bir kez ▶'ye basınca açılır
+    ol.needsTap = err?.name === 'NotAllowedError';
+    toast(ol.needsTap ? 'Ses için ▶ düğmesine bir kez dokun.' : 'Şarkı çalınamadı.');
   }
   ol.playing = false;
   online?.rerender();
+}
+
+// Tarayıcılar (özellikle Safari) dokunuş olmadan ses çalmaya izin vermez. Oyuncunun ilk dokunuşunda
+// (ör. "Katıl") ses öğesini sessizce bir kez çalıp durdururuz; sonraki otomatik çalmalara izin verilir.
+function silentWav() {
+  const n = 800; // 0.1 sn, 8 kHz, 8-bit mono
+  const bytes = new Uint8Array(44 + n);
+  const dv = new DataView(bytes.buffer);
+  const str4 = (o, t) => [...t].forEach((c, i) => dv.setUint8(o + i, c.charCodeAt(0)));
+  str4(0, 'RIFF'); dv.setUint32(4, 36 + n, true); str4(8, 'WAVE'); str4(12, 'fmt ');
+  dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+  dv.setUint32(24, 8000, true); dv.setUint32(28, 8000, true); dv.setUint16(32, 1, true); dv.setUint16(34, 8, true);
+  str4(36, 'data'); dv.setUint32(40, n, true); bytes.fill(128, 44);
+  return `data:audio/wav;base64,${btoa(String.fromCharCode(...bytes))}`;
+}
+
+let audioUnlocked = false;
+function unlockAudio() {
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+  const a = media.audio;
+  if (!a.paused) return; // zaten çalıyor = kilit açık; çalanı durdurma
+  const hadSrc = Boolean(a.getAttribute('src'));
+  if (!hadSrc) a.src = silentWav();
+  a.muted = true;
+  a.play().then(() => { a.pause(); a.muted = false; if (!hadSrc) a.removeAttribute('src'); }).catch(() => { a.muted = false; audioUnlocked = false; });
 }
 
 function suggestionsFor(pool, q) {
@@ -1239,6 +1296,7 @@ function suggestionsFor(pool, q) {
 
 function onlineGame(view, ctx) {
   prepareOnlineMedia(view);
+  if (view.me && ol.pending !== `${view.media.key}:${view.me.stage}:${view.me.guesses.length}`) ol.pending = null;
   const me = view.me;
   const stages = view.stages;
   const parts = [uiEl('div', { class: 'game-head' },
@@ -1250,8 +1308,6 @@ function onlineGame(view, ctx) {
     parts.push(uiEl('section', { class: 'card center' },
       uiEl('div', { class: `result-msg ${me.won ? 'good' : 'bad'}` }, me.won ? `🎉 Bildin! +${me.points}` : '😬 Bu sefer olmadı'),
       uiEl('p', { class: 'hint' }, 'Diğerleri bitirince cevap açılacak…')));
-  } else if (view.phase === 'play' && !me) {
-    parts.push(uiEl('section', { class: 'card warn center' }, '👀 Bu turu izliyorsun.'));
   }
 
   if (view.phase === 'reveal' || view.phase === 'over') parts.push(revealPanel(view, ctx));
@@ -1284,13 +1340,22 @@ function onlineGame(view, ctx) {
   return uiEl('div', { class: 'stack' }, parts);
 }
 
+// Aynı adımda ikinci kez eylem gönderme (çift dokunuş iki adım atlatmasın); sunucu da adımı kontrol eder.
+function sendOnce(view, ctx, action) {
+  const key = `${view.media.key}:${view.me.stage}:${view.me.guesses.length}`;
+  if (ol.pending === key) return false;
+  ol.pending = key;
+  ctx.act({ ...action, stage: view.me.stage, round: view.round });
+  return true;
+}
+
 function playPanel(view, ctx) {
   const me = view.me;
   const stages = view.stages;
   const isLast = me.stage >= stages.length - 1;
   const acList = uiEl('ul', { class: 'ol-ac', id: 'ol-ac' });
   const renderAc = () => {
-    acList.replaceChildren(...suggestionsFor(ctx.shared?.pool ?? [], ol.draft).map((s) =>
+    acList.replaceChildren(...suggestionsFor(ctx.shared?.pool ?? view.pool ?? [], ol.draft).map((s) =>
       uiEl('li', {}, uiEl('button', {
         type: 'button',
         onmousedown: (e) => e.preventDefault(),
@@ -1325,24 +1390,25 @@ function playPanel(view, ctx) {
         'aria-label': 'Çal',
         onclick: () => playOnlineClip(view),
       }, uiEl('span', { class: ol.countdown != null ? 'play-count' : 'play-icon' }, ol.countdown != null ? String(ol.countdown) : '▶')),
-      uiEl('div', { class: 'play-label' }, ol.countdown != null ? 'Hazır ol…' : ol.failed ? '⚠️ Şarkı yüklenemedi — tahmin edebilir veya geçebilirsin' : ol.ready ? `${stages[me.stage]} sn dinle` : 'Şarkı yükleniyor…')),
+      uiEl('div', { class: 'play-label' }, ol.countdown != null ? 'Hazır ol…' : ol.needsTap && !ol.playing ? '▶ Ses için bir kez dokun' : ol.failed ? '⚠️ Şarkı yüklenemedi — tahmin edebilir veya geçebilirsin' : ol.ready ? `${stages[me.stage]} sn dinle` : 'Şarkı yükleniyor…')),
     uiEl('form', {
       class: 'guess-form',
       onsubmit: (e) => {
         e.preventDefault();
         const textValue = ol.draft.trim();
         if (!textValue) return playOnlineClip(view);
+        if (!sendOnce(view, ctx, { type: 'guess', text: textValue })) return;
         ol.draft = '';
         media.stop();
-        ctx.act({ type: 'guess', text: textValue });
       },
     },
     input,
     acList,
     uiEl('div', { class: 'row' },
-      uiEl('button', { type: 'button', class: 'btn ghost', onclick: () => { media.stop(); ctx.act(isLast ? { type: 'giveUp' } : { type: 'skip' }); } },
-        isLast ? 'Pes et' : `Geç (+${fmt(stages[me.stage + 1] - stages[me.stage])} sn)`),
-      uiEl('button', { type: 'submit', class: 'btn primary' }, 'Tahmin et'))));
+      isLast ? null : uiEl('button', { type: 'button', class: 'btn ghost', onclick: () => { if (sendOnce(view, ctx, { type: 'skip' })) media.stop(); } },
+        `Geç (+${fmt(stages[me.stage + 1] - stages[me.stage])} sn)`),
+      uiEl('button', { type: 'submit', class: 'btn primary' }, 'Tahmin et')),
+    uiEl('button', { type: 'button', class: 'btn link', onclick: () => { if (confirm('Bu şarkıyı pas geçmek istiyor musun? (0 puan)') && sendOnce(view, ctx, { type: 'giveUp' })) media.stop(); } }, '🏳️ Pes et')));
 }
 
 function revealPanel(view, ctx) {
@@ -1367,14 +1433,15 @@ function revealPanel(view, ctx) {
   return uiEl('section', { class: 'card center' },
     view.phase === 'over' ? uiEl('div', { class: 'result-msg good' }, '🏁 Oyun bitti!') : null,
     cover ? uiEl('img', { class: 'ol-cover', src: cover, alt: '' }) : null,
+    view.me ? uiEl('div', { class: `result-msg ${view.me.won ? 'good' : 'bad'}` }, view.me.won ? `✓ Bildin! +${view.me.points}` : '✗ Bu sefer olmadı') : null,
     uiEl('div', { class: 'reveal-title' }, r.title),
     uiEl('div', { class: 'reveal-artist' }, r.artist ?? ''),
     view.phase === 'reveal'
       ? uiEl('div', { class: 'row center' },
         uiEl('button', { class: 'btn ghost', onclick: () => { if (media.isPaused()) media.resume(); else media.pause(); } }, '⏯ Durdur / Devam'),
         ctx.isHost
-          ? uiEl('button', { class: 'btn primary', onclick: () => { media.stop(); ctx.act({ type: 'next' }); } }, last ? 'Sonuçları göster' : 'Sonraki şarkı →')
-          : uiEl('p', { class: 'hint' }, 'Oda sahibi sonraki şarkıyı başlatacak…'))
+          ? uiEl('button', { class: 'btn primary', onclick: (e) => { e.currentTarget.disabled = true; media.stop(); ctx.act({ type: 'next', round: view.round }); } }, last ? 'Sonuçları göster' : 'Sonraki şarkı →')
+          : uiEl('p', { class: 'hint' }, 'Sıradaki şarkı birazdan kendiliğinden başlayacak (oda sahibi beklemeden de geçirebilir).'))
       : null);
 }
 
