@@ -488,3 +488,9 @@ body:not([data-mode="online"]) .online-only { display: none !important; }
 .play-count { font-size: 40px; font-weight: 900; color: #fff; line-height: 1; }
 
 .btn { min-height: 44px; }
+
+/* Casus Kim? soru-cevap sırası */
+.qa-pair { display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 24px; margin: 6px 0; flex-wrap: wrap; }
+.qa-pair b { overflow-wrap: anywhere; }
+.qa-pair b.qa-done::after { content: ' ✓'; color: var(--good); }
+.qa-arrow { color: var(--accent2); font-weight: 900; }

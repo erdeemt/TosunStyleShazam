@@ -17,6 +17,20 @@ const active = (state) => state.players.filter((p) => !p.left);
 const isSpy = (state, id) => state.round.spyIds.includes(id);
 const findPlayer = (state, id) => state.players.find((p) => p.id === id && !p.left);
 
+// Soru-cevap sırası: X → Y'ye soruyor; ikisi de onaylayınca cevap veren yeni soran olur ve kendisine
+// az önce sorana geri soramaz (Spyfall kuralı). Hedef kalanlardan rastgele.
+function pickTarget(state, rng, askerId, excludeId) {
+  const others = active(state).filter((p) => p.id !== askerId);
+  const preferred = others.filter((p) => p.id !== excludeId);
+  const pool = preferred.length ? preferred : others;
+  return pool.length ? rng.pick(pool).id : null;
+}
+
+function newPair(state, rng, askerId, excludeId = null) {
+  const r = state.round;
+  r.qa = { number: (r.qa?.number ?? 0) + 1, askerId, targetId: pickTarget(state, rng, askerId, excludeId), done: [] };
+}
+
 function startRound(state, ctx) {
   const rng = ctx.rng;
   const players = active(state);
@@ -37,6 +51,7 @@ function startRound(state, ctx) {
     spyIds,
     roles,
     firstAskerId: rng.pick(players).id,
+    qa: null, // { number, askerId, targetId, done: [playerId] }
     phase: 'play', // play | accuse | final | reveal
     endsAt: ctx.setTimer(state.settings.minutes * 60_000),
     remainingMs: null, // suçlama sırasında saat durur
@@ -45,6 +60,7 @@ function startRound(state, ctx) {
     finalVotes: {},
     result: null,
   };
+  newPair(state, rng, state.round.firstAskerId);
 }
 
 function finishRound(state, ctx, { winner, reason, accuserId = null, accusedId = null, guessId = null }) {
@@ -153,6 +169,14 @@ export default {
     if (!me) throw new GameError('Bu oyunda değilsin.');
 
     switch (action.type) {
+      case 'qaDone': {
+        if (r.phase !== 'play') throw new GameError('Şu an soru sırası yok.');
+        const qa = r.qa;
+        if (playerId !== qa.askerId && playerId !== qa.targetId) throw new GameError('Bu soru-cevap senin değil.');
+        if (!qa.done.includes(playerId)) qa.done.push(playerId);
+        if (qa.done.includes(qa.askerId) && qa.done.includes(qa.targetId)) newPair(state, ctx.rng, qa.targetId, qa.askerId);
+        return;
+      }
       case 'accuse': {
         if (r.phase !== 'play') throw new GameError('Şu an suçlama yapılamaz.');
         if (r.accusersUsed.includes(playerId)) throw new GameError('Bu turdaki suçlama hakkını kullandın.');
@@ -229,6 +253,10 @@ export default {
       return;
     }
     if (r.phase === 'reveal') return;
+    if (r.qa && (r.qa.askerId === playerId || r.qa.targetId === playerId)) {
+      const stay = r.qa.askerId === playerId ? r.qa.targetId : r.qa.askerId;
+      newPair(state, ctx.rng, findPlayer(state, stay) ? stay : active(state)[0]?.id, playerId);
+    }
     if (r.spyIds.includes(playerId) && r.spyIds.every((id) => state.players.find((x) => x.id === id)?.left)) {
       return finishRound(state, ctx, { winner: 'none', reason: 'spy_left' });
     }
@@ -262,6 +290,7 @@ export default {
       endsAt: r.endsAt,
       paused: r.phase === 'accuse',
       firstAskerId: r.firstAskerId,
+      qa: r.qa && { number: r.qa.number, askerId: r.qa.askerId, targetId: r.qa.targetId, done: r.qa.done },
       players: state.players.filter((p) => !p.left).map((p) => ({ id: p.id, name: p.name, score: p.score })),
       locations: LOCATION_LIST,
       me: inGame

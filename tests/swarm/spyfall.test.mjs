@@ -209,3 +209,42 @@ test('eş zamanlı: aynı anda 6 suçlama ve 6 oy tutarlı', async () => {
   const errors = g.bots.reduce((n, b) => n + b.errors.filter((e) => /suçlama yapılamaz/.test(e.message)).length, 0);
   assert.ok(errors >= 1, 'sadece bir suçlama aynı anda kabul edilmeli');
 });
+
+test('soru-cevap sırası: X → Y; ikisi onaylayınca cevap veren yeni soran olur ve sorana geri soramaz', async () => {
+  const g = await setupGame(5);
+  const byId = (id) => g.bots.find((b) => b.playerId === id);
+  let qa = g.host.view.qa;
+  assert.equal(qa.askerId, g.host.view.firstAskerId);
+  assert.notEqual(qa.targetId, qa.askerId);
+  const outsider = g.bots.find((b) => b.playerId !== qa.askerId && b.playerId !== qa.targetId);
+  assert.match((await outsider.expectError({ type: 'qaDone' })).message, /senin değil/);
+  // sadece soran onaylar → ikili değişmez
+  await byId(qa.askerId).act({ type: 'qaDone' });
+  let v = await g.host.waitView((x) => x.qa.done.length === 1);
+  assert.equal(v.qa.number, 1);
+  // cevaplayan da onaylar → yeni ikili
+  const prev = qa;
+  byId(qa.targetId).action({ type: 'qaDone' });
+  v = await g.host.waitView((x) => x.qa.number === 2);
+  assert.equal(v.qa.askerId, prev.targetId, 'cevap veren yeni soran olmalı');
+  assert.notEqual(v.qa.targetId, prev.askerId, 'kendisine sorana geri soramaz');
+  assert.notEqual(v.qa.targetId, v.qa.askerId);
+  assert.deepEqual(v.qa.done, []);
+});
+
+test('soru-cevap: sıradaki oyuncu ayrılırsa ikili yeniden kurulur; suçlama sırasında onay yok', async () => {
+  const g = await setupGame(5);
+  const byId = (id) => g.bots.find((b) => b.playerId === id);
+  const qa = g.host.view.qa;
+  const leaver = byId(qa.targetId);
+  const observer = g.bots.find((b) => b !== leaver && b.playerId !== qa.askerId) ?? byId(qa.askerId);
+  leaver.send({ t: 'leave' });
+  const v = await observer.waitView((x) => x.qa && x.qa.targetId !== leaver.playerId && x.qa.askerId !== leaver.playerId && x.players.length === 4);
+  assert.ok(v.players.some((p) => p.id === v.qa.targetId));
+  // suçlama sırasında soru onayı yapılamaz
+  const a = byId(v.qa.askerId);
+  const other = g.bots.find((b) => b !== leaver && b !== a);
+  await other.act({ type: 'accuse', targetId: a.playerId });
+  await a.waitView((x) => x.phase === 'accuse');
+  assert.match((await a.expectError({ type: 'qaDone' })).message, /soru sırası yok/);
+});

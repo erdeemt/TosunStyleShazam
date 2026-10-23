@@ -154,7 +154,10 @@ Mobil öncelikli tasarım: 360 px genişlikte kusursuz çalışmalı, butonlar �
 - 3–12 oyuncu. Her turda rastgele bir **mekân** (≥ 40 mekân, her biri 6–10 rol: "Hastane → Doktor, Hemşire, Hasta…").
 - 1 casus (9+ oyuncuda ayarla 2 casus seçilebilir). Casus olmayanlar mekânı ve kendi rolünü görür; casus sadece "Casussun" görür
   ve tahmin için **tüm mekân listesini** görür.
-- Tur süresi (varsayılan 8 dk) sayaç olarak herkeste görünür. İlk soruyu kim soracak rastgele gösterilir.
+- Tur süresi (varsayılan 8 dk) sayaç olarak herkeste görünür.
+- **Soru-cevap sırası (kullanıcı isteği, 2026-10-24):** ekranda "X → Y" yazar: X, Y'ye bir soru sorar. Soran "Sordum", sorulan
+  "Cevapladım" der; **ikisi de onaylayınca** cevap veren yeni soran olur ve kendisine az önce sorana geri soramaz (yeni hedef
+  kalanlardan rastgele). İlk soran rastgele. İkiliden biri ayrılırsa sıra yeniden kurulur. Suçlama sırasında onay yapılmaz.
 - Sorular sesli/sohbetle sorulur; uygulama **suçlama** ve **oylama** yönetir:
   - Herhangi bir oyuncu turda bir kez birini suçlayabilir → herkes Evet/Hayır oylar (suçlanan hariç). Oybirliği Evet ise suçlanan açıklanır.
   - Süre dolarsa zorunlu oylama: herkes bir şüpheli seçer, en çok oy alan açıklanır (eşitlikte casus kazanır).
