@@ -13,6 +13,19 @@ PORT=8080 npm start
 Harici paket yok, Node 18+ yeterli. Sunucu `0.0.0.0` üzerinde dinler; aynı ağdaki TV/telefondan
 `http://<bilgisayar-ip>:3000` ile de açılır. `index.html`'i doğrudan açmak çalışmaz (API sunucuda).
 
+### İnternetten oynamak (farklı evlerden)
+
+Domain gerekmeden geçici bir link açılır (Cloudflare Quick Tunnel, ücretsiz, hesap gerekmez):
+
+```bash
+winget install Cloudflare.cloudflared   # bir kez
+npm run online                          # sunucu + tünel; ekrana paylaşılacak linki yazar
+```
+
+Link (`https://xxx.trycloudflare.com`) her açılışta değişir; Ctrl+C ikisini birden kapatır. Sunucu tünel arkasında
+gerçek ziyaretçi IP'sini `CF-Connecting-IP` / `X-Forwarded-For` (son öğe) başlığından okur — sadece bağlantı aynı makineden
+(loopback) geliyorsa; dışarıdan doğrudan gelen bağlantıda bu başlıklar yok sayılır.
+
 ## 🎵 Tosun Shazam
 
 Heardle / melodicx tarzı şarkı tahmini. Şarkı önce 0.5 sn çalar, bilemezsen veya geçersen süre uzar:

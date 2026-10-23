@@ -33,12 +33,18 @@ export const httpLimiter = windowCounter(IP_LIMITS.httpPerMinute, 60_000);
 export const upstreamLimiter = windowCounter(IP_LIMITS.upstreamPerMinute, 60_000);
 export const identityLimiter = windowCounter(IP_LIMITS.newIdentitiesPerHour, 3_600_000);
 
-// Ters vekil (nginx/Caddy) arkasında gerçek IP için TRUST_PROXY=1.
+const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+
+// Gerçek istemci IP'si. Bağlantı aynı makinedeki bir tünel/vekilden geliyorsa (cloudflared, nginx, Caddy → loopback)
+// iletilen başlıklara güvenilir; dışarıdan doğrudan gelen bağlantıda başlıklar yok sayılır (sahte başlıkla sınır atlatılamaz).
+// Başka makinedeki bir vekil için TRUST_PROXY=1.
 export function clientIp(req) {
-  if (process.env.TRUST_PROXY === '1') {
-    // nginx/Caddy gelen başlığın SONUNA istemcinin adresini ekler; baştaki öğeler istemci tarafından yazılabilir.
-    const fwd = String(req.headers['x-forwarded-for'] ?? '').split(',').at(-1).trim();
-    if (fwd) return fwd;
-  }
-  return req.socket?.remoteAddress ?? 'unknown';
+  const remote = req.socket?.remoteAddress ?? 'unknown';
+  if (!LOOPBACK.has(remote) && process.env.TRUST_PROXY !== '1') return remote;
+  const cf = String(req.headers['cf-connecting-ip'] ?? '').trim(); // Cloudflare Tunnel: gerçek ziyaretçi
+  if (cf) return cf;
+  // nginx/Caddy/Cloudflare gelen başlığın SONUNA istemcinin adresini ekler; baştaki öğeler istemci tarafından yazılabilir.
+  const fwd = String(req.headers['x-forwarded-for'] ?? '').split(',').at(-1).trim();
+  return fwd || remote;
 }
+
