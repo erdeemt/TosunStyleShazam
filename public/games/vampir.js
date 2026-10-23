@@ -30,9 +30,11 @@ function settingsUI(s, { editable, change, playerCount }) {
     el('input', { type: 'checkbox', checked: s[key], disabled: !editable, onchange: (e) => change({ [key]: e.target.checked }) }),
     label);
   const auto = playerCount <= 7 ? 1 : playerCount <= 10 ? 2 : 3;
+  const cap = Math.max(1, Math.floor((playerCount - 1) / 3)); // sunucudaki maxVampires ile aynı
+  const vampLabel = (n) => (n > cap ? `${n} → bu kişi sayısında ${cap}` : String(n));
   return el('div', { class: 'stack' },
     el('div', { class: 'settings' },
-      select('vampires', [[0, `Otomatik (${auto})`], [1, '1'], [2, '2'], [3, '3']], 'Vampir sayısı'),
+      select('vampires', [[0, `Otomatik (${auto})`], [1, vampLabel(1)], [2, vampLabel(2)], [3, vampLabel(3)]], 'Vampir sayısı'),
       select('dayMinutes', [2, 3, 4, 5, 6, 8].map((n) => [n, `${n} dakika`]), 'Gündüz tartışması'),
       select('defenseSeconds', [15, 30, 45, 60].map((n) => [n, `${n} saniye`]), 'Savunma süresi'),
       select('nightSeconds', [30, 45, 60, 90, 120].map((n) => [n, `${n} saniye`]), 'Gece süresi')),
@@ -199,8 +201,8 @@ function overScreen(view, ctx) {
   const won = res.winnerIds.includes(ctx.playerId);
   return el('div', { class: 'stack' },
     el('section', { class: 'card center' },
-      el('div', { class: `result-msg ${won ? 'good' : 'bad'}` }, TEAM_WIN[res.winner]),
-      el('p', {}, won ? '🎉 Kazanan taraftasın!' : '😵 Kaybettin.')),
+      el('div', { class: `result-msg ${!view.me ? '' : won ? 'good' : 'bad'}` }, TEAM_WIN[res.winner]),
+      el('p', {}, !view.me ? '👀 Bu oyunu izledin.' : won ? '🎉 Kazanan taraftasın!' : '😵 Kaybettin.')),
     el('section', { class: 'card' },
       el('h2', {}, '🃏 Roller'),
       el('ul', { class: 'player-list roles' }, view.players.map((p) => {
