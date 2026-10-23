@@ -7,6 +7,15 @@ import { startProbedServer, SpyfallReferee, monkey, createRng, sleep, summarize,
 
 // TIME_SCALE=0.01 → tur 3 dk = 1.8 sn, suçlama oylaması 0.45 sn, final oylaması 0.6 sn, koltuk 1.2 sn
 const SCALE = 0.01;
+
+// Oyun sırasında sadece bağlantısı kopmuş oyuncu atılabilir (host kick ile oyunu yönlendiremesin):
+// hedef önce kopar, sonra host atar.
+async function kickOffline(host, target, observer) {
+  target.drop();
+  await observer.waitRoom((r) => r.players.find((p) => p.id === target.playerId)?.connected === false);
+  host.send({ t: 'kick', playerId: target.playerId });
+  await observer.waitRoom((r) => !r.players.some((p) => p.id === target.playerId));
+}
 let srv;
 const all = [];
 const refs = [];
@@ -226,15 +235,14 @@ test('suçlama oylamasında kick: oy vermemiş seçmen atılır → kalan Evet o
   host.action({ type: 'vote', yes: true });
   for (const b of others) b.action({ type: 'vote', yes: true });
   await accuser.waitView((v) => v.accusation?.votedCount === 2 + others.length);
-  host.send({ t: 'kick', playerId: victim.playerId });
-  await victim.waitFor((m) => m.t === 'kicked');
-  const kickedAt = victim.messages.findIndex((m) => m.t === 'kicked');
+  const kickedAt = victim.messages.length;
+  await kickOffline(host, victim, accuser);
   const v = await accuser.waitView((x) => x.phase === 'reveal');
   assert.equal(v.result.reason, 'caught');
   assert.equal(v.result.points[accuser.playerId], 2);
   await sleep(100);
   assert.equal(victim.messages.slice(kickedAt).filter((m) => m.t === 'view').length, 0, 'atılan oyuncu görünüm almaya devam etti');
-  assert.equal(victim.room, null);
+  assert.ok(!accuser.room.players.some((p) => p.id === victim.playerId));
   assertClean(g);
 });
 
@@ -245,7 +253,7 @@ test('suçlama oylamasında suçlananı kick: suçlama iptal; casusu kick: tur i
   const innocent = g.town.find((b) => b !== host && b !== accuser);
   await accuser.act({ type: 'accuse', targetId: innocent.playerId });
   await host.waitView((v) => v.phase === 'accuse');
-  host.send({ t: 'kick', playerId: innocent.playerId });
+  await kickOffline(host, innocent, accuser);
   const v = await accuser.waitView((x) => x.players.length === 5);
   assert.equal(v.phase, 'play');
   const spy = g.spies[0];
@@ -253,7 +261,7 @@ test('suçlama oylamasında suçlananı kick: suçlama iptal; casusu kick: tur i
   await accuser2.act({ type: 'accuse', targetId: host === spy ? accuser.playerId : spy.playerId });
   await host.waitView((x) => x.phase === 'accuse');
   if (host !== spy) {
-    host.send({ t: 'kick', playerId: spy.playerId });
+    await kickOffline(host, spy, accuser);
     const r = await accuser.waitView((x) => x.phase === 'reveal');
     assert.equal(r.result.reason, 'spy_left');
     assert.ok(Object.values(r.result.points).every((p) => p === 0));
@@ -268,7 +276,7 @@ test('final oylamasında kick: son oy vermeyen atılırsa oylama hemen çözül�
   const victim = g.town.find((b) => b !== g.host);
   for (const b of g.bots.filter((b) => b !== victim)) b.action({ type: 'finalVote', targetId: b === spy ? g.host.playerId : spy.playerId });
   await spy.waitView((v) => v.finalVote?.votedCount === 4);
-  g.host.send({ t: 'kick', playerId: victim.playerId });
+  await kickOffline(g.host, victim, spy);
   const r = await spy.waitView((vv) => vv.phase === 'reveal', { timeout: 300 });
   assert.equal(r.result.reason, spy === g.host ? 'final_wrong' : 'final_caught');
   assertClean(g);

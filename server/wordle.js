@@ -1,7 +1,7 @@
 // 🟩 Wordle TR — sunucu tarafı. Kurallar: PLAN.md §4.2, günlük sıralama: §3.6.
 // Cevap istemciye oyun bitene kadar gitmez; her tahmin burada değerlendirilir.
 import { readFileSync } from 'node:fs';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { createRng, seedFrom } from './rng.js';
 import { GameError, str } from './errors.js';
 import { jsonStore } from './store.js';
@@ -14,7 +14,12 @@ for (const w of ANSWERS) VALID.add(w);
 export const WORD_LENGTH = 5;
 export const MAX_GUESSES = 6;
 const EPOCH = '2026-10-22'; // 1 numaralı günlük bulmaca
-const DAILY_ORDER = createRng(seedFrom('tosun-wordle-v1')).shuffle(ANSWERS);
+// Günlük sıra sunucuya özel gizli tuzla karıştırılır: repo herkese açık, kelime sırası koddan hesaplanamasın.
+// Tuz data/secrets.json'da ilk çalıştırmada üretilir (testler WORDLE_SALT verir).
+const secrets = jsonStore('secrets', {});
+if (!secrets.data.wordleSalt) { secrets.data.wordleSalt = randomBytes(16).toString('hex'); secrets.flushNow(); }
+const SALT = process.env.WORDLE_SALT || secrets.data.wordleSalt;
+const DAILY_ORDER = createRng(seedFrom(`tosun-wordle-v1:${SALT}`)).shuffle(ANSWERS);
 const FREE_TTL_MS = 6 * 3600_000;
 const MAX_FREE_GAMES = 5000;
 

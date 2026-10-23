@@ -119,16 +119,19 @@ test('doktor aynı kişiyi üst üste koruyamaz; vampir vampiri seçemez; gözc�
   const target = g.by('koylu')[0];
   if (g.vamps.length > 1) {
     const err = await g.vamps[0].expectError({ type: 'nightPick', targetId: g.vamps[1].playerId });
-    assert.match(err.message, /seçemezsin/);
+    assert.match(err.message, /seçim yapılamaz/); // bilerek genel metin
   }
   await seer.act({ type: 'nightPick', targetId: g.vamps[0].playerId });
   assert.deepEqual(seer.view.me.seerResults.map((r) => r.isVampire), [true]);
-  assert.match((await seer.expectError({ type: 'nightPick', targetId: target.playerId })).message, /bakışını kullandın/);
+  // ikinci bakış sessizce yok sayılır (hata metni ekranda gözcüyü ele verirdi)
+  await seer.act({ type: 'nightPick', targetId: target.playerId });
+  assert.equal(seer.view.me.seerResults.length, 1);
+  assert.equal(seer.view.me.nightPick, g.vamps[0].playerId);
   await playNight(g, { victim: g.by('deli')[0], protect: target });
   g.host.send({ t: 'action', action: { type: 'endDay' } });
   await doc.waitView((x) => x.phase === 'night' && x.night === 2);
   assert.ok(!doc.view.me.nightTargets.includes(target.playerId));
-  assert.match((await doc.expectError({ type: 'nightPick', targetId: target.playerId })).message, /üst üste/);
+  assert.match((await doc.expectError({ type: 'nightPick', targetId: target.playerId })).message, /seçim yapılamaz/);
 });
 
 test('yargılama: aday + destek + savunma + çoğunluk Evet → asılır, gece başlar; rol açıklanmaz', async () => {
@@ -229,4 +232,37 @@ test('host olmayan geceye geçiremez; host ölü olsa da geçirebilir', async ()
   assert.match((await nonHost.expectError({ type: 'endDay' })).message, /oda sahibi/);
   g.host.action({ type: 'endDay' });
   await g.host.waitView((v) => v.phase === 'night' && v.night === 2);
+});
+
+test('güvenlik: oyun sırasında host bağlı oyuncuyu atamaz; kopuk oyuncuyu atabilir', async () => {
+  const g = await setup(6);
+  const victim = g.bots.find((b) => b !== g.host);
+  const errP = g.host.waitFor((m) => m.t === 'error');
+  g.host.send({ t: 'kick', playerId: victim.playerId });
+  assert.match((await errP).message, /bağlantısı kopmuş/);
+  assert.ok(g.host.room.players.some((p) => p.id === victim.playerId), 'oyuncu odada kalmalı');
+  // kopuk oyuncu atılabilir
+  victim.drop();
+  await g.host.waitRoom((r) => r.players.find((p) => p.id === victim.playerId)?.connected === false);
+  g.host.send({ t: 'kick', playerId: victim.playerId });
+  await g.host.waitRoom((r) => !r.players.some((p) => p.id === victim.playerId));
+});
+
+test('güvenlik: ölü vampir müttefik seçimlerini görmez; bekleyen aday varken gün bitirilemez', async () => {
+  const g = await setup(8); // 2 vampir
+  await playNight(g, {});
+  const [v1, v2] = g.vamps;
+  await hang(g, v1);
+  await Promise.all(g.bots.map((b) => b.waitView((x) => x.phase === 'night' && x.night === 2)));
+  const target = v2.view.me.nightTargets[0];
+  await v2.act({ type: 'nightPick', targetId: target });
+  const dead = await v1.waitView((x) => x.nightProgress?.done >= 1);
+  assert.equal(dead.me.allyPicks, undefined, 'ölü vampir gece seçimlerini görmemeli');
+  // gündüze geç, aday göster, host gün bitirmeye çalışsın
+  for (const b of living(g)) if (b !== v2) b.action({ type: 'nightPick', targetId: b.view.me.nightTargets.find((id) => id !== b.playerId) });
+  await g.host.waitView((x) => x.phase === 'day' || x.phase === 'over');
+  if (g.host.view.phase !== 'day') return;
+  const alive = living(g);
+  await alive[0].act({ type: 'nominate', targetId: alive[1].playerId });
+  assert.match((await g.host.expectError({ type: 'endDay' })).message, /Bekleyen bir aday/);
 });

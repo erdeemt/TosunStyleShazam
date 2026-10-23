@@ -2,7 +2,7 @@
 // Sunucu yetkilidir: oyun durumu burada yaşar, istemciye sadece view(state, playerId) gider. Bkz. PLAN.md §3.
 import { randomBytes, randomUUID } from 'node:crypto';
 import { WebSocketServer } from 'ws';
-import { createRng } from './rng.js';
+import { createRng, cryptoRng } from './rng.js';
 import { GameError, str } from './errors.js';
 import { jsonStore } from './store.js';
 import { IP_LIMITS, clientIp, identityLimiter } from './limits.js';
@@ -192,7 +192,7 @@ function createRoom(identity, gameId, ip) {
     players: new Map(),
     settings: game.validateSettings({ ...game.defaultSettings }),
     state: null,
-    rng: createRng(BASE_SEED != null ? BASE_SEED + roomCounter : undefined),
+    rng: BASE_SEED != null ? createRng(BASE_SEED + roomCounter) : cryptoRng(),
     timer: null,
     timerToken: 0,
     seq: 0,
@@ -300,7 +300,7 @@ function onDisconnect(identity) {
   if (room.hostId === identity.id) {
     clearTimeout(room.hostTimer);
     room.hostTimer = setTimeout(() => {
-      if (!rooms.has(room.code) || room.hostId !== identity.id || room.players.get(identity.id)?.connected) return;
+      if (rooms.get(room.code) !== room || room.hostId !== identity.id || room.players.get(identity.id)?.connected) return;
       const next = pickHost(room);
       if (next.connected && next.id !== identity.id) { room.hostId = next.id; broadcast(room); }
     }, scaled(LIMITS.hostHandoffMs));
@@ -371,6 +371,11 @@ const handlers = {
     requireHost(room, identity);
     const targetId = str(msg.playerId);
     if (targetId === identity.id || !room.players.has(targetId)) throw new GameError('Bu oyuncu çıkarılamaz.');
+    const target0 = room.players.get(targetId);
+    // Oyun sırasında host kick ile oyunu yönlendiremesin (ör. köylüleri atıp vampirleri kazandırmak).
+    if (room.phase === 'playing' && target0.connected && !target0.spectator) {
+      throw new GameError('Oyun sırasında sadece bağlantısı kopmuş oyuncular çıkarılabilir.');
+    }
     const target = identities.get(targetId);
     removePlayer(room, targetId, 'kick');
     send(target?.socket, { t: 'kicked' });

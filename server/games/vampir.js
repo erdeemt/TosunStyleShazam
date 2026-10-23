@@ -1,6 +1,7 @@
 // 🧛 Vampir Köylü. Kurallar: PLAN.md §4.3.
 // Gizli bilgi: roller (vampirler birbirini bilir), gece seçimleri, gözcü sonuçları oyun bitene kadar sahibi dışında kimseye gitmez.
 // Ölüm duyurularında rol yok.
+import { randomInt } from 'node:crypto';
 import { GameError, num, str } from '../errors.js';
 
 const NOMINATION_MS = 30_000; // destek gelmezse aday bu süre sonra düşer
@@ -210,7 +211,7 @@ export default {
       log: [],
       winner: null,
       winnerIds: [],
-      gameKey: rng.int(1e9),
+      gameKey: randomInt(1e9), // RNG'den üretilmez (iç durumu sızdırırdı)
     };
     startNight(state, ctx);
     return state;
@@ -222,6 +223,7 @@ export default {
     if (action.type === 'endDay') {
       if (state.phase !== 'day') throw new GameError('Şu an gündüz tartışması yok.');
       if (playerId !== ctx.hostId) throw new GameError('Geceye oda sahibi geçirir.');
+      if (nominationActive(state, ctx.now)) throw new GameError('Bekleyen bir aday var; önce destek süresi dolsun.');
       return startNight(state, ctx);
     }
     const me = alivePlayer(state, playerId);
@@ -231,12 +233,10 @@ export default {
     switch (action.type) {
       case 'nightPick': {
         if (state.phase !== 'night') throw new GameError('Şu an gece değil.');
-        if (!nightTargets(state, me).includes(targetId)) {
-          if (me.role === 'doktor' && targetId === state.lastProtected) throw new GameError('Aynı kişiyi üst üste iki gece koruyamazsın.');
-          throw new GameError('Bu kişiyi seçemezsin.');
-        }
+        // Hata metinleri bilerek genel: yandaki kişi ekranda okuyunca rol anlaşılmasın.
+        if (!nightTargets(state, me).includes(targetId)) throw new GameError('Bu seçim yapılamaz.');
         if (me.role === 'gozcu') {
-          if (me.id in state.nightPicks) throw new GameError('Bu geceki bakışını kullandın.');
+          if (me.id in state.nightPicks) return; // gözcü tek bakar; tekrar dokunuş sessizce yok sayılır
           state.seerResults.push({ night: state.night, targetId, isVampire: player(state, targetId).role === 'vampir' });
         }
         state.nightPicks[me.id] = targetId; // vampir/doktor/sahte görev seçimini gece bitene kadar değiştirebilir
@@ -340,7 +340,7 @@ export default {
       }
       if (me.role === 'vampir') {
         mine.allies = state.players.filter((p) => p.role === 'vampir' && p.id !== me.id).map((p) => p.id);
-        if (state.phase === 'night') {
+        if (state.phase === 'night' && me.alive) {
           mine.allyPicks = Object.fromEntries(mine.allies.filter((id) => id in state.nightPicks).map((id) => [id, state.nightPicks[id]]));
         }
       }

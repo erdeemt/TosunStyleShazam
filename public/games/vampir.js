@@ -113,7 +113,8 @@ function nightScreen(view, ctx) {
         const allies = Object.entries(allyPicks).filter(([, t]) => t === p.id).map(([id]) => nameOf(view, id));
         return el('button', {
           class: `target${picked === p.id ? ' chosen' : ''}`,
-          disabled: !allowed,
+          // Kart kapalıyken herkesin düğmeleri aynı görünür (pasif düğmeler rolü ele verirdi); geçersiz seçimi sunucu reddeder.
+          disabled: cardOpen && !allowed,
           onclick: () => ctx.act({ type: 'nightPick', targetId: p.id }),
         }, p.name, p.id === ctx.playerId ? ' (sen)' : '',
         allies.length ? el('small', { class: 'ally-pick' }, `🧛 ${allies.join(', ')}`) : null);
