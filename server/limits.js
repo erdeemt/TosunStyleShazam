@@ -36,7 +36,8 @@ export const identityLimiter = windowCounter(IP_LIMITS.newIdentitiesPerHour, 3_6
 // Ters vekil (nginx/Caddy) arkasında gerçek IP için TRUST_PROXY=1.
 export function clientIp(req) {
   if (process.env.TRUST_PROXY === '1') {
-    const fwd = String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim();
+    // nginx/Caddy gelen başlığın SONUNA istemcinin adresini ekler; baştaki öğeler istemci tarafından yazılabilir.
+    const fwd = String(req.headers['x-forwarded-for'] ?? '').split(',').at(-1).trim();
     if (fwd) return fwd;
   }
   return req.socket?.remoteAddress ?? 'unknown';

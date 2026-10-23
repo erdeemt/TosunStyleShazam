@@ -102,7 +102,7 @@ export default {
 | `action` | `action` | Oyuna özel eylem, `{ type, ... }`. |
 | `kick` | `playerId` | Host: oyuncuyu çıkar. |
 | `rename` | `name` | Ad değiştir (bekleme odasında). |
-| `backToLobby` | — | Host: oyun bitince bekleme odasına dön. |
+| `backToLobby` | — | Host: oyun **bittikten sonra** bekleme odasına dön (oyun sürerken reddedilir). |
 
 Sunucu → istemci:
 
@@ -173,12 +173,59 @@ Mobil öncelikli tasarım: 360 px genişlikte kusursuz çalışmalı, butonlar �
   **Sınırsız mod**: rastgele kelime, sıralama yok.
 - Kabul: günlük cevap ağ trafiğinde, sayfa kaynağında, JS'de görünmez (oyun bitene kadar).
 
-### 4.3 Sonraki aşamalar (P2–P4)
+### 4.3 🧛 Vampir Köylü (P2) — kullanıcı ile netleşti (2026-10-23)
+
+**Kurulum**
+- 5–12 oyuncu. Vampir sayısı otomatik: 5–7 → 1, 8–10 → 2, 11–12 → 3. Host elle de seçebilir ama üst sınır
+  oyuncuların üçte birinden az: 5–6 → 1, 7–9 → 2, 10+ → 3 (fazlası ilk geceden sonra oyunu bitirir).
+- Özel roller (host her oyunda açıp kapatır, varsayılan hepsi açık): 🩺 **Doktor**, 🔮 **Gözcü**, 🤡 **Deli**.
+  Her özel rolden en fazla bir tane; kalanlar 🧑‍🌾 **Köylü**. Vampirler birbirini bilir; başka kimse kimseyi bilmez.
+- Ayarlar: gündüz tartışma süresi (2–8 dk, varsayılan 4), savunma süresi (15–60 sn, varsayılan 30),
+  gece süresi (30–120 sn, varsayılan 60), vampir sayısı (otomatik / 1 / 2 / 3), roller.
+
+**Gece** (ekranda yazı; ses yok)
+- Herkesin ekranında aynı anda bir görev ve aynı görünüm olur — kimin dokunduğundan rol anlaşılmasın.
+  **Seçim sadece rol kartı açıkken yapılır**; kart kapalıyken herkesin düğmeleri, vurgusu ve dokunuşa tepkisi aynıdır
+  ("Seçim yapmak için kartını aç"). Rol kartı her faz değişiminde kendiliğinden kapanır; tüm rollerin kartı aynı renktedir.
+  - Vampirler: kurban seçer; vampirler birbirinin seçimini canlı görür. En çok oy alan ölür; eşitlikte eşitler arasından rastgele.
+    Hiç oy yoksa kimse ölmez. Vampirler birbirini seçemez.
+  - Doktor: bir kişiyi korur (kendini de seçebilir); **aynı kişiyi üst üste iki gece koruyamaz**. Korunan kurbansa kimse ölmez.
+  - Gözcü: bir kişiyi seçer, anında "Vampir" / "Vampir değil" öğrenir (Deli "vampir değil" görünür). Sonuçlar gözcüde birikir.
+  - Köylü, Deli ve ölmemiş diğerleri: sahte görev "En çok şüphelendiğin kişiyi seç" (sonucu kimseye gösterilmez).
+- Gece, yaşayan herkes seçim yapınca veya süre dolunca biter.
+
+**Gündüz**
+- Sabah duyurusu: "Bu gece X öldü." veya "Bu gece kimse ölmedi." — **roller hiçbir zaman açıklanmaz** (oyun sonuna kadar),
+  doktorun kimi kurtardığı da söylenmez.
+- Tartışma (sohbet sesli/Discord'dan). Saat işler; host erken bitirebilir ("Geceye geç").
+- **Aday gösterme:** yaşayan her oyuncu günde bir kez birini aday gösterebilir; başka bir yaşayan oyuncu "Destekliyorum" derse
+  yargılama başlar. Destek gelmezse aday 30 sn sonra düşer (herkese yayınlanır). Aynı anda tek aday; bekleyen aday varken
+  host günü bitiremez.
+- **Yargılama:** tartışma saati durur → aday "savunma süresi" kadar konuşur → yaşayanlar (aday hariç) "Asılsın mı?" Evet/Hayır;
+  oylar gizli (sadece "x/y oy" görünür, herkes kendi oyunu görür); oy vermeyen Hayır sayılır; **oy hakkı olanların yarısından fazlası Evet** derse asılır ve gece başlar; değilse tartışma kaldığı yerden sürer.
+- Tartışma süresi biterse o gün kimse asılmaz, gece başlar.
+
+**Kazanma** (her ölümden sonra kontrol)
+- 🤡 Deli gündüz **asılırsa** tek başına kazanır, oyun biter (gece öldürülürse kazanamaz).
+- Tüm vampirler ölürse köy kazanır.
+- Yaşayan vampir sayısı ≥ yaşayan vampir olmayanlar sayısı ise vampirler kazanır.
+- Oyun sonunda herkesin rolü, kimin ne zaman öldüğü ve gözcünün sonuçları açıklanır.
+
+**Ölüler ve ayrılanlar**
+- Ölüler izleyici olur: oy veremez, aday gösteremez, rolleri ve gece olayları onlara da açıklanmaz. "Ölüler konuşmaz" ekranda hatırlatılır.
+- Kalıcı olarak ayrılan oyuncu ölmüş sayılır (duyurulmaz, sadece "oyundan ayrıldı"); kazanma koşulu tekrar kontrol edilir.
+
+**Kabul kriterleri**
+- Bir oyuncunun görünümünde, oyun bitene kadar, kendi rolü dışında hiçbir rol yok — vampirler hariç (birbirlerini görür).
+  Doktorun koruma hedefi sadece doktorda, gözcü sonuçları sadece gözcüde, vampir oyları sadece vampirlerde.
+- Gece ekranı her rol için aynı yapıda (aynı sayıda düğme, aynı başlık uzunluğu yaklaşık); ölüler gece görev almaz.
+- Ölüm duyurusunda rol yok; ölü oyuncunun görünümünde de diğer roller yok.
+- Doktor aynı kişiyi üst üste koruyamaz; vampir vampiri seçemez; ölü kimse eylem yapamaz.
+
+### 4.4 Sonraki aşamalar (P2 kalanı – P4)
 
 Her biri başlamadan önce bu bölüm, aynı ayrıntıda kural + kabul kriteriyle genişletilecek (kullanıcıya danışılarak).
 Ön notlar:
-- **Vampir Köylü:** Roller: vampir(ler), köylü, doktor (gece bir kişiyi korur), gözcü (gece bir kişinin rolünü öğrenir).
-  6–10 kişi: 2 vampir; 11–12: 3. Sunucu anlatıcıdır; fazlar zamanlı; ölüler izleyici olur ve konuşmaz (kural metni).
 - **Tabu:** iki takım; anlatanın telefonunda kart; rakip takımdan bir "gözcü"nün telefonunda da kart + "Yasak!" butonu.
 - **Kod Adı:** liderlerin telefonunda renk haritası; takım üyelerinde sadece kelimeler.
 - **Online Shazam:** sunucu şarkıyı ve başlangıç anını seçer; istemciler sesi kendileri çalar (sunucu saati ile senkron).

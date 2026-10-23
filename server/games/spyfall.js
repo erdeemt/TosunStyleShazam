@@ -1,6 +1,7 @@
 // 🕵️ Casus Kim? (Spyfall). Kurallar: PLAN.md §4.1.
 // Gizli bilgi: mekân ve roller casusun görünümüne, casusların kimliği diğerlerinin görünümüne sonuç açıklanana kadar girmez.
 import { readFileSync } from 'node:fs';
+import { randomInt } from 'node:crypto';
 import { GameError, num, str } from '../errors.js';
 
 const { locations: LOCATIONS } = JSON.parse(readFileSync(new URL('../../content/spyfall/locations.json', import.meta.url), 'utf8'));
@@ -137,7 +138,7 @@ export default {
     const state = {
       settings,
       players: players.map((p) => ({ id: p.id, name: p.name, score: 0, left: false })),
-      gameKey: ctx.rng.int(1e9), // istemci yeni oyunu ayırt etsin (kart yeniden gizlensin)
+      gameKey: randomInt(1e9), // istemci yeni oyunu ayırt etsin; RNG'den üretilmez (iç durumu sızdırırdı)
       usedLocations: [],
       round: null,
       over: false,

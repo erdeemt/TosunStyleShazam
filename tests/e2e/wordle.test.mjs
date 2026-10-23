@@ -8,6 +8,7 @@ import { startServer } from '../lib/server.js';
 
 const DAY = '2026-11-06';
 process.env.TEST_GAMES = '1';
+process.env.WORDLE_SALT = 'test-salt'; // tests/lib/server.js ile aynı
 process.env.FAKE_TODAY = DAY;
 const { dailyAnswer } = await import('../../server/wordle.js');
 const ANSWER = dailyAnswer(DAY);
@@ -53,8 +54,12 @@ test('günlük Wordle: yanlış + doğru tahmin, renkler, sıralama, yenileme', 
   const firstRow = await page.$$eval('.w-row:first-child .w-tile', (t) => t.map((x) => x.className));
   assert.ok(firstRow.every((c) => /absent|present|correct/.test(c)));
 
-  // Doğru kelime (fiziksel klavye)
-  await page.keyboard.type(ANSWER);
+  // Doğru kelime: ASCII harfler fiziksel klavyeden, Türkçe harfler ekran klavyesinden
+  // (Playwright ç/ğ/ı/ö/ş/ü'yü tuş olayı olmadan ekler; gerçek Türkçe klavyede bu sorun yok).
+  for (const ch of ANSWER) {
+    if (/[a-z]/.test(ch)) await page.keyboard.press(ch);
+    else await page.click(`.w-key[aria-label="${ch}"]`);
+  }
   await page.keyboard.press('Enter');
   await page.waitForSelector('.w-result');
   const second = await page.$$eval('.w-row:nth-child(2) .w-tile', (t) => t.map((x) => x.className));

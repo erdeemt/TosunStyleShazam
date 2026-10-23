@@ -1,6 +1,28 @@
 // Tohumlu rastgele sayı üreteci (mulberry32). Testlerde SEED ile oyunlar tekrarlanabilir olur.
 import { randomInt } from 'node:crypto';
 
+// Gizli atamalar (roller, casus, mekân) için: çıktılarından iç durum geri hesaplanamaz.
+export function cryptoRng() {
+  const rng = {
+    seed: null,
+    next: () => randomInt(2 ** 48 - 1) / 2 ** 48,
+    int: (n) => randomInt(n),
+    pick: (arr) => arr[randomInt(arr.length)],
+    shuffle(arr) {
+      const out = [...arr];
+      for (let i = out.length - 1; i > 0; i--) {
+        const j = randomInt(i + 1);
+        [out[i], out[j]] = [out[j], out[i]];
+      }
+      return out;
+    },
+  };
+  return rng;
+}
+
+// Tohumlu üreteç: SADECE testlerde (SEED) ve gizli olmayan işler için. Çıktısını istemciye gönderme —
+// mulberry32'nin iç durumu tek bir çıktıdan geri hesaplanabilir.
+
 export function createRng(seed = randomInt(2 ** 31)) {
   let a = seed >>> 0;
   const next = () => {

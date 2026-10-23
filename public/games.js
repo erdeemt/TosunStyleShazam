@@ -32,4 +32,12 @@ export const GAMES = [
     categories: ['multi'],
     load: () => import('./games/spyfall.js'),
   },
+  {
+    id: 'vampir',
+    name: 'Vampir Köylü',
+    icon: '🧛',
+    desc: 'Gece vampirler avlanır, gündüz köy asar',
+    categories: ['multi'],
+    load: () => import('./games/vampir.js'),
+  },
 ];

@@ -366,10 +366,10 @@ body { display: flex; }
   width: 100%; padding: 26px 18px; border-radius: var(--radius); cursor: pointer; font: inherit; color: var(--text);
   background: linear-gradient(160deg, #3a2160, #22133a); border: 2px solid var(--accent2);
 }
-.role-card b { font-size: 26px; font-weight: 900; }
+.role-card > b { font-size: 26px; font-weight: 900; }
 .role-card small { color: var(--muted); }
 .role-card.hidden-card { border-style: dashed; border-color: var(--line); }
-.role-card.hidden-card b { font-size: 18px; }
+.role-card.hidden-card > b { font-size: 18px; }
 .role-card.spy { border-color: var(--bad); background: linear-gradient(160deg, #4a1530, #22133a); }
 .role-emoji { font-size: 52px; line-height: 1; }
 .role-name { font-size: 18px; font-weight: 500; color: var(--accent2); overflow-wrap: anywhere; }
@@ -447,3 +447,21 @@ body { display: flex; }
 .icon-btn { width: 44px; height: 44px; }
 select, input { min-height: 44px; }
 .btn.link { min-height: 44px; }
+
+/* ---------- Vampir Köylü ---------- */
+
+.target-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.target {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left;
+  background: var(--bg); border: 2px solid var(--line); border-radius: 10px; color: var(--text);
+  font: inherit; font-weight: 500; padding: 12px; min-height: 52px; cursor: pointer;
+}
+.target:disabled { opacity: .35; cursor: not-allowed; }
+.target.chosen { border-color: var(--accent2); background: #ffb5471a; }
+.ally-pick { color: var(--bad); font-size: 12px; }
+.player-list li.dead .player-name { opacity: .55; text-decoration: line-through; }
+.announce { font-size: 20px; margin: 4px 0; }
+.seer-list { list-style: none; padding: 0; margin: 4px 0 0; font-size: 14px; display: flex; flex-direction: column; gap: 2px; }
+.checks { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 10px; }
+label.check { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 15px; min-height: 44px; cursor: pointer; }
+label.check input { width: 20px; height: 20px; min-height: 0; accent-color: var(--accent); }

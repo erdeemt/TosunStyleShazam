@@ -6,6 +6,7 @@ import { startServer } from '../lib/server.js';
 
 const DAY = '2026-11-05';
 process.env.TEST_GAMES = '1';
+process.env.WORDLE_SALT = 'test-salt'; // tests/lib/server.js ile aynı
 process.env.FAKE_TODAY = DAY;
 const { dailyAnswer } = await import('../../server/wordle.js');
 const ANSWER = dailyAnswer(DAY);
