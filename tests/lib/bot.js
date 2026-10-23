@@ -29,7 +29,7 @@ export class Bot {
     this.closed = null;
     this.connections++;
     // Eski (kopmuş) soketten geç gelen mesaj/kapanış yeni bağlantının durumunu bozmasın.
-    ws.on('message', (data) => { if (this.ws === ws) this.#onMessage(JSON.parse(String(data))); });
+    ws.on('message', (data) => { if (this.ws === ws) this.#onMessage(JSON.parse(String(data)), data.length); });
     ws.on('close', (code, reason) => { if (this.ws !== ws) return; this.closed = { code, reason: String(reason) }; this.#check(); });
     ws.on('error', () => {});
     await new Promise((resolve, reject) => {
@@ -45,8 +45,9 @@ export class Bot {
     return this;
   }
 
-  #onMessage(msg) {
+  #onMessage(msg, bytes) {
     msg.receivedAt = Date.now();
+    msg.bytes = bytes; // ham mesaj boyutu (yan kanal ölçümleri için)
     this.messages.push(msg);
     if (msg.t === 'room') this.room = msg.room;
     if (msg.t === 'view') this.view = msg.view;
@@ -116,6 +117,12 @@ export class Bot {
     const m = await p;
     if (m.t === 'error') throw new Error(m.message);
     return m.room;
+  }
+
+  // Odadan çık; yerel oda bilgisi hemen silinir (sunucunun room:null yanıtını beklemeden, testlerde bayat oda kullanılmasın).
+  leave() {
+    this.send({ t: 'leave' });
+    this.room = null;
   }
 
   action(action) {

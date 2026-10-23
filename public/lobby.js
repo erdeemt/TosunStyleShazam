@@ -102,10 +102,6 @@ export function mountLobby(root, game) {
         class: 'btn link',
         onclick: () => { if (confirm('Odadan çıkmak istiyor musun?')) net.send({ t: 'leave' }); },
       }, 'Odadan çık'),
-      isHost && room.phase === 'playing' ? el('button', {
-        class: 'btn link',
-        onclick: () => { if (confirm('Oyunu herkes için bitirip bekleme odasına dönülsün mü?')) net.send({ t: 'backToLobby' }); },
-      }, 'Oyunu iptal et') : null,
     );
   }
 

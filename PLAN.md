@@ -102,7 +102,7 @@ export default {
 | `action` | `action` | Oyuna özel eylem, `{ type, ... }`. |
 | `kick` | `playerId` | Host: oyuncuyu çıkar. |
 | `rename` | `name` | Ad değiştir (bekleme odasında). |
-| `backToLobby` | — | Host: oyun bitince bekleme odasına dön. |
+| `backToLobby` | — | Host: oyun **bittikten sonra** bekleme odasına dön (oyun sürerken reddedilir). |
 
 Sunucu → istemci:
 

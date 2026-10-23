@@ -110,7 +110,8 @@ test('davet linki (adı olmayan yeni kullanıcı), yenileme, host yenileme, atma
   }
   soft((await state(b.page)).room.hostId === (await state(host.page)).playerId, 'host yenileyince host değişti');
   await shot(host, 'rb-13-host-after-refresh');
-  soft(await host.page.locator('text=Oyunu iptal et').count() === 1, 'host yenileme sonrası host kontrolleri yok');
+  // Oyun sürerken iptal düğmesi yok artık (host oyunu sıfırlayamasın); host yetkisini oda bilgisinden kontrol et.
+  { const hs = await state(host.page); soft(hs.room?.hostId === hs.playerId, 'host yenileme sonrası oda sahipliği kayboldu'); }
 
   // Menüde gezinme oda içindeyken: Shazam'a git, geri dön
   await b.page.click('#nav-toggle');

@@ -52,7 +52,7 @@ function resolveNight(state, ctx) {
   for (const p of alive(state)) {
     const target = picks[p.id];
     if (!target) continue;
-    if (p.role === 'vampir') tally[target] = (tally[target] ?? 0) + 1;
+    if (p.role === 'vampir' && alivePlayer(state, target)) tally[target] = (tally[target] ?? 0) + 1;
     if (p.role === 'doktor') doctorPick = target;
   }
   const max = Math.max(0, ...Object.values(tally));
@@ -299,6 +299,11 @@ export default {
     if (!p || !p.alive || state.phase === 'over') return;
     kill(state, playerId, 'left');
     delete state.nightPicks[playerId];
+    // Ayrılan kişiye yapılmış seçimler geçersiz: vampirler/doktor yeniden seçsin (öldürme boşa gitmesin).
+    // Gözcünün bakışı zaten kullanıldı, o kalır.
+    for (const [id, target] of Object.entries(state.nightPicks)) {
+      if (target === playerId && player(state, id)?.role !== 'gozcu') delete state.nightPicks[id];
+    }
     if (state.nomination && (state.nomination.byId === playerId || state.nomination.targetId === playerId)) state.nomination = null;
     if (checkWin(state, ctx)) return;
     if (state.phase === 'night') return maybeEndNight(state, ctx);

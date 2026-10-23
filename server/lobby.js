@@ -401,6 +401,8 @@ const handlers = {
   backToLobby(identity) {
     const room = requireRoom(identity);
     requireHost(room, identity);
+    // Oyun sürerken host oyunu iptal edemez (ör. asılmak üzere olan vampir host sonucu engelleyemesin).
+    if (room.phase === 'playing') throw new GameError('Oyun bitmeden bekleme odasına dönülemez.');
     clearAllTimers(room);
     room.state = null;
     room.phase = 'lobby';
