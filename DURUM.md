@@ -21,20 +21,19 @@ Açık küçük notlar:
 - Kopuk oyuncular suçlama oylamasını 45 sn bekletiyor (QA notu) — oylamada sadece bağlı oyuncuları saymak düşünülebilir.
 - Öneri: sadece TEST_GAMES=1 iken `/api/stats` (odalar, kimlikler, açık soket, bellek).
 
-## Şu an: 🧛 Vampir Köylü (dal `game/vampir`)
+## 🧛 Vampir Köylü — BİTTİ, main'e merge + push edildi (2026-10-23)
 
-- Kurallar kullanıcıyla netleşti → PLAN.md §4.3. Roller: Vampir/Köylü/Doktor/Gözcü/Deli; roller oyun sonuna kadar
-  hiç açıklanmaz; anlatıcı sadece yazı; klasik oylama (aday + destek → savunma → Asılsın mı?).
-- Yapıldı ve commit'li (dalda): server/games/vampir.js, public/games/vampir.js, 17 sürü + 1 tarayıcı testi.
-  `npm test` 93/93, `npm run e2e` 11/11.
-- Çalışıyor/çalıştırıldı: qa-player, lobby-swarm, security-auditor ajanları Vampir üzerinde (raporlar gelince düzelt).
-- Sonra: düzeltmeler → testler yeşil → `game/vampir`'i main'e merge (merge commit) → push.
+- Kurallar PLAN.md §4.3. QA, sürü ve güvenlik turları yapıldı, tüm bulgular düzeltildi.
+- Güvenlik turunda bulunan kritik açık: gameKey tohumlu RNG çıktısıydı → roller (ve Casus'ta mekân/casus)
+  hesaplanabiliyordu. Artık gerçek oyunlar crypto RNG kullanıyor (tohumlu üreteç sadece SEED ile, testlerde).
+- `npm test` 122/122 (2 soak SOAK=1 ile), `npm run e2e` 18/18.
+- Not: tests/e2e/qa-spyfall-robust "6 kişi host devri" testi bir çalıştırmada zaman aşımına düştü (sonraki geçti) — kararsız olabilir.
 
 ## Sıradaki adımlar
 
-1. Vampir ajan raporlarını düzelt, merge + push (kullanıcı bu akışı onayladı: oyun başına dal, bitince merge).
-2. Sıradaki P2 oyunu için kullanıcıyla kural netleştir: 😂 Komik Cevap, 👉 Hangimiz?, 🚫 Tabu.
-3. Domain alınınca RPi'ye deploy (güvenlik raporundaki sertleştirme önerileri: reverse proxy, systemd, TRUST_PROXY=1).
+1. Sıradaki P2 oyunu için kullanıcıyla kural netleştir: 😂 Komik Cevap, 👉 Hangimiz?, 🚫 Tabu. Yeni dal: `game/<id>`.
+2. Açık soru: Vampir yargılamasında oylar gizli (sadece sayı) — açık olsun mu?
+3. Domain alınınca RPi'ye deploy (reverse proxy, systemd, TRUST_PROXY=1; XFF son öğe kullanılıyor).
 
 ## Kullanıcı kararları (2026-10-23)
 
