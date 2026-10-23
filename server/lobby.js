@@ -77,8 +77,13 @@ function newCode() {
   throw new GameError('Oda kodu üretilemedi, tekrar dene.');
 }
 
+const MAX_BUFFERED_BYTES = 1_000_000;
+
 function send(socket, msg) {
-  if (socket && socket.readyState === 1) socket.send(JSON.stringify(msg));
+  if (!socket || socket.readyState !== 1) return;
+  // Okumayan (veya çok yavaş) istemciye mesaj biriktirme: bellek tükenmesin.
+  if (socket.bufferedAmount > MAX_BUFFERED_BYTES) { socket.terminate(); return; }
+  socket.send(JSON.stringify(msg));
 }
 
 function sendError(socket, code, message) {
@@ -97,6 +102,8 @@ function roomInfo(room) {
       .sort((a, b) => a.joinedAt - b.joinedAt)
       .map((p) => ({ id: p.id, name: p.name, connected: p.connected, isHost: p.id === room.hostId, spectator: p.spectator })),
     settings: room.settings,
+    // Oyuna özel hazırlık verisinin herkese açık özeti (ör. Shazam: kaç şarkı, hangi kaynaklar)
+    prep: room.game.prepInfo ? room.game.prepInfo(room.prep) : null,
     minPlayers: room.game.minPlayers,
     maxPlayers: Math.min(room.game.maxPlayers, LIMITS.maxPlayersPerRoom),
   };
@@ -112,15 +119,29 @@ function viewFor(room, playerId) {
   }
 }
 
+// Büyük ve oyun boyunca değişmeyen veri (ör. Shazam öneri listesi) her görünümde değil, oyuncu başına bir kez gider.
+// game.shared(state) → { key, data }; anahtar değişince (yeni oyun) veya yeniden bağlanınca tekrar gönderilir.
+function sendShared(room, p, socket) {
+  const sh = room.state && room.game.shared ? room.game.shared(room.state) : null;
+  if (!sh || p.sharedKey === sh.key) return;
+  send(socket, { t: 'shared', key: sh.key, data: sh.data });
+  p.sharedKey = sh.key;
+}
+
+function sendTo(room, p, info = roomInfo(room)) {
+  const socket = identities.get(p.id)?.socket;
+  if (!socket) return;
+  send(socket, { t: 'room', room: info });
+  if (room.state) {
+    sendShared(room, p, socket);
+    send(socket, { t: 'view', view: viewFor(room, p.id), seq: room.seq, serverNow: Date.now() });
+  }
+}
+
 function broadcast(room) {
   const info = roomInfo(room);
   room.seq++;
-  for (const p of room.players.values()) {
-    const socket = identities.get(p.id)?.socket;
-    if (!socket) continue;
-    send(socket, { t: 'room', room: info });
-    if (room.state) send(socket, { t: 'view', view: viewFor(room, p.id), seq: room.seq, serverNow: Date.now() });
-  }
+  for (const p of room.players.values()) sendTo(room, p, info);
 }
 
 // ---------- Oyun bağlamı ve zamanlayıcı ----------
@@ -197,6 +218,7 @@ function createRoom(identity, gameId, ip) {
     phase: 'lobby',
     players: new Map(),
     settings: game.validateSettings({ ...game.defaultSettings }),
+    prep: game.initialPrep ? game.initialPrep() : null, // oyunlar arası korunur (bekleme odasında host doldurur)
     state: null,
     rng: BASE_SEED != null ? createRng(BASE_SEED + roomCounter) : cryptoRng(),
     timers: new Map(), // isim -> { token, handle }
@@ -238,11 +260,15 @@ function joinRoom(identity, rawCode) {
 function reconnect(identity, room) {
   const p = room.players.get(identity.id);
   if (!p) return;
+  const wasConnected = p.connected;
   p.connected = true;
+  p.sharedKey = null; // yeni soket paylaşılan veriyi almadı
   clearTimeout(p.leaveTimer);
   p.leaveTimer = null;
   clearTimeout(room.emptyTimer);
-  broadcast(room);
+  // Zaten bağlıysa (ör. tekrar "join") sadece ona gönder: herkese yeniden yayın yapıp trafik çoğaltılmasın.
+  if (wasConnected) sendTo(room, p);
+  else broadcast(room);
 }
 
 // Oda sahibi adayı: bağlı oyuncu > bağlı izleyici > herhangi biri; eşitlikte en eski katılan.
@@ -350,16 +376,28 @@ const handlers = {
     room.settings = room.game.validateSettings({ ...room.settings, ...incoming });
     broadcast(room);
   },
+  // Host bekleme odasında oyuna özel veri gönderir (ör. Shazam şarkı listesi, parça parça). Oyun modülü doğrular.
+  prep(identity, msg) {
+    const room = requireRoom(identity);
+    requireHost(room, identity);
+    if (!room.game.prep) throw new GameError('Bu oyunda hazırlık yok.');
+    if (room.phase !== 'lobby') throw new GameError('Hazırlık sadece bekleme odasında yapılır.');
+    const data = msg.data && typeof msg.data === 'object' && !Array.isArray(msg.data) ? msg.data : {};
+    room.prep = room.game.prep(room.prep, data);
+    broadcast(room);
+  },
   start(identity) {
     const room = requireRoom(identity);
     requireHost(room, identity);
     if (room.phase !== 'lobby') throw new GameError('Oyun zaten başladı.');
     const players = [...room.players.values()].filter((p) => p.connected).sort((a, b) => a.joinedAt - b.joinedAt);
     if (players.length < room.game.minPlayers) throw new GameError(`Bu oyun için en az ${room.game.minPlayers} kişi gerekli.`);
+    const notReady = room.game.canStart?.(room.prep, room.settings);
+    if (notReady) throw new GameError(notReady);
     // Kopuk oyuncular oyuna alınmaz, izleyici olur.
     for (const p of room.players.values()) p.spectator = !p.connected;
     const ctx = makeCtx(room);
-    room.state = room.game.setup({ players: players.map((p) => ({ id: p.id, name: p.name })), settings: room.settings, rng: room.rng, ctx });
+    room.state = room.game.setup({ players: players.map((p) => ({ id: p.id, name: p.name })), settings: room.settings, prep: room.prep, rng: room.rng, ctx });
     room.phase = 'playing';
     afterChange(room);
   },

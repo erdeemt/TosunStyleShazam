@@ -28,6 +28,7 @@ export class Bot {
     this.ws = ws;
     this.closed = null;
     this.connections++;
+    this.connectIndex = this.messages.length; // bu bağlantıdan sonra gelen ilk mesajın sırası (bayat görünüm ayırt etmek için)
     // Eski (kopmuş) soketten geç gelen mesaj/kapanış yeni bağlantının durumunu bozmasın.
     ws.on('message', (data) => { if (this.ws === ws) this.#onMessage(JSON.parse(String(data)), data.length); });
     ws.on('close', (code, reason) => { if (this.ws !== ws) return; this.closed = { code, reason: String(reason) }; this.#check(); });
@@ -68,9 +69,9 @@ export class Bot {
   }
 
   // Bu çağrıdan sonra gelecek (veya `fromStart` ise önceden gelmiş) bir mesajı bekler.
-  waitFor(pred, { timeout = 5000, fromStart = false } = {}) {
+  waitFor(pred, { timeout = 5000, fromStart = false, from } = {}) {
     return new Promise((resolve, reject) => {
-      const w = { pred, resolve, reject, from: fromStart ? 0 : this.messages.length, onClose: true };
+      const w = { pred, resolve, reject, from: from ?? (fromStart ? 0 : this.messages.length), onClose: true };
       w.timer = setTimeout(() => {
         this.waiters = this.waiters.filter((x) => x !== w);
         reject(new Error(`${this.name}: mesaj beklenirken zaman aşımı`));
@@ -84,6 +85,15 @@ export class Bot {
   async waitView(pred, opts) {
     if (this.view && pred(this.view)) return this.view;
     return (await this.waitFor((m) => m.t === 'view' && m.view && pred(m.view), opts)).view;
+  }
+
+  // Son connect()'ten SONRA gelmiş (bayat olmayan) bir görünüm/oda bekler — yeniden bağlanma testleri için.
+  async waitFreshView(pred = () => true, opts = {}) {
+    return (await this.waitFor((m) => m.t === 'view' && m.view && pred(m.view), { ...opts, from: this.connectIndex })).view;
+  }
+
+  async waitFreshRoom(pred = () => true, opts = {}) {
+    return (await this.waitFor((m) => m.t === 'room' && m.room && pred(m.room), { ...opts, from: this.connectIndex })).room;
   }
 
   async waitRoom(pred, opts) {

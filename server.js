@@ -340,8 +340,9 @@ const CSP = [
   "default-src 'self'",
   "script-src 'self' https://www.youtube.com https://s.ytimg.com",
   'frame-src https://www.youtube.com https://www.youtube-nocookie.com',
-  "img-src 'self' data: https:",
-  "media-src 'self' https:",
+  // Kapaklar ve önizlemeler sadece müzik servislerinin CDN'lerinden (host tarafından eklenen şarkılar dahil).
+  "img-src 'self' data: https://i.scdn.co https://*.spotifycdn.com https://i.ytimg.com https://*.dzcdn.net",
+  "media-src 'self' data: https://p.scdn.co https://*.dzcdn.net", // data: → ses kilidini açan sessiz klip
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   'font-src https://fonts.gstatic.com',
   "connect-src 'self'",
