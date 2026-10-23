@@ -31,9 +31,9 @@ Açık küçük notlar:
 
 ## Sıradaki adımlar
 
-1. Sıradaki P2 oyunu için kullanıcıyla kural netleştir: 😂 Komik Cevap, 👉 Hangimiz?, 🚫 Tabu. Yeni dal: `game/<id>`.
-2. Açık soru: Vampir yargılamasında oylar gizli (sadece sayı) — açık olsun mu?
-3. Domain alınınca RPi'ye deploy (reverse proxy, systemd, TRUST_PROXY=1; XFF son öğe kullanılıyor).
+1. **BEKLE:** kullanıcı arkadaşlarıyla mevcut oyunları (Shazam, Casus Kim?, Wordle, Vampir Köylü) deneyecek;
+   geri bildirimini topla, düzelt. Yeni oyunlara (Komik Cevap, Hangimiz?, Tabu) kullanıcı "geç" deyince geçilecek.
+2. Domain alınınca RPi'ye deploy (reverse proxy, systemd, TRUST_PROXY=1; XFF son öğe kullanılıyor).
 
 ## Kullanıcı kararları (2026-10-23)
 
