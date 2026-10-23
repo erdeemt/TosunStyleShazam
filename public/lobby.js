@@ -16,13 +16,18 @@ export function mountLobby(root, game) {
     if (!active) return;
     const room = net.room;
     const screen = room && room.game === game.id ? roomScreen(room) : entryScreen(room);
-    if (net.replaced) {
+    if (net.replaced && !screen.dataset.replacedBanner) {
+      screen.dataset.replacedBanner = '1';
       screen.prepend(el('section', { class: 'card warn' },
         '📱 Bu oyuna başka bir sekmeden (veya cihazdan) bağlandın; bu sekme durduruldu.',
         el('button', { class: 'btn primary', onclick: () => net.takeover() }, 'Bu sekmede devam et')));
     }
-    root.replaceChildren(screen);
+    if (root.firstChild !== screen) root.replaceChildren(screen);
   };
+
+  // Oyun ekranı aynı öğeyi döndürürse (renderGame yapısı değişmedi) tüm ekranı baştan kurma: sadece üst çubuğu yenile.
+  // Böylece yazı kutusu yeniden oluşturulmaz, başkaları oynarken yazılan harfler kaybolmaz.
+  let cache = { gameEl: null, screen: null, bar: null, phase: null };
 
   // ---------- Giriş: ad + oda kur / katıl ----------
   function entryScreen(otherRoom) {
@@ -85,15 +90,23 @@ export function mountLobby(root, game) {
       hostId: room.hostId,
     };
 
-    if (room.phase === 'lobby') return waitingRoom(room, ctx);
+    if (room.phase === 'lobby') { cache = { gameEl: null, screen: null, bar: null, phase: null }; return waitingRoom(room, ctx); }
 
-    return el('div', { class: 'screen active' },
-      el('div', { class: 'room-bar' },
-        el('span', { class: 'room-code-small' }, `Oda ${room.code}`),
-        el('span', { class: 'hint' }, `${room.players.filter((p) => p.connected).length} kişi bağlı`),
-        net.connected ? null : el('span', { class: 'badge offline' }, 'Bağlantı yok…')),
+    const bar = el('div', { class: 'room-bar' },
+      el('span', { class: 'room-code-small' }, `Oda ${room.code}`),
+      el('span', { class: 'hint' }, `${room.players.filter((p) => p.connected).length} kişi bağlı`),
+      net.connected ? null : el('span', { class: 'badge offline' }, 'Bağlantı yok…'));
+    const gameEl = net.view ? game.renderGame(net.view, ctx) : el('section', { class: 'card' }, 'Yükleniyor…');
+    if (gameEl === cache.gameEl && cache.screen?.isConnected && cache.phase === room.phase) {
+      cache.bar.replaceWith(bar);
+      cache.bar = bar;
+      return cache.screen;
+    }
+
+    const screen = el('div', { class: 'screen active' },
+      bar,
       me?.spectator ? el('section', { class: 'card warn' }, '👀 Oyun başladıktan sonra katıldın; bu el izleyicisin.') : null,
-      net.view ? game.renderGame(net.view, ctx) : el('section', { class: 'card' }, 'Yükleniyor…'),
+      gameEl,
       room.phase === 'over'
         ? (isHost
           ? el('button', { class: 'btn big primary', onclick: () => net.send({ t: 'backToLobby' }) }, 'Bekleme odasına dön')
@@ -104,6 +117,8 @@ export function mountLobby(root, game) {
         onclick: () => { if (confirm('Odadan çıkmak istiyor musun?')) net.send({ t: 'leave' }); },
       }, 'Odadan çık'),
     );
+    cache = { gameEl, screen, bar, phase: room.phase };
+    return screen;
   }
 
   function waitingRoom(room, ctx) {

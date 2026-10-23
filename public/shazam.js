@@ -275,6 +275,7 @@ const media = {
       clock = () => p.getCurrentTime();
     } else {
       this.audio.volume = this.volume;
+      this.audio.muted = false; // ses kilidi açılırken kalmış olabilir
       this.audio.currentTime = start;
       await this.audio.play();
       clock = () => this.audio.currentTime;
@@ -1049,6 +1050,10 @@ const ol = {
   cover: null,
   countdown: null, // 3-2-1 geri sayımı (her şarkının ilk çalınışında)
   pending: null, // gönderilmiş ama cevabı gelmemiş eylem (çift dokunuş koruması)
+  acHidden: false, // öneri seçildi/gönderildi: yeni yazı gelene kadar liste kapalı
+  struct: null, // son tam çizimin yapı anahtarı
+  el: null,
+  card: null,
   countedKey: null,
 };
 
@@ -1281,7 +1286,14 @@ function unlockAudio() {
   const hadSrc = Boolean(a.getAttribute('src'));
   if (!hadSrc) a.src = silentWav();
   a.muted = true;
-  a.play().then(() => { a.pause(); a.muted = false; if (!hadSrc) a.removeAttribute('src'); }).catch(() => { a.muted = false; audioUnlocked = false; });
+  const token = media.clipToken;
+  a.play().then(() => {
+    a.muted = false;
+    // Bu arada gerçek bir klip başladıysa onu durdurma (aynı dokunuş hem kilidi açar hem çalar)
+    if (media.playing || media.clipToken !== token) return;
+    a.pause();
+    if (!hadSrc) a.removeAttribute('src');
+  }).catch(() => { a.muted = false; audioUnlocked = false; });
 }
 
 function suggestionsFor(pool, q) {
@@ -1294,9 +1306,36 @@ function suggestionsFor(pool, q) {
     .slice(0, 6);
 }
 
+function playersCard(view, ctx) {
+  const stages = view.stages;
+  const ranked = [...view.players].sort((a, b) => b.score - a.score);
+  return uiEl('section', { class: 'card' },
+    uiEl('h2', {}, view.phase === 'over' ? '🏆 Final skorları' : '👥 Oyuncular'),
+    uiEl('ul', { class: 'player-list' }, ranked.map((p) => {
+      let status = '';
+      if (view.phase === 'play') status = p.done ? (p.won ? '✓ bildi' : '✗ bitirdi') : p.stage != null ? `🎧 ${stages[p.stage]} sn` : '';
+      else if (p.roundPoints != null && view.phase === 'reveal') status = p.roundPoints ? `+${p.roundPoints}` : '0';
+      return uiEl('li', { class: ctx.connected(p.id) ? '' : 'offline' },
+        uiEl('span', { class: 'player-name' }, p.name),
+        p.id === ctx.playerId ? uiEl('span', { class: 'tag' }, 'sen') : null,
+        status ? uiEl('span', { class: 'tag' }, status) : null,
+        uiEl('span', { class: 'score' }, `${p.score} puan`));
+    })));
+}
+
 function onlineGame(view, ctx) {
   prepareOnlineMedia(view);
   if (view.me && ol.pending !== `${view.media.key}:${view.me.stage}:${view.me.guesses.length}`) ol.pending = null;
+  // Başkalarının hamlesi sadece oyuncular kartını değiştirir: ekranın geri kalanını (yazı kutusu dahil) yerinde bırak.
+  const me0 = view.me;
+  const struct = JSON.stringify([view.phase, view.round, view.endsAt, me0?.stage, me0?.guesses.length, me0?.done, me0?.points,
+    ol.ready, ol.playing, ol.countdown, ol.failed, ol.needsTap, ctx.isHost, view.reveal?.title ?? null, ol.cover, view.over]);
+  if (struct === ol.struct && ol.el?.isConnected) {
+    const card = playersCard(view, ctx);
+    ol.card.replaceWith(card);
+    ol.card = card;
+    return ol.el;
+  }
   const me = view.me;
   const stages = view.stages;
   const parts = [uiEl('div', { class: 'game-head' },
@@ -1313,23 +1352,13 @@ function onlineGame(view, ctx) {
   if (view.phase === 'reveal' || view.phase === 'over') parts.push(revealPanel(view, ctx));
 
   // Oyuncular: puan + bu turdaki ilerleme (tahmin metinleri yok)
-  const ranked = [...view.players].sort((a, b) => b.score - a.score);
-  parts.push(uiEl('section', { class: 'card' },
-    uiEl('h2', {}, view.phase === 'over' ? '🏆 Final skorları' : '👥 Oyuncular'),
-    uiEl('ul', { class: 'player-list' }, ranked.map((p) => {
-      let status = '';
-      if (view.phase === 'play') status = p.done ? (p.won ? '✓ bildi' : '✗ bitirdi') : p.stage != null ? `🎧 ${stages[p.stage]} sn` : '';
-      else if (p.roundPoints != null && view.phase === 'reveal') status = p.roundPoints ? `+${p.roundPoints}` : '0';
-      return uiEl('li', { class: ctx.connected(p.id) ? '' : 'offline' },
-        uiEl('span', { class: 'player-name' }, p.name),
-        p.id === ctx.playerId ? uiEl('span', { class: 'tag' }, 'sen') : null,
-        status ? uiEl('span', { class: 'tag' }, status) : null,
-        uiEl('span', { class: 'score' }, `${p.score} puan`));
-    }))));
+  const card = playersCard(view, ctx);
+  parts.push(card);
+  ol.card = card;
 
   // Yazarken yeniden çizim odağı kaçırmasın
   if (ol.focus) {
-    requestAnimationFrame(() => {
+    queueMicrotask(() => { // lobi ekranı yerleştirdikten hemen sonra, bir sonraki tuştan önce
       const input = document.getElementById('ol-guess');
       if (input && document.activeElement !== input) {
         input.focus();
@@ -1337,7 +1366,9 @@ function onlineGame(view, ctx) {
       }
     });
   }
-  return uiEl('div', { class: 'stack' }, parts);
+  ol.struct = struct;
+  ol.el = uiEl('div', { class: 'stack' }, parts);
+  return ol.el;
 }
 
 // Aynı adımda ikinci kez eylem gönderme (çift dokunuş iki adım atlatmasın); sunucu da adımı kontrol eder.
@@ -1355,12 +1386,14 @@ function playPanel(view, ctx) {
   const isLast = me.stage >= stages.length - 1;
   const acList = uiEl('ul', { class: 'ol-ac', id: 'ol-ac' });
   const renderAc = () => {
+    if (ol.acHidden) return acList.replaceChildren();
     acList.replaceChildren(...suggestionsFor(ctx.shared?.pool ?? view.pool ?? [], ol.draft).map((s) =>
       uiEl('li', {}, uiEl('button', {
         type: 'button',
         onmousedown: (e) => e.preventDefault(),
         onclick: () => {
           ol.draft = s.label.split(' — ')[0];
+          ol.acHidden = true;
           const input = document.getElementById('ol-guess');
           if (input) { input.value = ol.draft; input.focus(); }
           acList.replaceChildren();
@@ -1369,7 +1402,7 @@ function playPanel(view, ctx) {
   };
   const input = uiEl('input', {
     id: 'ol-guess', type: 'text', autocomplete: 'off', placeholder: 'Şarkının adı ne? (boş Enter = çal)',
-    oninput: (e) => { ol.draft = e.target.value; renderAc(); },
+    oninput: (e) => { ol.draft = e.target.value; ol.acHidden = false; renderAc(); },
     onfocus: () => { ol.focus = true; },
     onblur: () => { ol.focus = false; },
   });
