@@ -247,34 +247,58 @@ const media = {
     return a.duration;
   },
 
+  // Ses seviyesi (0–1), tarayıcıda hatırlanır. iOS donanım tuşlarını kullanır, bunu yok sayar.
+  volume: store.load('volume', 0.6),
+
+  setVolume(v) {
+    this.volume = Math.min(1, Math.max(0, Number(v) || 0));
+    store.save('volume', this.volume);
+    this.audio.volume = this.volume;
+    if (this.kind === 'youtube') yt.player?.setVolume(Math.round(this.volume * 100));
+  },
+
   // start'tan itibaren dur saniye çalar, onProgress(geçen sn) ile ilerleme bildirir.
+  // Süre duvar saatiyle DEĞİL medyanın kendi saatiyle ölçülür: Mac/Safari ve Bluetooth kulaklıkta play()
+  // döndükten sonra sesin gerçekten başlaması yüzlerce ms sürebiliyor; duvar saatiyle 0.5 sn'lik klip hiç duyulmuyordu.
   async playClip(start, dur, onProgress) {
     this.stop();
+    const token = this.clipToken;
+    let clock;
     if (this.kind === 'youtube') {
       const p = yt.player;
       p.seekTo(start, true);
       p.unMute();
-      p.setVolume(100);
-      const playing = yt.waitFor((s) => s === YT.PlayerState.PLAYING, 10000);
+      p.setVolume(Math.round(this.volume * 100));
+      const playing = yt.waitFor((st) => st === YT.PlayerState.PLAYING, 10000);
       p.playVideo();
       await playing;
+      clock = () => p.getCurrentTime();
     } else {
+      this.audio.volume = this.volume;
       this.audio.currentTime = start;
       await this.audio.play();
+      clock = () => this.audio.currentTime;
     }
+    if (token !== this.clipToken) return; // bu arada durduruldu
     this.playing = true;
-    const t0 = performance.now();
+    const base = clock(); // çalma başladığı andaki konum; ilerleme buna göre ölçülür
     return new Promise((resolve) => {
       const finish = () => {
         cancelAnimationFrame(this.raf);
+        clearTimeout(this.stopTimer);
         this.pause();
         this.playing = false;
         onProgress(dur);
         resolve();
       };
-      this.stopTimer = setTimeout(finish, dur * 1000);
+      this.clipResolve = resolve; // stop() çağrılırsa bekleyen söz askıda kalmasın
+      // Güvenlik ağı: medya saati hiç ilerlemezse (takılma) en geç bu kadar sonra dur.
+      this.stopTimer = setTimeout(finish, dur * 1000 + 3000);
       const tick = () => {
-        onProgress(Math.min((performance.now() - t0) / 1000, dur));
+        if (token !== this.clipToken) return;
+        const elapsed = Math.max(0, clock() - base);
+        onProgress(Math.min(elapsed, dur));
+        if (elapsed >= dur) return finish();
         this.raf = requestAnimationFrame(tick);
       };
       tick();
@@ -286,8 +310,10 @@ const media = {
     if (this.kind === 'youtube') {
       yt.player.seekTo(start, true);
       yt.player.unMute();
+      yt.player.setVolume(Math.round(this.volume * 100));
       yt.player.playVideo();
     } else {
+      this.audio.volume = this.volume;
       this.audio.currentTime = start;
       this.audio.play().catch(() => {});
     }
@@ -308,9 +334,15 @@ const media = {
     else this.audio.play().catch(() => {});
   },
 
+  clipToken: 0,
+  clipResolve: null,
+
   stop() {
     clearTimeout(this.stopTimer);
     cancelAnimationFrame(this.raf);
+    this.clipToken++;
+    this.clipResolve?.();
+    this.clipResolve = null;
     this.playing = false;
     if (this.kind) this.pause();
   },
@@ -1012,6 +1044,8 @@ const ol = {
   syncing: false,
   coverFor: null,
   cover: null,
+  countdown: null, // 3-2-1 geri sayımı (her şarkının ilk çalınışında)
+  countedKey: null,
 };
 
 function mountOnline() {
@@ -1163,7 +1197,21 @@ function prepareOnlineMedia(view) {
 }
 
 async function playOnlineClip(view) {
-  if (!ol.ready || ol.playing || !view.me) return;
+  if (!ol.ready || ol.playing || ol.countdown || !view.me) return;
+  // Her şarkının ilk çalınışında 3-2-1: herkes hazırlansın, kimse "habersiz" kaçırmasın.
+  if (ol.countedKey !== ol.key) {
+    ol.countedKey = ol.key;
+    const key = ol.key;
+    for (let n = 3; n >= 1; n--) {
+      ol.countdown = n;
+      online?.rerender();
+      await sleep(1000);
+      if (ol.key !== key) { ol.countdown = null; return; } // bu arada tur değişti
+    }
+    ol.countdown = null;
+    view = net.view; // geri sayım sırasında durum değişmiş olabilir
+    if (!view?.me || view.me.done || view.phase !== 'play') { online?.rerender(); return; }
+  }
   ol.playing = true;
   online?.rerender();
   const dur = view.stages[view.me.stage];
@@ -1271,12 +1319,13 @@ function playPanel(view, ctx) {
     uiEl('div', { class: 'ol-bar' }, uiEl('i', { id: 'ol-bar-fill' })),
     uiEl('div', { class: 'play-wrap' },
       uiEl('button', {
-        class: `play-btn${ol.playing ? ' playing' : ''}`,
+        // Geri sayımda soluklaşmasın diye pasif değil (tıklamayı playOnlineClip yok sayar), nabız efektiyle.
+        class: `play-btn${ol.playing || ol.countdown != null ? ' playing' : ''}`,
         disabled: !ol.ready || ol.playing,
         'aria-label': 'Çal',
         onclick: () => playOnlineClip(view),
-      }, uiEl('span', { class: 'play-icon' }, '▶')),
-      uiEl('div', { class: 'play-label' }, ol.failed ? '⚠️ Şarkı yüklenemedi — tahmin edebilir veya geçebilirsin' : ol.ready ? `${stages[me.stage]} sn dinle` : 'Şarkı yükleniyor…')),
+      }, uiEl('span', { class: ol.countdown != null ? 'play-count' : 'play-icon' }, ol.countdown != null ? String(ol.countdown) : '▶')),
+      uiEl('div', { class: 'play-label' }, ol.countdown != null ? 'Hazır ol…' : ol.failed ? '⚠️ Şarkı yüklenemedi — tahmin edebilir veya geçebilirsin' : ol.ready ? `${stages[me.stage]} sn dinle` : 'Şarkı yükleniyor…')),
     uiEl('form', {
       class: 'guess-form',
       onsubmit: (e) => {
@@ -1336,6 +1385,8 @@ function revealPanel(view, ctx) {
 if (new URLSearchParams(location.search).has('debug')) Object.assign(window, { tss: { state, media, yt } });
 
 yt.init();
+$('volume-range').value = String(Math.round(media.volume * 100));
+$('volume-range').addEventListener('input', (e) => media.setVolume(Number(e.target.value) / 100));
 restoreSettings();
 renderPlayers();
 renderSources();
