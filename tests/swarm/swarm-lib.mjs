@@ -51,7 +51,7 @@ const NEXT_OK = {
 const ROOM_PHASE_NEXT = { lobby: ['lobby', 'playing'], playing: ['playing', 'over', 'lobby'], over: ['over', 'lobby'] };
 
 // Açıklama öncesi görünümde izin verilen alanlar (yeni bir alan eklenirse sızıntı şüphesi olarak işaretlenir).
-const VIEW_KEYS = new Set(['gameKey', 'round', 'totalRounds', 'phase', 'over', 'endsAt', 'paused', 'firstAskerId', 'players', 'locations', 'me', 'canAccuse', 'accusation', 'finalVote', 'result']);
+const VIEW_KEYS = new Set(['gameKey', 'round', 'totalRounds', 'phase', 'over', 'endsAt', 'paused', 'firstAskerId', 'players', 'locations', 'me', 'canAccuse', 'accusation', 'finalVote', 'result', 'qa']); // qa: herkese açık soru-cevap ikilisi
 const ME_SPY_KEYS = ['spy', 'spyCount'];
 const ME_TOWN_KEYS = ['location', 'role', 'spy'];
 const ACC_KEYS = ['byId', 'myVote', 'targetId', 'votedCount', 'voterCount'];
@@ -246,7 +246,7 @@ export class SpyfallReferee {
       const iAmSpy = r.spyIds.includes(b.playerId);
       for (const pv of views) {
         // nötr alanlar (herkese açık listeler / id'ler / kendi oyu) taramadan çıkarılır
-        const { locations, players, firstAskerId, accusation, finalVote, ...rest } = pv;
+        const { locations, players, firstAskerId, qa, accusation, finalVote, ...rest } = pv; // qa herkese açık (kimin kime sorduğu)
         const text = JSON.stringify({ ...rest, accusation: accusation && { ...accusation, byId: 0, targetId: 0 }, finalVote: finalVote && { ...finalVote, myVote: 0 } });
         if (iAmSpy || !pv.me) {
           if (text.includes(`"${loc.id}"`) || text.includes(`"${loc.name}"`)) this.fail(b, `casus/izleyici açıklama öncesi mekânı gördü (${loc.id})`);
