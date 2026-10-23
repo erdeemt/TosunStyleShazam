@@ -1,4 +1,8 @@
 // Tosun Style Shazam — istemci tarafı oyun mantığı.
+import { mountLobby } from './lobby.js';
+import { net } from './net.js';
+// Online bölüm ui.js'in el()'ini kullanır (false/null nitelikleri atlar, dizileri açar); eski bölümler yerel el()'i.
+import { countdown, el as uiEl } from './ui.js';
 
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -490,7 +494,7 @@ const MODES = {
   ],
   multi: [
     { id: 'contest', icon: '🏆', name: 'Yarışma', desc: 'Tek ekran, sırayla tahmin, skor tablosu', start: 'Yarışmayı başlat' },
-    { id: 'online', icon: '🌐', name: 'Online', desc: 'Herkes kendi telefonundan — yakında', disabled: true },
+    { id: 'online', icon: '🌐', name: 'Online', desc: 'Oda kur, herkes kendi telefonundan', start: '' },
   ],
 };
 
@@ -503,6 +507,7 @@ function setMode(mode) {
   for (const card of document.querySelectorAll('.mode-card')) card.classList.toggle('selected', card.dataset.mode === mode);
   $('start-btn').textContent = info.start;
   $('per-player-label').textContent = mode === 'solo' ? 'Şarkı sayısı' : 'Kişi başı şarkı';
+  if (mode === 'online') mountOnline(); else unmountOnline();
 }
 
 function renderModes() {
@@ -536,6 +541,7 @@ export function enter(category) {
 // Başka bir sayfaya geçince sesi kes, oyunu kapat.
 export function leave() {
   stopGame();
+  unmountOnline();
 }
 
 // ---------- Serbest mod ----------
@@ -981,6 +987,346 @@ $('free-next-btn').addEventListener('click', () => { state.game.round++; nextRou
 $('again-btn').addEventListener('click', startGame);
 $('menu-btn').addEventListener('click', () => show('setup'));
 window.addEventListener('resize', placeYoutube);
+
+// ======================================================================
+// Online mod (lobili, herkes kendi telefonundan). Kurallar: PLAN.md §4.4; mantık sunucuda (server/games/shazam.js).
+// Şarkıları oda sahibi ekler (yukarıdaki kaynak motoru), ses her telefonda çalar, tahmin sunucuda kontrol edilir.
+// ======================================================================
+
+let online = null; // mountLobby tutamacı
+let offRoomWatch = null;
+
+// Shazam odasındayken mod kartları yer kaplamasın (odadan çıkınca geri gelir).
+const syncModePick = () => $('mode-pick').classList.toggle('hidden', Boolean(online && net.room?.game === 'shazam'));
+const ol = {
+  key: null, // hazırlanan şarkının tur anahtarı
+  ready: false,
+  failed: false,
+  start: 0,
+  playing: false,
+  revealedKey: null,
+  draft: '',
+  focus: false,
+  linkDraft: '',
+  syncing: false,
+  coverFor: null,
+  cover: null,
+};
+
+function mountOnline() {
+  if (online) return;
+  online = mountLobby($('shazam-online'), {
+    id: 'shazam',
+    name: 'Tosun Shazam',
+    icon: '🎵',
+    howTo: [
+      'Oda sahibi Spotify / YouTube / Deezer linklerini ekler ve odaya gönderir.',
+      'Her turda herkese aynı şarkı gelir; herkes kendi telefonunda 0.5 sn\'den başlayıp dinler.',
+      'Yanlış tahmin veya "Geç" bir sonraki süreyi açar: 0.5 → 1.5 → 5 → 10 → 20 sn.',
+      'Ne kadar erken bilirsen o kadar puan: 5, 4, 3, 2, 1. O adımda ilk bilen +1.',
+      'Herkes bitince (veya süre dolunca) cevap açılır. Kulaklık önerilir. 🎧',
+    ],
+    renderSettings: onlineSettings,
+    renderGame: onlineGame,
+  });
+  offRoomWatch = net.on('room', syncModePick);
+  syncModePick();
+}
+
+function unmountOnline() {
+  online?.unmount();
+  online = null;
+  offRoomWatch?.();
+  offRoomWatch = null;
+  syncModePick();
+  ol.key = null;
+  media.stop();
+}
+
+const compactTrack = (t) => ({
+  title: t.title, artist: t.artist, alt: t.alt, ytId: t.ytId, audio: t.audio, cover: t.cover, spotifyId: t.spotifyId,
+});
+
+// Yüklü kaynakları odaya gönder: önce sıfırla, sonra kaynak kaynak ≤ 25 şarkılık parçalar (mesaj sınırı 8 KB).
+async function syncPrep(sendPrep) {
+  if (ol.syncing) return;
+  ol.syncing = true;
+  online?.rerender();
+  try {
+    sendPrep({ op: 'reset' });
+    const seen = new Set();
+    for (const s of state.sources) {
+      const tracks = (s.tracks ?? []).filter((t) => (t.ytId || t.audio) && !seen.has(trackKey(t)));
+      tracks.forEach((t) => seen.add(trackKey(t)));
+      for (let i = 0; i < tracks.length; i += 25) {
+        sendPrep({ op: 'add', source: s.name ?? s.url, tracks: tracks.slice(i, i + 25).map(compactTrack) });
+        await sleep(200); // hız sınırına takılmasın
+      }
+    }
+  } finally {
+    ol.syncing = false;
+    online?.rerender();
+  }
+}
+
+function onlineSettings(settings, { editable, change, room, sendPrep }) {
+  const prep = room.prep ?? { trackCount: 0, sources: [] };
+  const select = (key, options, label) => uiEl('label', {},
+    label,
+    uiEl('select', { disabled: !editable, onchange: (e) => change({ [key]: key === 'start' ? e.target.value : Number(e.target.value) }) },
+      options.map(([v, textLabel]) => uiEl('option', { value: String(v), selected: settings[key] === v }, textLabel))));
+
+  const summary = uiEl('p', { class: prep.trackCount ? 'hint' : 'hint warn-text' },
+    prep.trackCount
+      ? `🎶 Odada ${prep.trackCount} şarkı${prep.sources.length ? ` (${prep.sources.join(', ')})` : ''}.`
+      : editable ? 'Henüz odada şarkı yok: link ekle ve "Odaya gönder"e bas.' : 'Oda sahibi şarkıları ekliyor…');
+
+  let hostTools = null;
+  if (editable) {
+    const loading = state.sources.some((s) => s.loading);
+    const local = allTracks().filter((t) => t.ytId || t.audio).length;
+    const input = uiEl('textarea', {
+      rows: '2',
+      placeholder: 'Spotify / YouTube / Deezer linki — playlist, albüm veya tek şarkı',
+      oninput: (e) => { ol.linkDraft = e.target.value; },
+    });
+    input.value = ol.linkDraft;
+    hostTools = uiEl('div', { class: 'stack' },
+      input,
+      uiEl('div', { class: 'row' },
+        uiEl('button', {
+          class: 'btn',
+          disabled: loading,
+          onclick: async () => {
+            const urls = ol.linkDraft.split(/\s+/).filter(Boolean);
+            ol.linkDraft = '';
+            const loadingDone = addSources(urls); // kaynaklar hemen listeye girer (yükleniyor…)
+            online?.rerender();
+            await loadingDone;
+            online?.rerender();
+            await syncPrep(sendPrep); // yüklenince otomatik gönder
+          },
+        }, loading ? 'Yükleniyor…' : 'Linkleri yükle'),
+        uiEl('button', { class: 'btn primary', disabled: loading || ol.syncing || !local, onclick: () => syncPrep(sendPrep) },
+          ol.syncing ? 'Gönderiliyor…' : `🔄 Odaya gönder (${local})`)),
+      state.sources.length
+        ? uiEl('ul', { class: 'sources' }, state.sources.map((s, i) => uiEl('li', {},
+          uiEl('span', { class: `badge ${sourceKind(s.url)}` }, sourceKind(s.url)),
+          uiEl('span', { class: 'src-name', title: s.url }, s.name ?? s.url),
+          uiEl('span', { class: 'src-count' }, s.loading ? 'yükleniyor…' : s.error ? `⚠️ ${s.error}` : `${s.tracks.length} şarkı`),
+          uiEl('button', { title: 'Kaldır', onclick: () => { state.sources.splice(i, 1); saveSources(); online?.rerender(); } }, '×'))))
+        : null,
+      uiEl('p', { class: 'hint' }, 'Tek oyunculu modda eklediğin listeler burada da hazır. Önizlemesi olmayan Spotify şarkıları atlanır.'));
+  }
+
+  return uiEl('div', { class: 'stack' },
+    summary,
+    hostTools,
+    uiEl('div', { class: 'settings' },
+      select('rounds', [5, 10, 15, 20, 30].map((n) => [n, `${n} şarkı`]), 'Şarkı sayısı'),
+      select('roundSeconds', [45, 60, 90, 120, 180].map((n) => [n, `${n} saniye`]), 'Tur süresi'),
+      select('start', [['random', 'Rastgele yer'], ['begin', 'Şarkının başı']], 'Başlangıç noktası')));
+}
+
+// Bu turun şarkısını sessizce yükle; herkes aynı başlangıç noktasını hesaplasın (startFraction sunucudan).
+function prepareOnlineMedia(view) {
+  const m = view.media;
+  if (ol.key === m.key) return;
+  ol.key = m.key;
+  ol.ready = false;
+  ol.failed = false;
+  ol.playing = false;
+  ol.draft = '';
+  media.prepare({ ytId: m.ytId, audio: m.audio, title: '', artist: '' })
+    .then((duration) => {
+      if (ol.key !== m.key) return;
+      const f = m.startFraction;
+      let start = 0;
+      if (f != null && Number.isFinite(duration)) {
+        if (media.kind === 'audio') start = f * Math.max(0, duration - view.stages.at(-1) - 0.5);
+        else {
+          const lo = duration * 0.15;
+          const hi = Math.max(lo, duration * 0.65 - view.stages.at(-1));
+          start = lo + f * (hi - lo);
+        }
+      }
+      ol.start = start;
+      ol.ready = true;
+      online?.rerender();
+    })
+    .catch(() => {
+      if (ol.key !== m.key) return;
+      ol.failed = true;
+      online?.rerender();
+    });
+}
+
+async function playOnlineClip(view) {
+  if (!ol.ready || ol.playing || !view.me) return;
+  ol.playing = true;
+  online?.rerender();
+  const dur = view.stages[view.me.stage];
+  try {
+    await media.playClip(ol.start, dur, (t) => {
+      const bar = document.getElementById('ol-bar-fill');
+      if (bar) bar.style.width = `${(t / view.stages.at(-1)) * 100}%`;
+    });
+  } catch {
+    toast('Şarkı çalınamadı.');
+  }
+  ol.playing = false;
+  online?.rerender();
+}
+
+function suggestionsFor(view, q) {
+  const n = norm(q);
+  if (!n) return [];
+  return view.pool
+    .map((label) => ({ label, key: norm(label) }))
+    .filter((x) => x.key.includes(n))
+    .sort((a, b) => Number(!a.key.startsWith(n)) - Number(!b.key.startsWith(n)))
+    .slice(0, 6);
+}
+
+function onlineGame(view, ctx) {
+  prepareOnlineMedia(view);
+  const me = view.me;
+  const stages = view.stages;
+  const parts = [uiEl('div', { class: 'game-head' },
+    uiEl('div', { class: 'round' }, view.phase === 'over' ? 'Oyun bitti' : `Şarkı ${view.round} / ${view.totalRounds}`),
+    view.endsAt ? uiEl('div', { class: 'big-timer' }, '⏱️ ', countdown(view.endsAt, ctx.serverOffset)) : null)];
+
+  if (view.phase === 'play' && me && !me.done) parts.push(playPanel(view, ctx));
+  else if (view.phase === 'play' && me?.done) {
+    parts.push(uiEl('section', { class: 'card center' },
+      uiEl('div', { class: `result-msg ${me.won ? 'good' : 'bad'}` }, me.won ? `🎉 Bildin! +${me.points}` : '😬 Bu sefer olmadı'),
+      uiEl('p', { class: 'hint' }, 'Diğerleri bitirince cevap açılacak…')));
+  } else if (view.phase === 'play' && !me) {
+    parts.push(uiEl('section', { class: 'card warn center' }, '👀 Bu turu izliyorsun.'));
+  }
+
+  if (view.phase === 'reveal' || view.phase === 'over') parts.push(revealPanel(view, ctx));
+
+  // Oyuncular: puan + bu turdaki ilerleme (tahmin metinleri yok)
+  const ranked = [...view.players].sort((a, b) => b.score - a.score);
+  parts.push(uiEl('section', { class: 'card' },
+    uiEl('h2', {}, view.phase === 'over' ? '🏆 Final skorları' : '👥 Oyuncular'),
+    uiEl('ul', { class: 'player-list' }, ranked.map((p) => {
+      let status = '';
+      if (view.phase === 'play') status = p.done ? (p.won ? '✓ bildi' : '✗ bitirdi') : p.stage != null ? `🎧 ${stages[p.stage]} sn` : '';
+      else if (p.roundPoints != null && view.phase === 'reveal') status = p.roundPoints ? `+${p.roundPoints}` : '0';
+      return uiEl('li', { class: ctx.connected(p.id) ? '' : 'offline' },
+        uiEl('span', { class: 'player-name' }, p.name),
+        p.id === ctx.playerId ? uiEl('span', { class: 'tag' }, 'sen') : null,
+        status ? uiEl('span', { class: 'tag' }, status) : null,
+        uiEl('span', { class: 'score' }, `${p.score} puan`));
+    }))));
+
+  // Yazarken yeniden çizim odağı kaçırmasın
+  if (ol.focus) {
+    requestAnimationFrame(() => {
+      const input = document.getElementById('ol-guess');
+      if (input && document.activeElement !== input) {
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+      }
+    });
+  }
+  return uiEl('div', { class: 'stack' }, parts);
+}
+
+function playPanel(view, ctx) {
+  const me = view.me;
+  const stages = view.stages;
+  const isLast = me.stage >= stages.length - 1;
+  const acList = uiEl('ul', { class: 'ol-ac', id: 'ol-ac' });
+  const renderAc = () => {
+    acList.replaceChildren(...suggestionsFor(view, ol.draft).map((s) =>
+      uiEl('li', {}, uiEl('button', {
+        type: 'button',
+        onmousedown: (e) => e.preventDefault(),
+        onclick: () => {
+          ol.draft = s.label.split(' — ')[0];
+          const input = document.getElementById('ol-guess');
+          if (input) { input.value = ol.draft; input.focus(); }
+          acList.replaceChildren();
+        },
+      }, s.label))));
+  };
+  const input = uiEl('input', {
+    id: 'ol-guess', type: 'text', autocomplete: 'off', placeholder: 'Şarkının adı ne? (boş Enter = çal)',
+    oninput: (e) => { ol.draft = e.target.value; renderAc(); },
+    onfocus: () => { ol.focus = true; },
+    onblur: () => { ol.focus = false; },
+  });
+  input.value = ol.draft;
+  renderAc();
+
+  return uiEl('section', { class: 'card game-card' },
+    uiEl('ol', { class: 'guesses' }, me.guesses.map((g, i) =>
+      uiEl('li', { class: g.text == null ? 'skip' : 'wrong' }, g.text == null ? `⏭ Geçildi (${stages[i]} sn)` : `✗ ${g.text}`))),
+    uiEl('div', { class: 'ol-stages' }, stages.map((s, i) =>
+      uiEl('span', { class: `ol-stage${i === me.stage ? ' current' : i < me.stage ? ' past' : ''}` }, `${s} sn`))),
+    uiEl('div', { class: 'ol-bar' }, uiEl('i', { id: 'ol-bar-fill' })),
+    uiEl('div', { class: 'play-wrap' },
+      uiEl('button', {
+        class: `play-btn${ol.playing ? ' playing' : ''}`,
+        disabled: !ol.ready || ol.playing,
+        'aria-label': 'Çal',
+        onclick: () => playOnlineClip(view),
+      }, uiEl('span', { class: 'play-icon' }, '▶')),
+      uiEl('div', { class: 'play-label' }, ol.failed ? '⚠️ Şarkı yüklenemedi — tahmin edebilir veya geçebilirsin' : ol.ready ? `${stages[me.stage]} sn dinle` : 'Şarkı yükleniyor…')),
+    uiEl('form', {
+      class: 'guess-form',
+      onsubmit: (e) => {
+        e.preventDefault();
+        const textValue = ol.draft.trim();
+        if (!textValue) return playOnlineClip(view);
+        ol.draft = '';
+        media.stop();
+        ctx.act({ type: 'guess', text: textValue });
+      },
+    },
+    input,
+    acList,
+    uiEl('div', { class: 'row' },
+      uiEl('button', { type: 'button', class: 'btn ghost', onclick: () => { media.stop(); ctx.act(isLast ? { type: 'giveUp' } : { type: 'skip' }); } },
+        isLast ? 'Pes et' : `Geç (+${fmt(stages[me.stage + 1] - stages[me.stage])} sn)`),
+      uiEl('button', { type: 'submit', class: 'btn primary' }, 'Tahmin et'))));
+}
+
+function revealPanel(view, ctx) {
+  const r = view.reveal;
+  if (!r) return null;
+  // Tur açılınca şarkıyı bir kez baştan çal
+  if (view.phase === 'reveal' && ol.revealedKey !== view.media.key && ol.ready) {
+    ol.revealedKey = view.media.key;
+    media.playFrom(ol.start);
+  }
+  // Kapak: Spotify playlist şarkılarında yok → sonradan çek; YouTube'da küçük resim
+  let cover = r.cover ?? (r.ytId ? `https://i.ytimg.com/vi/${r.ytId}/hqdefault.jpg` : null);
+  if (!cover && r.spotifyId) {
+    if (ol.coverFor !== r.spotifyId) {
+      ol.coverFor = r.spotifyId;
+      ol.cover = null;
+      api(`/api/spotify-cover?id=${r.spotifyId}`).then(({ cover: c }) => { ol.cover = c; online?.rerender(); }).catch(() => {});
+    }
+    cover = ol.cover;
+  }
+  const last = view.round >= view.totalRounds;
+  return uiEl('section', { class: 'card center' },
+    view.phase === 'over' ? uiEl('div', { class: 'result-msg good' }, '🏁 Oyun bitti!') : null,
+    cover ? uiEl('img', { class: 'ol-cover', src: cover, alt: '' }) : null,
+    uiEl('div', { class: 'reveal-title' }, r.title),
+    uiEl('div', { class: 'reveal-artist' }, r.artist ?? ''),
+    view.phase === 'reveal'
+      ? uiEl('div', { class: 'row center' },
+        uiEl('button', { class: 'btn ghost', onclick: () => { if (media.isPaused()) media.resume(); else media.pause(); } }, '⏯ Durdur / Devam'),
+        ctx.isHost
+          ? uiEl('button', { class: 'btn primary', onclick: () => { media.stop(); ctx.act({ type: 'next' }); } }, last ? 'Sonuçları göster' : 'Sonraki şarkı →')
+          : uiEl('p', { class: 'hint' }, 'Oda sahibi sonraki şarkıyı başlatacak…'))
+      : null);
+}
 
 // ======================================================================
 // Başlangıç

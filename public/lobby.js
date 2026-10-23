@@ -141,6 +141,8 @@ export function mountLobby(root, game) {
           editable: ctx.isHost,
           change: (patch) => net.send({ t: 'settings', settings: patch }),
           playerCount: connectedCount,
+          room,
+          sendPrep: (data) => net.send({ t: 'prep', data }),
         }),
         ctx.isHost ? null : el('p', { class: 'hint' }, 'Ayarları oda sahibi değiştirir.')) : null,
       ctx.isHost
