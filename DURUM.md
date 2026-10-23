@@ -1,4 +1,4 @@
-# Kaldığımız yer (2026-10-22)
+# Kaldığımız yer (2026-10-23)
 
 Bir sonraki oturum buradan devam eder. Ayrıntılı şartname: `PLAN.md`.
 
@@ -21,14 +21,21 @@ Açık küçük notlar:
 - Kopuk oyuncular suçlama oylamasını 45 sn bekletiyor (QA notu) — oylamada sadece bağlı oyuncuları saymak düşünülebilir.
 - Öneri: sadece TEST_GAMES=1 iken `/api/stats` (odalar, kimlikler, açık soket, bellek).
 
+## Şu an: 🧛 Vampir Köylü (dal `game/vampir`)
+
+- Kurallar kullanıcıyla netleşti → PLAN.md §4.3. Roller: Vampir/Köylü/Doktor/Gözcü/Deli; roller oyun sonuna kadar
+  hiç açıklanmaz; anlatıcı sadece yazı; klasik oylama (aday + destek → savunma → Asılsın mı?).
+- Yapıldı ve commit'li (dalda): server/games/vampir.js, public/games/vampir.js, 17 sürü + 1 tarayıcı testi.
+  `npm test` 93/93, `npm run e2e` 11/11.
+- Çalışıyor/çalıştırıldı: qa-player, lobby-swarm, security-auditor ajanları Vampir üzerinde (raporlar gelince düzelt).
+- Sonra: düzeltmeler → testler yeşil → `game/vampir`'i main'e merge (merge commit) → push.
+
 ## Sıradaki adımlar
 
-1. Kullanıcıya P1 özetini ver, GitHub'a push için onay al.
-2. P2 için kuralları kullanıcıyla netleştir (PLAN.md §4.3): 🧛 Vampir Köylü, 👉 Hangimiz?, 😂 Komik Cevap, 🚫 Tabu.
+1. Vampir ajan raporlarını düzelt, merge + push (kullanıcı bu akışı onayladı: oyun başına dal, bitince merge).
+2. Sıradaki P2 oyunu için kullanıcıyla kural netleştir: 😂 Komik Cevap, 👉 Hangimiz?, 🚫 Tabu.
 3. Domain alınınca RPi'ye deploy (güvenlik raporundaki sertleştirme önerileri: reverse proxy, systemd, TRUST_PROXY=1).
 
-## Kullanıcıya sorulacak küçük kararlar
+## Kullanıcı kararları (2026-10-23)
 
-- Wordle cevap listesinde sınırda kelimeler var (kanka, moruk, salak, eroin, esrar, namaz…) — çıkarılsın mı?
-  (`content/wordle/curation/answers-exclude.txt`'e ekleyip `node content/wordle/build.mjs`.)
-- Wordle listeleri CC BY-SA kaynaklardan; repo herkese açıksa atıf README'de var, uygun mu?
+- Wordle sınırda kelimeler: hepsi kalsın. Mevcut geçmiş main'e doğrudan push edildi; yeni oyunlar kendi dalında.
