@@ -90,7 +90,7 @@ test('oda temizliği: herkes leave → oda hemen silinir; herkes kopar → koltu
   await srv.waitProbe((p) => p.rooms === base, 5000);
 });
 
-test('sunucu oda sınırı (200): 201. oda reddedilir; sınırdayken odadaki host "create" denerse odasını kaybetmemeli', { todo: 'BUG adayı: createRoom önce leaveRoom yapıyor, sonra sınırı kontrol ediyor' }, async () => {
+test('sunucu oda sınırı (200): 201. oda reddedilir; sınırdayken odadaki host "create" denerse odasını kaybetmemeli', async () => {
   const base = (await srv.waitProbe(() => true)).rooms;
   // Önce 2 kişilik bir oda: host sınırdayken create denesin
   const g = await makeRoom(srv.wsUrl, '_test', 2, 'Sınır');
@@ -119,7 +119,7 @@ test('sunucu oda sınırı (200): 201. oda reddedilir; sınırdayken odadaki hos
   }
 });
 
-test('oyun sırasında rename reddedilir ve kimlik adı da değişmemeli', { todo: 'BUG adayı (düşük): rename hata verse de identity.name değişiyor' }, async () => {
+test('oyun sırasında rename reddedilir ve kimlik adı da değişmemeli', async () => {
   const { bots, host, code } = await makeRoom(srv.wsUrl, '_test', 2, 'Ad');
   track(bots);
   host.send({ t: 'start' });

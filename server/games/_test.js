@@ -1,6 +1,6 @@
 // Test oyunu: her oyuncunun gizli bir sayısı var, sırayla "press" yapılır, süre dolunca veya
 // herkes basınca biter. Lobi testleri (gizli bilgi sızıntısı, sıra, zamanlayıcı, yeniden bağlanma) için.
-import { GameError } from '../errors.js';
+import { GameError, num } from '../errors.js';
 
 export default {
   id: '_test',
@@ -10,7 +10,7 @@ export default {
   defaultSettings: { seconds: 60 },
 
   validateSettings(s) {
-    const seconds = Math.min(600, Math.max(5, Math.round(Number(s.seconds) || 60)));
+    const seconds = Math.min(600, Math.max(5, Math.round(num(s.seconds) || 60)));
     return { seconds };
   },
 

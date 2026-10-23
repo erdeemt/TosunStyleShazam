@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { createRng, seedFrom } from './rng.js';
-import { GameError } from './errors.js';
+import { GameError, str } from './errors.js';
 import { jsonStore } from './store.js';
 
 const read = (name) => JSON.parse(readFileSync(new URL(`../content/wordle/${name}.json`, import.meta.url), 'utf8'));
@@ -26,7 +26,7 @@ const freeGames = new Map(); // gameId -> { playerId, answer, guesses, done, won
 const FOLD = { â: 'a', î: 'i', û: 'u' };
 
 export function normalizeWord(raw) {
-  return String(raw ?? '').trim().toLocaleLowerCase('tr').normalize('NFC').replace(/[âîû]/g, (c) => FOLD[c]);
+  return str(raw).trim().toLocaleLowerCase('tr').normalize('NFC').replace(/[âîû]/g, (c) => FOLD[c]);
 }
 
 // NYT kuralları: önce yeşiller, sonra kalan harf sayısına göre sarılar.
@@ -121,7 +121,7 @@ export function startGame(identity, mode) {
 
 export function guess(identity, mode, gameId, rawWord) {
   if (mode === 'free') {
-    const game = freeGames.get(String(gameId));
+    const game = freeGames.get(str(gameId));
     if (!game || game.playerId !== identity.id) throw new GameError('Oyun bulunamadı, yeni oyun başlat.');
     if (game.done) throw new GameError('Bu oyun bitti.');
     const word = checkGuess(rawWord);
@@ -134,7 +134,7 @@ export function guess(identity, mode, gameId, rawWord) {
 
   // Günlük: sadece bugünün bulmacası oynanabilir (gece yarısı değişince eski oyun kapanır).
   const date = todayIstanbul();
-  if (String(gameId) !== date) throw new GameError('Günün bulmacası değişti, sayfayı yenile.');
+  if (str(gameId) !== date) throw new GameError('Günün bulmacası değişti, sayfayı yenile.');
   const entry = dailyEntry(date, identity, true);
   if (entry.done) throw new GameError('Bugünkü bulmacayı bitirdin. Yarın yeni kelime!');
   const word = checkGuess(rawWord);

@@ -3,7 +3,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import { createRng } from './rng.js';
-import { GameError } from './errors.js';
+import { GameError, str } from './errors.js';
 import { jsonStore } from './store.js';
 import { IP_LIMITS, clientIp, identityLimiter } from './limits.js';
 import { GAMES } from './games/index.js';
@@ -53,7 +53,7 @@ const scaled = (ms) => Math.max(1, Math.round(ms * TIME_SCALE));
 const BAD_CHARS = new RegExp(`[${['0000-001f', '007f-009f', '200b-200f', '2028-202e', '2060-2069', 'feff-feff'].map((r) => r.split('-').map((h) => `\\u${h}`).join('-')).join('')}]`, 'g');
 
 export function sanitizeName(raw) {
-  const clean = String(raw ?? '').replace(BAD_CHARS, '').replace(/\s+/g, ' ').trim();
+  const clean = str(raw).replace(BAD_CHARS, '').replace(/\s+/g, ' ').trim();
   const chars = [...clean].slice(0, LIMITS.nameMaxLength).join('').trim();
   return chars || 'Oyuncu';
 }
@@ -172,10 +172,13 @@ function runTick(room, token) {
 function createRoom(identity, gameId, ip) {
   const game = Object.hasOwn(GAMES, gameId) ? GAMES[gameId] : null;
   if (!game) throw new GameError('Böyle bir oyun yok.');
-  leaveRoom(identity, 'switch');
-  if (rooms.size >= LIMITS.maxRooms) throw new GameError('Sunucu dolu, biraz sonra tekrar dene.');
-  const fromIp = [...rooms.values()].filter((r) => r.creatorIp === ip).length;
+  // Önce kontroller: reddedilen istek kullanıcıyı mevcut odasından çıkarmasın. Ayrılacağı kendi odası sayılmaz.
+  const own = identity.roomCode && rooms.get(identity.roomCode);
+  const freesOwn = own && own.players.size === 1 ? 1 : 0;
+  if (rooms.size - freesOwn >= LIMITS.maxRooms) throw new GameError('Sunucu dolu, biraz sonra tekrar dene.');
+  const fromIp = [...rooms.values()].filter((r) => r.creatorIp === ip && !(r === own && freesOwn)).length;
   if (fromIp >= IP_LIMITS.roomsPerIp) throw new GameError('Bu ağdan çok fazla oda açık. Eski odaları kapatın.');
+  leaveRoom(identity, 'switch');
   const code = newCode();
   roomCounter++;
   const room = {
@@ -214,7 +217,7 @@ function addPlayer(room, identity, { spectator = false } = {}) {
 }
 
 function joinRoom(identity, rawCode) {
-  const code = String(rawCode ?? '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
+  const code = str(rawCode).toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
   const room = rooms.get(code);
   if (!room) throw new GameError('Bu kodla bir oda bulunamadı.');
   if (identity.roomCode === code && room.players.has(identity.id)) return reconnect(identity, room);
@@ -236,6 +239,20 @@ function reconnect(identity, room) {
   broadcast(room);
 }
 
+// Oda sahibi adayı: bağlı oyuncu > bağlı izleyici > herhangi biri; eşitlikte en eski katılan.
+// (İzleyici host olursa oyun "sonraki tur"da takılır.)
+function pickHost(room) {
+  const score = (p) => (p.connected ? 2 : 0) + (p.spectator && room.phase !== 'lobby' ? 0 : 1);
+  return [...room.players.values()].sort((a, b) => score(b) - score(a) || a.joinedAt - b.joinedAt)[0];
+}
+
+// Ayar nesnesinden sadece düz değerleri al (nesne/dizi tuzakları validateSettings'e ulaşmasın).
+function primitives(obj) {
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) if (['string', 'number', 'boolean'].includes(typeof v)) out[k] = v;
+  return out;
+}
+
 function removePlayer(room, playerId, reason) {
   const p = room.players.get(playerId);
   if (!p) return;
@@ -253,8 +270,7 @@ function removePlayer(room, playerId, reason) {
   }
   if (room.players.size === 0) return deleteRoom(room);
   if (room.hostId === playerId) {
-    const next = [...room.players.values()].sort((a, b) => (b.connected - a.connected) || (a.joinedAt - b.joinedAt))[0];
-    room.hostId = next.id;
+    room.hostId = pickHost(room).id;
   }
   if (reason) room.lastEvent = reason;
   afterChange(room);
@@ -285,8 +301,8 @@ function onDisconnect(identity) {
     clearTimeout(room.hostTimer);
     room.hostTimer = setTimeout(() => {
       if (!rooms.has(room.code) || room.hostId !== identity.id || room.players.get(identity.id)?.connected) return;
-      const next = [...room.players.values()].filter((x) => x.connected).sort((a, b) => a.joinedAt - b.joinedAt)[0];
-      if (next) { room.hostId = next.id; broadcast(room); }
+      const next = pickHost(room);
+      if (next.connected && next.id !== identity.id) { room.hostId = next.id; broadcast(room); }
     }, scaled(LIMITS.hostHandoffMs));
   }
   if (![...room.players.values()].some((x) => x.connected)) {
@@ -310,7 +326,7 @@ function requireHost(room, identity) {
 
 const handlers = {
   create(identity, msg, socket) {
-    const room = createRoom(identity, String(msg.game ?? ''), socket.ip);
+    const room = createRoom(identity, str(msg.game), socket.ip);
     broadcast(room);
   },
   join(identity, msg) {
@@ -324,7 +340,7 @@ const handlers = {
     const room = requireRoom(identity);
     requireHost(room, identity);
     if (room.phase !== 'lobby') throw new GameError('Ayarlar sadece bekleme odasında değişir.');
-    const incoming = msg.settings && typeof msg.settings === 'object' ? msg.settings : {};
+    const incoming = msg.settings && typeof msg.settings === 'object' && !Array.isArray(msg.settings) ? primitives(msg.settings) : {};
     room.settings = room.game.validateSettings({ ...room.settings, ...incoming });
     broadcast(room);
   },
@@ -353,7 +369,7 @@ const handlers = {
   kick(identity, msg) {
     const room = requireRoom(identity);
     requireHost(room, identity);
-    const targetId = String(msg.playerId ?? '');
+    const targetId = str(msg.playerId);
     if (targetId === identity.id || !room.players.has(targetId)) throw new GameError('Bu oyuncu çıkarılamaz.');
     const target = identities.get(targetId);
     removePlayer(room, targetId, 'kick');
@@ -361,11 +377,11 @@ const handlers = {
     send(target?.socket, { t: 'room', room: null });
   },
   rename(identity, msg) {
+    const room = identity.roomCode && rooms.get(identity.roomCode);
+    if (room && room.phase !== 'lobby') throw new GameError('Ad sadece bekleme odasında değişir.');
     identity.name = sanitizeName(msg.name);
     persistIdentity(identity);
-    const room = identity.roomCode && rooms.get(identity.roomCode);
     if (room) {
-      if (room.phase !== 'lobby') throw new GameError('Ad sadece bekleme odasında değişir.');
       room.players.get(identity.id).name = uniqueName(room, identity.name, identity.id);
       broadcast(room);
     }
@@ -385,14 +401,14 @@ const handlers = {
 
 // playerId + token doğruysa mevcut kimlik, değilse yeni kimlik. HTTP uçları (günlük bulmacalar) da bunu kullanır.
 export function resolveIdentity({ playerId, token, name } = {}, ip = null) {
-  let identity = playerId && identities.get(String(playerId));
+  let identity = typeof playerId === 'string' ? identities.get(playerId) : null;
   if (!identity || typeof token !== 'string' || identity.token !== token) {
     if (ip && !identityLimiter.hit(ip)) throw new GameError('Bu ağdan çok fazla yeni oyuncu oluşturuldu. Biraz sonra tekrar dene.');
     if (identities.size >= LIMITS.maxIdentities) pruneIdentities();
     identity = { id: randomUUID(), token: randomBytes(16).toString('hex'), name: null, socket: null, roomCode: null, lastSeen: Date.now() };
     identities.set(identity.id, identity);
   }
-  if (name != null && String(name).trim()) identity.name = sanitizeName(name);
+  if (str(name).trim()) identity.name = sanitizeName(name);
   identity.lastSeen = Date.now();
   persistIdentity(identity);
   return identity;
@@ -411,8 +427,8 @@ function handleHello(socket, msg) {
   try {
     identity = resolveIdentity(msg, socket.ip);
   } catch (err) {
-    if (err instanceof GameError) return sendError(socket, 'identity', err.message);
-    throw err;
+    if (!(err instanceof GameError)) console.error('hello hatası:', err);
+    return sendError(socket, 'identity', err instanceof GameError ? err.message : 'Kimlik doğrulanamadı.');
   }
   // Aynı bağlantıda kimlik değişirse eski kimliğin bağlantısı kopmuş sayılır.
   if (socket.identity && socket.identity !== identity && socket.identity.socket === socket) {

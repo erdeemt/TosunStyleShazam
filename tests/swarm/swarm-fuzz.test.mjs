@@ -205,13 +205,13 @@ test('fuzz: her mesaj tipi × alan × düşmanca değer — sunucu çökmez, oyu
   assert.deepEqual(r.crashes.map((c) => c.label), [], 'sunucu tek bir mesajla çökmemeli (bkz. ÇÖKME logları)');
 });
 
-test('fuzz: düşmanca hello sonrası soket yanıt vermeye devam etmeli (yakalanmamış istisna yok)', { todo: 'BUG: hello içindeki String(obj) TypeError ws dinleyicisinden kaçıyor; soket sessizleşiyor' }, async () => {
+test('fuzz: düşmanca hello sonrası soket yanıt vermeye devam etmeli (yakalanmamış istisna yok)', async () => {
   const r = await runFuzz();
   assert.deepEqual(r.zombies, []);
   assert.deepEqual(r.uncaught, []);
 });
 
-test('fuzz: iç hata (internal) dönen yük olmamalı (toString/valueOf tuzakları → GameError olmalı)', { todo: 'BUG (düşük): String(obj) TypeError → "Bir şeyler ters gitti" + log gürültüsü' }, async () => {
+test('fuzz: iç hata (internal) dönen yük olmamalı (toString/valueOf tuzakları → GameError olmalı)', async () => {
   const r = await runFuzz();
   assert.deepEqual(r.internal, []);
 });

@@ -1,7 +1,7 @@
 // 🕵️ Casus Kim? (Spyfall). Kurallar: PLAN.md §4.1.
 // Gizli bilgi: mekân ve roller casusun görünümüne, casusların kimliği diğerlerinin görünümüne sonuç açıklanana kadar girmez.
 import { readFileSync } from 'node:fs';
-import { GameError } from '../errors.js';
+import { GameError, num, str } from '../errors.js';
 
 const { locations: LOCATIONS } = JSON.parse(readFileSync(new URL('../../content/spyfall/locations.json', import.meta.url), 'utf8'));
 const LOCATION_LIST = LOCATIONS.map(({ id, name, emoji }) => ({ id, name, emoji }));
@@ -123,7 +123,7 @@ export default {
 
   validateSettings(s) {
     const clamp = (v, lo, hi, def) => {
-      const n = Math.round(Number(v));
+      const n = Math.round(num(v));
       return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : def;
     };
     return {
@@ -155,7 +155,7 @@ export default {
       case 'accuse': {
         if (r.phase !== 'play') throw new GameError('Şu an suçlama yapılamaz.');
         if (r.accusersUsed.includes(playerId)) throw new GameError('Bu turdaki suçlama hakkını kullandın.');
-        const target = findPlayer(state, String(action.targetId));
+        const target = findPlayer(state, str(action.targetId));
         if (!target || target.id === playerId) throw new GameError('Geçersiz oyuncu.');
         r.accusersUsed.push(playerId);
         pauseClock(state, ctx);
@@ -177,7 +177,7 @@ export default {
       case 'guess': {
         if (r.phase !== 'play') throw new GameError('Şu an tahmin yapılamaz.');
         if (!isSpy(state, playerId)) throw new GameError('Sadece casus mekân tahmin edebilir.');
-        const guess = LOCATIONS.find((l) => l.id === String(action.locationId));
+        const guess = LOCATIONS.find((l) => l.id === str(action.locationId));
         if (!guess) throw new GameError('Böyle bir mekân yok.');
         if (guess.id === r.locationId) finishRound(state, ctx, { winner: 'spy', reason: 'guess', guessId: guess.id });
         else finishRound(state, ctx, { winner: 'town', reason: 'bad_guess', guessId: guess.id });
@@ -186,7 +186,7 @@ export default {
       case 'finalVote': {
         if (r.phase !== 'final') throw new GameError('Şu an oylama yok.');
         if (playerId in r.finalVotes) throw new GameError('Oyunu zaten verdin.');
-        const target = findPlayer(state, String(action.targetId));
+        const target = findPlayer(state, str(action.targetId));
         if (!target || target.id === playerId) throw new GameError('Geçersiz oyuncu.');
         r.finalVotes[playerId] = target.id;
         maybeResolveFinal(state, ctx);

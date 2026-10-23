@@ -402,7 +402,7 @@ test('yarış: aynı hedefe kick + leave aynı anda, start + 2 ayrılma aynı an
 
 // ---------------------------------------------------------------------------------------------------------------
 // Bulgu: izleyici host olunca tur ilerletilemez (BUG adayı, bkz. rapor).
-test('host devri izleyiciye düşerse açıklama ekranından sonraki tura geçilebilmeli', { todo: 'BUG: izleyici host "next" diyemez, oyuncular da diyemez → oyun reveal\'da takılır' }, async () => {
+test('host ayrılınca oda sahipliği izleyiciye değil oyuncuya geçer; sonraki tura geçilebilir (B2)', async () => {
   // A (host), D, B, C, E katılır. D kopar → A oyunu A,B,C,E ile başlatır (D izleyici). D döner. A ayrılır → host D (izleyici).
   const bots = await makeBots(srv.wsUrl, 5, 'Iz');
   all.push(...bots);
@@ -422,7 +422,9 @@ test('host devri izleyiciye düşerse açıklama ekranından sonraki tura geçil
   if (A.view.me.spy) return; // casus ayrılırsa tur iptal olur; senaryo başka yoldan aynı sonuca varır
   A.send({ t: 'leave' });
   const room = await B.waitRoom((r) => r.players.length === 4);
-  assert.equal(room.hostId, D.playerId, 'host izleyici D oldu');
+  // Düzeltme sonrası: host izleyici D'ye değil, en eski oyuncuya (B) geçer.
+  assert.notEqual(room.hostId, D.playerId, 'host izleyiciye geçmemeli');
+  assert.equal(room.hostId, B.playerId);
   const spy = [B, C, E].find((b) => b.view.me.spy);
   const town = [B, C, E].find((b) => !b.view.me.spy);
   await spy.act({ type: 'guess', locationId: town.view.me.location.id });
