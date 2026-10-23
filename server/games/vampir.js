@@ -19,6 +19,12 @@ export function autoVampires(n) {
   return n <= 7 ? 1 : n <= 10 ? 2 : 3;
 }
 
+// Elle seçilen vampir sayısı için üst sınır: oyuncuların üçte birinden az (5–6 kişide 1, 7–9'da 2, 10+ 3).
+// Daha fazlası ilk geceden sonra oyunu bitirir.
+export function maxVampires(n) {
+  return Math.max(1, Math.floor((n - 1) / 3));
+}
+
 const alive = (state) => state.players.filter((p) => p.alive);
 const player = (state, id) => state.players.find((p) => p.id === id);
 const alivePlayer = (state, id) => {
@@ -35,6 +41,7 @@ function startNight(state, ctx) {
   state.nomination = null;
   state.trial = null;
   state.nominatedToday = [];
+  ctx.clearTimer('nomination');
   state.endsAt = ctx.setTimer(state.settings.nightSeconds * 1000);
 }
 
@@ -58,6 +65,7 @@ function resolveNight(state, ctx) {
 
   if (victimId) kill(state, victimId, 'night');
   state.announcement = { night: state.night, deadId: victimId };
+  state.lastTrial = null; // dünün oylama sonucu yeni güne taşınmasın (asılma bilgisi gece boyunca kalır)
   if (checkWin(state, ctx)) return;
   state.phase = 'day';
   state.endsAt = ctx.setTimer(state.settings.dayMinutes * 60_000);
@@ -102,6 +110,7 @@ function startTrial(state, ctx, targetId) {
   state.phase = 'trial';
   state.trial = { targetId, votes: {} };
   state.nomination = null;
+  ctx.clearTimer('nomination');
   state.endsAt = ctx.setTimer(state.settings.defenseSeconds * 1000);
 }
 
@@ -186,7 +195,7 @@ export default {
   setup({ players, settings, rng, ctx }) {
     const n = players.length;
     // Vampirler her zaman yarıdan az olmalı.
-    const vampCount = Math.max(1, Math.min(settings.vampires || autoVampires(n), Math.ceil(n / 2) - 1));
+    const vampCount = settings.vampires ? Math.min(settings.vampires, maxVampires(n)) : autoVampires(n);
     const roles = Array(vampCount).fill('vampir');
     for (const special of ['doktor', 'gozcu', 'deli']) if (settings[special] && roles.length < n) roles.push(special);
     while (roles.length < n) roles.push('koylu');
@@ -249,7 +258,8 @@ export default {
         const target = alivePlayer(state, targetId);
         if (!target || target.id === me.id) throw new GameError('Geçersiz aday.');
         state.nominatedToday.push(me.id);
-        state.nomination = { byId: me.id, targetId: target.id, at: ctx.now, expiresAt: ctx.now + NOMINATION_MS * ctx.timeScale };
+        // Destek gelmezse aday kendi zamanlayıcısıyla düşer ve herkese yayınlanır.
+        state.nomination = { byId: me.id, targetId: target.id, at: ctx.now, expiresAt: ctx.setTimer(NOMINATION_MS, 'nomination') };
         return;
       }
       case 'support': {
@@ -276,7 +286,8 @@ export default {
     }
   },
 
-  tick(state, ctx) {
+  tick(state, ctx, name = 'main') {
+    if (name === 'nomination') { state.nomination = null; return; }
     if (state.phase === 'night') resolveNight(state, ctx);
     else if (state.phase === 'day') startNight(state, ctx); // süre bitti, kimse asılmadı
     else if (state.phase === 'trial') startTrialVote(state, ctx);

@@ -2,7 +2,7 @@
 // Aynı odada oynandığı için rolü ele veren her şey (rol, gece talimatı, müttefik seçimleri, gözcü sonucu)
 // sadece "kartını göster" açıkken görünür; gece herkesin ekranı aynı yapıda.
 import { mountLobby } from '../lobby.js';
-import { $, el, countdown } from '../ui.js';
+import { $, el, countdown, toast } from '../ui.js';
 
 const ROLES = {
   vampir: { name: 'Vampir', icon: '🧛', desc: 'Her gece diğer vampirlerle bir kurban seç. Gündüz köylü gibi davran.', night: 'Kurbanını seç.' },
@@ -36,6 +36,7 @@ function settingsUI(s, { editable, change, playerCount }) {
       select('dayMinutes', [2, 3, 4, 5, 6, 8].map((n) => [n, `${n} dakika`]), 'Gündüz tartışması'),
       select('defenseSeconds', [15, 30, 45, 60].map((n) => [n, `${n} saniye`]), 'Savunma süresi'),
       select('nightSeconds', [30, 45, 60, 90, 120].map((n) => [n, `${n} saniye`]), 'Gece süresi')),
+    el('p', { class: 'hint' }, 'Elle seçilen vampir sayısı en fazla: 5–6 kişide 1, 7–9 kişide 2, 10+ kişide 3 (fazlası ilk geceden sonra oyunu bitirir).'),
     el('div', { class: 'checks' },
       toggle('doktor', '🩺 Doktor'), toggle('gozcu', '🔮 Gözcü'), toggle('deli', '🤡 Deli')));
 }
@@ -43,7 +44,8 @@ function settingsUI(s, { editable, change, playerCount }) {
 const nameOf = (view, id) => view.players.find((p) => p.id === id)?.name ?? '?';
 
 function roleCard(view) {
-  const key = `${view.gameKey}`;
+  // Her faz değişiminde kart kendiliğinden kapanır (gece açılan kart gündüz masada açık kalmasın).
+  const key = `${view.gameKey}:${view.phase}:${view.night}`;
   if (cardKey !== key) { cardKey = key; cardOpen = false; }
   if (!view.me) return null;
   const toggle = () => { cardOpen = !cardOpen; lobby.rerender(); };
@@ -64,7 +66,8 @@ function roleCard(view) {
   if (view.me.role === 'doktor' && view.me.lastProtected) {
     extra.push(el('small', {}, `Dün gece ${nameOf(view, view.me.lastProtected)} adlı oyuncuyu korudun; bu gece onu koruyamazsın.`));
   }
-  return el('button', { class: `role-card${view.me.role === 'vampir' ? ' spy' : ''}`, onclick: toggle },
+  // Bütün roller aynı renkte: uzaktan bakınca kart renginden rol anlaşılmasın.
+  return el('button', { class: 'role-card', onclick: toggle },
     el('span', { class: 'role-emoji' }, r.icon),
     el('b', {}, r.name),
     el('small', {}, r.desc),
@@ -103,25 +106,32 @@ function nightScreen(view, ctx) {
   const r = me ? ROLES[me.role] : null;
   const picked = me?.nightPick;
   const allyPicks = cardOpen ? me?.allyPicks ?? {} : {};
+  // Seçim sadece kart açıkken yapılır: kapalıyken herkesin ekranı ve dokunuşa tepkisi birebir aynı
+  // (vurgu, pasif düğme, hata mesajı rolü ele verirdi). Herkes gece kartını açmak zorunda.
+  let hint;
+  if (!me) hint = '👀 İzleyicisin; gece olayları gizli.';
+  else if (!me.alive) hint = '💀 Ölüler gece görev almaz.';
+  else if (!cardOpen) hint = picked ? '✓ Seçimini yaptın. Değiştirmek için kartını aç.' : 'Seçim yapmak için kartını aç. Herkes bir seçim yapar.';
+  else hint = `${r.night} ${me.role === 'gozcu' ? 'Tek bakış hakkın var, seçimin değişmez.' : 'Seçimini gece bitene kadar değiştirebilirsin.'}`;
   return el('section', { class: 'card' },
     el('h2', {}, '🌙 Köy uyuyor — gece görevin'),
-    el('p', { class: 'hint' }, cardOpen && r ? r.night : 'Görevini görmek için kartını aç. Seçim yapınca diğerlerini bekle.'),
-    me?.alive === false ? el('p', {}, '💀 Ölüler gece görev almaz.') : null,
+    el('p', { class: 'hint' }, hint),
     me?.alive
       ? el('div', { class: 'target-grid' }, view.players.filter((p) => p.alive).map((p) => {
         const allowed = me.nightTargets.includes(p.id);
         const allies = Object.entries(allyPicks).filter(([, t]) => t === p.id).map(([id]) => nameOf(view, id));
         return el('button', {
-          class: `target${picked === p.id ? ' chosen' : ''}`,
-          // Kart kapalıyken herkesin düğmeleri aynı görünür (pasif düğmeler rolü ele verirdi); geçersiz seçimi sunucu reddeder.
+          class: `target${cardOpen && picked === p.id ? ' chosen' : ''}`,
           disabled: cardOpen && !allowed,
-          onclick: () => ctx.act({ type: 'nightPick', targetId: p.id }),
+          onclick: () => {
+            if (!cardOpen) return toast('Seçim yapmak için kartını aç.');
+            ctx.act({ type: 'nightPick', targetId: p.id });
+          },
         }, p.name, p.id === ctx.playerId ? ' (sen)' : '',
         allies.length ? el('small', { class: 'ally-pick' }, `🧛 ${allies.join(', ')}`) : null);
       }))
       : null,
-    el('p', { class: 'hint center' }, `${view.nightProgress.done}/${view.nightProgress.total} kişi seçti`
-      + (picked ? ' · seçimini gece bitene kadar değiştirebilirsin' : '')));
+    el('p', { class: 'hint center' }, `${view.nightProgress.done}/${view.nightProgress.total} kişi seçti`));
 }
 
 function dayScreen(view, ctx) {
@@ -139,7 +149,7 @@ function dayScreen(view, ctx) {
     el('h2', {}, '🗣️ Tartışın'),
     el('p', { class: 'hint' }, me?.canNominate
       ? 'Şüphelendiğin birini aday gösterebilirsin (günde bir kez).'
-      : me?.alive ? 'Bugünkü aday gösterme hakkını kullandın.' : '💀 Ölüler konuşmaz.'),
+      : me?.alive ? 'Bugünkü aday gösterme hakkını kullandın.' : me ? '💀 Ölüler konuşmaz.' : '👀 İzleyicisin.'),
     playerList(view, ctx, (p) => (me?.canNominate && !nom && p.alive && p.id !== ctx.playerId
       ? el('button', { class: 'btn ghost small', onclick: () => ctx.act({ type: 'nominate', targetId: p.id }) }, '☝️ Aday göster')
       : null))));
@@ -169,17 +179,17 @@ function trialScreen(view, ctx) {
       ? el('div', { class: 'row center' },
         el('button', { class: 'btn primary', onclick: () => ctx.act({ type: 'trialVote', yes: true }) }, '👍 Evet, asılsın'),
         el('button', { class: 'btn ghost', onclick: () => ctx.act({ type: 'trialVote', yes: false }) }, '👎 Hayır'))
-      : el('p', {}, amTarget ? '😰 Senin hakkında oylanıyor.' : t.myVote != null ? `Verdiğin oy: ${t.myVote ? '👍 Evet' : '👎 Hayır'}` : '💀 Ölüler oy veremez.'));
+      : el('p', {}, amTarget ? '😰 Senin hakkında oylanıyor.' : t.myVote != null ? `Verdiğin oy: ${t.myVote ? '👍 Evet' : '👎 Hayır'}` : view.me ? '💀 Ölüler oy veremez.' : '👀 İzleyiciler oy veremez.'));
 }
 
 function playerList(view, ctx, action) {
-  const deathText = { night: 'gece öldü', hanged: 'asıldı', left: 'oyundan ayrıldı' };
+  const deathText = (d) => (d.cause === 'night' ? `${d.night}. gece öldü` : d.cause === 'hanged' ? `${d.night}. gün asıldı` : 'oyundan ayrıldı');
   return el('ul', { class: 'player-list' }, view.players.map((p) =>
     el('li', { class: `${p.alive ? '' : 'dead'}${ctx.connected(p.id) ? '' : ' offline'}` },
       el('span', { class: 'player-name' }, `${p.alive ? '' : '💀 '}${p.name}`),
       p.id === ctx.playerId ? el('span', { class: 'tag' }, 'sen') : null,
       p.id === ctx.hostId ? el('span', { class: 'tag' }, '👑') : null,
-      p.alive ? null : el('span', { class: 'tag' }, `${p.death.night}. ${deathText[p.death.cause]}`),
+      p.alive ? null : el('span', { class: 'tag' }, deathText(p.death)),
       ctx.connected(p.id) ? null : el('span', { class: 'tag' }, '📴'),
       action?.(p))));
 }
@@ -200,6 +210,11 @@ function overScreen(view, ctx) {
           el('span', { class: 'tag' }, `${r.icon} ${r.name}`),
           res.winnerIds.includes(p.id) ? el('span', { class: 'score good' }, '🏆') : null);
       }))),
+    el('section', { class: 'card' },
+      el('h2', {}, '⚰️ Ölümler'),
+      el('ul', { class: 'howto' }, view.players.filter((p) => !p.alive)
+        .sort((a, b) => a.death.night - b.death.night || (a.death.cause === 'night' ? -1 : 1))
+        .map((p) => el('li', {}, `${p.name} (${ROLES[res.roles[p.id]].name}) — ${p.death.cause === 'night' ? `${p.death.night}. gece öldürüldü` : p.death.cause === 'hanged' ? `${p.death.night}. gün asıldı` : 'oyundan ayrıldı'}`)))),
     el('section', { class: 'card' },
       el('h2', {}, '📜 Geceler'),
       el('ul', { class: 'howto' }, res.log.filter((l) => !l.trial).map((l) => el('li', {},

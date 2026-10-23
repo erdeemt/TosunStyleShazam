@@ -131,36 +131,42 @@ function makeCtx(room) {
     rng: room.rng,
     hostId: room.hostId,
     timeScale: TIME_SCALE,
-    // ms: oyun süresi (gerçek dakika cinsinden düşünülür); dönen değer bitiş anı (epoch ms, ölçeklenmiş)
-    setTimer(ms) {
-      clearTimeout(room.timer);
+    // ms: oyun süresi (gerçek dakika cinsinden düşünülür); dönen değer bitiş anı (epoch ms, ölçeklenmiş).
+    // Aynı anda birden fazla zamanlayıcı olabilir (ör. gündüz saati + aday destek süresi); isim verilmezse 'main'.
+    // Dolunca game.tick(state, ctx, name) çağrılır.
+    setTimer(ms, name = 'main') {
+      clearTimeout(room.timers.get(name)?.handle);
       const delay = scaled(ms);
-      const token = ++room.timerToken;
-      room.timer = setTimeout(() => runTick(room, token), delay);
+      const token = ++room.timerSeq;
+      room.timers.set(name, { token, handle: setTimeout(() => runTick(room, name, token), delay) });
       return Date.now() + delay;
     },
-    clearTimer() {
-      clearTimeout(room.timer);
-      room.timer = null;
-      room.timerToken++;
+    clearTimer(name = 'main') {
+      clearTimeout(room.timers.get(name)?.handle);
+      room.timers.delete(name);
     },
     log: (...args) => console.log(`[${room.code}]`, ...args),
   };
 }
 
+function clearAllTimers(room) {
+  for (const t of room.timers.values()) clearTimeout(t.handle);
+  room.timers.clear();
+}
+
 function afterChange(room) {
   if (room.state && room.phase === 'playing' && room.game.isOver(room.state)) {
     room.phase = 'over';
-    clearTimeout(room.timer);
+    clearAllTimers(room);
   }
   broadcast(room);
 }
 
-function runTick(room, token) {
-  if (!rooms.has(room.code) || token !== room.timerToken || !room.state || room.phase !== 'playing') return;
-  room.timer = null;
+function runTick(room, name, token) {
+  if (rooms.get(room.code) !== room || room.timers.get(name)?.token !== token || !room.state || room.phase !== 'playing') return;
+  room.timers.delete(name);
   try {
-    room.game.tick?.(room.state, makeCtx(room));
+    room.game.tick?.(room.state, makeCtx(room), name);
   } catch (err) {
     console.error(`[${room.code}] tick hatası:`, err);
   }
@@ -193,8 +199,8 @@ function createRoom(identity, gameId, ip) {
     settings: game.validateSettings({ ...game.defaultSettings }),
     state: null,
     rng: BASE_SEED != null ? createRng(BASE_SEED + roomCounter) : cryptoRng(),
-    timer: null,
-    timerToken: 0,
+    timers: new Map(), // isim -> { token, handle }
+    timerSeq: 0,
     seq: 0,
     emptyTimer: null,
   };
@@ -277,7 +283,7 @@ function removePlayer(room, playerId, reason) {
 }
 
 function deleteRoom(room) {
-  clearTimeout(room.timer);
+  clearAllTimers(room);
   clearTimeout(room.hostTimer);
   clearTimeout(room.emptyTimer);
   for (const p of room.players.values()) clearTimeout(p.leaveTimer);
@@ -395,8 +401,7 @@ const handlers = {
   backToLobby(identity) {
     const room = requireRoom(identity);
     requireHost(room, identity);
-    clearTimeout(room.timer);
-    room.timerToken++;
+    clearAllTimers(room);
     room.state = null;
     room.phase = 'lobby';
     for (const p of room.players.values()) p.spectator = false;

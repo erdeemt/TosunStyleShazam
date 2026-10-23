@@ -85,10 +85,12 @@ for (const [n, vamps] of [[5, 1], [7, 1], [8, 2], [10, 2], [11, 3], [12, 3]]) {
   });
 }
 
-test('roller kapatılabilir, vampir sayısı elle seçilebilir ama yarıdan az kalır', async () => {
+test('roller kapatılabilir; elle vampir sayısı üçte birden az kalır (6 kişi → 1, 9 kişi → 2)', async () => {
   const g = await setup(6, { doktor: false, gozcu: false, deli: false, vampires: 3 });
-  assert.equal(g.vamps.length, 2, '6 kişide en fazla 2 vampir');
-  assert.equal(g.by('koylu').length, 4);
+  assert.equal(g.vamps.length, 1, '6 kişide en fazla 1 vampir');
+  assert.equal(g.by('koylu').length, 5);
+  const g9 = await setup(9, { vampires: 3 });
+  assert.equal(g9.vamps.length, 2, '9 kişide en fazla 2 vampir');
 });
 
 test('gece: vampir kurbanı ölür, rol açıklanmaz; doktor kurtarırsa kimse ölmez', async () => {
@@ -137,7 +139,7 @@ test('doktor aynı kişiyi üst üste koruyamaz; vampir vampiri seçemez; gözc�
 test('yargılama: aday + destek + savunma + çoğunluk Evet → asılır, gece başlar; rol açıklanmaz', async () => {
   const g = await setup(8);
   await playNight(g, {});
-  const target = g.by('koylu')[0];
+  const target = living(g).find((b) => b.view.me.role === 'koylu');
   const v = await hang(g, target);
   assert.equal(v.phase, 'night');
   assert.equal(v.lastTrial.hanged, true);
@@ -150,7 +152,7 @@ test('yargılama: aday + destek + savunma + çoğunluk Evet → asılır, gece b
 test('yargılama: çoğunluk yoksa asılmaz, tartışma kaldığı yerden sürer; günde tek aday hakkı', async () => {
   const g = await setup(6);
   await playNight(g, {});
-  const target = g.by('koylu')[0] ?? g.by('deli')[0];
+  const target = living(g).find((b) => b.view.me.role === 'koylu') ?? living(g).find((b) => b.view.me.role === 'deli');
   const before = g.host.view.endsAt;
   const v = await hang(g, target, { yes: false });
   assert.equal(v.phase, 'day');
@@ -167,7 +169,7 @@ test('yargılama: çoğunluk yoksa asılmaz, tartışma kaldığı yerden sürer
 
 test('deli asılırsa tek başına kazanır', async () => {
   const g = await setup(6);
-  await playNight(g, {});
+  await playNight(g, { victim: g.by('koylu')[0] }); // deli gece ölmesin
   const deli = g.by('deli')[0];
   const v = await hang(g, deli);
   assert.equal(v.phase, 'over');
@@ -260,9 +262,27 @@ test('güvenlik: ölü vampir müttefik seçimlerini görmez; bekleyen aday vark
   assert.equal(dead.me.allyPicks, undefined, 'ölü vampir gece seçimlerini görmemeli');
   // gündüze geç, aday göster, host gün bitirmeye çalışsın
   for (const b of living(g)) if (b !== v2) b.action({ type: 'nightPick', targetId: b.view.me.nightTargets.find((id) => id !== b.playerId) });
-  await g.host.waitView((x) => x.phase === 'day' || x.phase === 'over');
+  await Promise.all(g.bots.map((b) => b.waitView((x) => x.phase === 'day' || x.phase === 'over')));
   if (g.host.view.phase !== 'day') return;
-  const alive = living(g);
+  const alive = living(g); // herkes sabahı gördükten sonra: gece ölen yaşıyor sanılmasın
   await alive[0].act({ type: 'nominate', targetId: alive[1].playerId });
   assert.match((await g.host.expectError({ type: 'endDay' })).message, /Bekleyen bir aday/);
+});
+
+test('destek almayan aday süre dolunca düşer ve herkese yayınlanır; sonra yeni aday gösterilebilir', async () => {
+  const room = await makeRoom(srv.wsUrl, 'vampir', 5, 'Aday');
+  all.push(...room.bots);
+  room.host.send({ t: 'settings', settings: { nightSeconds: 30, dayMinutes: 8 } }); // aday 30 sn ≈ 0.3 sn
+  await room.host.waitRoom((r) => r.settings.nightSeconds === 30);
+  room.host.send({ t: 'start' });
+  await Promise.all(room.bots.map((b) => b.waitView((v) => v.phase === 'day', { timeout: 3000 })));
+  const alive = room.bots.filter((b) => b.view.players.find((p) => p.id === b.playerId).alive);
+  const [a, b, c] = alive;
+  await a.act({ type: 'nominate', targetId: b.playerId });
+  await c.waitView((v) => v.nomination?.targetId === b.playerId);
+  // süre dolunca: sunucu kendiliğinden yeni görünüm yollar (istemci eski adayı göstermeye devam etmez)
+  const cleared = await c.waitView((v) => v.phase === 'day' && v.nomination === null, { timeout: 3000 });
+  assert.equal(cleared.nomination, null);
+  await c.act({ type: 'nominate', targetId: a.playerId });
+  assert.equal(c.view.nomination.byId, c.playerId);
 });

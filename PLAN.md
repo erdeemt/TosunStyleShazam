@@ -176,15 +176,17 @@ Mobil öncelikli tasarım: 360 px genişlikte kusursuz çalışmalı, butonlar �
 ### 4.3 🧛 Vampir Köylü (P2) — kullanıcı ile netleşti (2026-10-23)
 
 **Kurulum**
-- 5–12 oyuncu. Vampir sayısı otomatik: 5–7 → 1, 8–10 → 2, 11–12 → 3 (host ayarda 1–3 arası elle de seçebilir;
-  vampir sayısı her zaman köylü tarafından az olmalı).
+- 5–12 oyuncu. Vampir sayısı otomatik: 5–7 → 1, 8–10 → 2, 11–12 → 3. Host elle de seçebilir ama üst sınır
+  oyuncuların üçte birinden az: 5–6 → 1, 7–9 → 2, 10+ → 3 (fazlası ilk geceden sonra oyunu bitirir).
 - Özel roller (host her oyunda açıp kapatır, varsayılan hepsi açık): 🩺 **Doktor**, 🔮 **Gözcü**, 🤡 **Deli**.
   Her özel rolden en fazla bir tane; kalanlar 🧑‍🌾 **Köylü**. Vampirler birbirini bilir; başka kimse kimseyi bilmez.
 - Ayarlar: gündüz tartışma süresi (2–8 dk, varsayılan 4), savunma süresi (15–60 sn, varsayılan 30),
   gece süresi (30–120 sn, varsayılan 60), vampir sayısı (otomatik / 1 / 2 / 3), roller.
 
 **Gece** (ekranda yazı; ses yok)
-- Herkesin ekranında aynı anda bir görev ve aynı görünüm olur — kimin dokunduğundan rol anlaşılmasın:
+- Herkesin ekranında aynı anda bir görev ve aynı görünüm olur — kimin dokunduğundan rol anlaşılmasın.
+  **Seçim sadece rol kartı açıkken yapılır**; kart kapalıyken herkesin düğmeleri, vurgusu ve dokunuşa tepkisi aynıdır
+  ("Seçim yapmak için kartını aç"). Rol kartı her faz değişiminde kendiliğinden kapanır; tüm rollerin kartı aynı renktedir.
   - Vampirler: kurban seçer; vampirler birbirinin seçimini canlı görür. En çok oy alan ölür; eşitlikte eşitler arasından rastgele.
     Hiç oy yoksa kimse ölmez. Vampirler birbirini seçemez.
   - Doktor: bir kişiyi korur (kendini de seçebilir); **aynı kişiyi üst üste iki gece koruyamaz**. Korunan kurbansa kimse ölmez.
@@ -197,9 +199,10 @@ Mobil öncelikli tasarım: 360 px genişlikte kusursuz çalışmalı, butonlar �
   doktorun kimi kurtardığı da söylenmez.
 - Tartışma (sohbet sesli/Discord'dan). Saat işler; host erken bitirebilir ("Geceye geç").
 - **Aday gösterme:** yaşayan her oyuncu günde bir kez birini aday gösterebilir; başka bir yaşayan oyuncu "Destekliyorum" derse
-  yargılama başlar (destek gelmezse aday düşer, 30 sn sonra veya yeni aday gelince). Aynı anda tek aday.
+  yargılama başlar. Destek gelmezse aday 30 sn sonra düşer (herkese yayınlanır). Aynı anda tek aday; bekleyen aday varken
+  host günü bitiremez.
 - **Yargılama:** tartışma saati durur → aday "savunma süresi" kadar konuşur → yaşayanlar (aday hariç) "Asılsın mı?" Evet/Hayır;
-  oy vermeyen Hayır sayılır; **oy hakkı olanların yarısından fazlası Evet** derse asılır ve gece başlar; değilse tartışma kaldığı yerden sürer.
+  oylar gizli (sadece "x/y oy" görünür, herkes kendi oyunu görür); oy vermeyen Hayır sayılır; **oy hakkı olanların yarısından fazlası Evet** derse asılır ve gece başlar; değilse tartışma kaldığı yerden sürer.
 - Tartışma süresi biterse o gün kimse asılmaz, gece başlar.
 
 **Kazanma** (her ölümden sonra kontrol)
