@@ -105,7 +105,8 @@ function playerList(view, ctx, { mode }) {
       me ? el('span', { class: 'tag' }, 'sen') : null,
       p.id === ctx.hostId ? el('span', { class: 'tag' }, '👑') : null,
       ctx.connected(p.id) ? null : el('span', { class: 'tag' }, '📴 bağlantı yok'),
-      p.id === view.firstAskerId && view.phase === 'play' ? el('span', { class: 'tag' }, '❓ ilk soran') : null,
+      view.phase === 'play' && view.qa?.askerId === p.id ? el('span', { class: 'tag' }, '❓ soruyor') : null,
+      view.phase === 'play' && view.qa?.targetId === p.id ? el('span', { class: 'tag' }, '💬 cevaplıyor') : null,
       el('span', { class: 'score' }, `${p.score} puan`),
       action);
   }));
@@ -148,9 +149,7 @@ function renderGame(view, ctx) {
   const parts = [head, roleCard(view)];
 
   if (view.phase === 'play') {
-    parts.push(el('section', { class: 'card center' },
-      el('p', {}, '❓ İlk soruyu ', el('b', {}, name(view.firstAskerId)), ' soruyor.'),
-      el('p', { class: 'hint' }, 'Sırayla birbirinize mekânla ilgili sorular sorun. Casusu bulunca suçlayın!')));
+    parts.push(qaCard(view, ctx));
     if (view.me?.spy && guessOpen) {
       const grid = locationGrid(view, ctx);
       parts.push(el('button', { class: 'btn ghost', onclick: () => { guessOpen = false; lobby.rerender(); } }, '✕ Vazgeç, tahmin etmeyeceğim'), grid);
@@ -193,6 +192,30 @@ function renderGame(view, ctx) {
   return el('div', { class: 'stack' }, parts);
 }
 
+// Sıradaki soru-cevap: X → Y. İkisi de onaylayınca sıra cevap verene geçer (sunucu yeni ikiliyi seçer).
+function qaCard(view, ctx) {
+  const qa = view.qa;
+  if (!qa) return null;
+  const amAsker = qa.askerId === ctx.playerId;
+  const amTarget = qa.targetId === ctx.playerId;
+  const doneBy = (id) => qa.done.includes(id);
+  const mine = amAsker || amTarget;
+  return el('section', { class: 'card center qa-card' },
+    el('div', { class: 'hint' }, `${qa.number}. soru`),
+    el('div', { class: 'qa-pair' },
+      el('b', { class: doneBy(qa.askerId) ? 'qa-done' : '' }, ctx.name(qa.askerId)),
+      el('span', { class: 'qa-arrow' }, '→'),
+      el('b', { class: doneBy(qa.targetId) ? 'qa-done' : '' }, ctx.name(qa.targetId))),
+    el('p', { class: 'hint' }, amAsker
+      ? 'Mekânla ilgili bir soru sor; cevabı alınca onayla.'
+      : amTarget ? 'Sana soruluyor: cevapla, sonra onayla.' : `${ctx.name(qa.askerId)}, ${ctx.name(qa.targetId)} adlı oyuncuya soruyor. Dikkatle dinle!`),
+    mine
+      ? doneBy(ctx.playerId)
+        ? el('p', {}, `✓ Onayladın — ${ctx.name(amAsker ? qa.targetId : qa.askerId)} bekleniyor…`)
+        : el('button', { class: 'btn primary', onclick: () => ctx.act({ type: 'qaDone' }) }, amAsker ? '✓ Sordum' : '✓ Cevapladım')
+      : qa.done.length ? el('p', { class: 'hint' }, `✓ ${qa.done.map(ctx.name).join(', ')} onayladı`) : null);
+}
+
 function resultCard(view, ctx) {
   const res = view.result;
   const spies = res.spyIds.map(ctx.name).join(' ve ');
@@ -223,7 +246,7 @@ export function enter() {
     icon: '🕵️',
     howTo: [
       'Herkesin telefonunda aynı mekân ve kendi rolü yazar — biri hariç: casus.',
-      'Sırayla birbirinize mekânla ilgili sorular sorun ("Buraya en son ne zaman geldin?").',
+      'Ekranda kimin kime soracağı yazar ("Ali → Ayşe"). Soran sorar, sorulan cevaplar; ikisi de onaylayınca sıra cevap verene geçer.',
       'Casus mekânı bilmez; cevaplardan çıkarmaya ve belli etmemeye çalışır.',
       'Herkes turda bir kez birini suçlayabilir; herkes "Evet" derse suçlanan açıklanır.',
       'Casus istediği an mekânı tahmin edebilir: doğruysa kazanır, yanlışsa kaybeder.',
