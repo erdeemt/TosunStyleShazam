@@ -2,10 +2,14 @@
 import testGame from './_test.js';
 import spyfall from './spyfall.js';
 import vampir from './vampir.js';
+import nuance from './nuance.js';
+import tone from './tone.js';
 
 export const GAMES = {
   [spyfall.id]: spyfall,
   [vampir.id]: vampir,
+  [nuance.id]: nuance,
+  [tone.id]: tone,
 };
 
 // Lobi altyapısını gerçek oyunlardan bağımsız test etmek için; sadece TEST_GAMES=1 iken açık.

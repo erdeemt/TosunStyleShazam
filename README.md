@@ -1,7 +1,20 @@
 # 🎮 Tosun Style
 
 Arkadaşlarla oynanan oyun salonu. Sol menüde **Tek Oyunculu** ve **Çok Oyunculu** kategorileri var;
-oyunlar desteklediği kategorilerin altında listelenir. Şimdilik tek oyun var: **🎵 Tosun Shazam**.
+oyunlar desteklediği kategorilerin altında listelenir.
+
+| Oyun | Kategori | Kısaca |
+|---|---|---|
+| 🎵 Tosun Shazam | Tek + Çok | Şarkıyı 0.5 saniyeden tanı (aşağıda) |
+| 🟩 Wordle TR | Tek | 5 harfli Türkçe kelime, günlük + sınırsız, arkadaş sıralaması |
+| 🎨 Nüans | Tek + Çok | Rengi birkaç saniye gör, HSB kaydırıcılarıyla yeniden oluştur; puan algısal renk farkıyla (CIEDE2000), 0–1000 |
+| 🔊 Ton Avı | Tek + Çok | 3 sn'lik tonu dinle, dikey pedde aynı perdeyi bul; puan sent farkıyla, 5 tur 0–50 |
+| 🕵️ Casus Kim? | Çok | Aranızdaki casusu bulun |
+| 🧛 Vampir Köylü | Çok | Gece vampirler avlanır, gündüz köy asar |
+
+Nüans ve Ton Avı'nın **Tek Oyunculu** hâlinde 📅 Günlük (herkese aynı hedefler, günde bir deneme, sıralama) ve
+♾️ Sınırsız sekmesi; **Çok Oyunculu** hâlinde oda kurulur, herkes aynı hedefleri aynı anda görür ve tur sonunda cevaplar
+yan yana açılır. Kurallar ve formüller: `PLAN.md` §4.4–4.5.
 
 ## Çalıştırma
 

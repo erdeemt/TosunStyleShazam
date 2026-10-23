@@ -5,6 +5,7 @@ import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { attachLobby, resolveIdentity, verifyIdentity } from './server/lobby.js';
 import * as wordle from './server/wordle.js';
+import * as recall from './server/recall.js';
 import { GameError } from './server/errors.js';
 import { clientIp, httpLimiter, upstreamLimiter } from './server/limits.js';
 
@@ -280,6 +281,18 @@ async function handleApi(url, res, req) {
   if (!httpLimiter.hit(ip)) return sendJson(res, 429, { error: 'Çok fazla istek, biraz yavaşla.' });
   if (UPSTREAM_PATHS.has(url.pathname) && !upstreamLimiter.hit(ip)) {
     return sendJson(res, 429, { error: 'Çok fazla link isteği, bir dakika sonra tekrar dene.' });
+  }
+  // Hafıza oyunları (Nüans, Ton Avı): /api/recall/<oyun>/<uç>. Yol sabit listeyle eşleşir (girdi regex/yol olarak kullanılmaz).
+  const recallRoute = url.pathname.match(/^\/api\/recall\/(nuance|tone)\/(start|round|submit|leaderboard)$/);
+  if (recallRoute) {
+    const [, game, endpoint] = recallRoute;
+    const body = await readJson(req);
+    const identity = requireIdentity(body);
+    const mode = body.mode === 'free' ? 'free' : 'daily';
+    if (endpoint === 'start') return sendJson(res, 200, recall.startGame(identity, game, mode, body.difficulty));
+    if (endpoint === 'round') return sendJson(res, 200, recall.startRound(identity, game, mode, body.gameId, body.round));
+    if (endpoint === 'submit') return sendJson(res, 200, recall.submitGuess(identity, game, mode, body.gameId, body.round, body.guess));
+    return sendJson(res, 200, recall.leaderboard(game, recall.todayIstanbul(), identity.id));
   }
   switch (url.pathname) {
     // ---------- Kimlik + günlük bulmacalar ----------
