@@ -140,7 +140,7 @@ const ytCache = new Map(); // videoId -> meta | null
 const YT_CACHE_MAX = 5000;
 
 async function youtubeMeta(videoId) {
-  if (!/^[w-]{6,20}$/.test(videoId)) return null;
+  if (!/^[\w-]{6,20}$/.test(videoId)) return null;
   if (ytCache.has(videoId)) return ytCache.get(videoId);
   const meta = await youtubeMetaUncached(videoId);
   if (ytCache.size >= YT_CACHE_MAX) ytCache.delete(ytCache.keys().next().value);
