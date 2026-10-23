@@ -77,8 +77,13 @@ function newCode() {
   throw new GameError('Oda kodu üretilemedi, tekrar dene.');
 }
 
+const MAX_BUFFERED_BYTES = 1_000_000;
+
 function send(socket, msg) {
-  if (socket && socket.readyState === 1) socket.send(JSON.stringify(msg));
+  if (!socket || socket.readyState !== 1) return;
+  // Okumayan (veya çok yavaş) istemciye mesaj biriktirme: bellek tükenmesin.
+  if (socket.bufferedAmount > MAX_BUFFERED_BYTES) { socket.terminate(); return; }
+  socket.send(JSON.stringify(msg));
 }
 
 function sendError(socket, code, message) {
@@ -114,15 +119,29 @@ function viewFor(room, playerId) {
   }
 }
 
+// Büyük ve oyun boyunca değişmeyen veri (ör. Shazam öneri listesi) her görünümde değil, oyuncu başına bir kez gider.
+// game.shared(state) → { key, data }; anahtar değişince (yeni oyun) veya yeniden bağlanınca tekrar gönderilir.
+function sendShared(room, p, socket) {
+  const sh = room.state && room.game.shared ? room.game.shared(room.state) : null;
+  if (!sh || p.sharedKey === sh.key) return;
+  send(socket, { t: 'shared', key: sh.key, data: sh.data });
+  p.sharedKey = sh.key;
+}
+
+function sendTo(room, p, info = roomInfo(room)) {
+  const socket = identities.get(p.id)?.socket;
+  if (!socket) return;
+  send(socket, { t: 'room', room: info });
+  if (room.state) {
+    sendShared(room, p, socket);
+    send(socket, { t: 'view', view: viewFor(room, p.id), seq: room.seq, serverNow: Date.now() });
+  }
+}
+
 function broadcast(room) {
   const info = roomInfo(room);
   room.seq++;
-  for (const p of room.players.values()) {
-    const socket = identities.get(p.id)?.socket;
-    if (!socket) continue;
-    send(socket, { t: 'room', room: info });
-    if (room.state) send(socket, { t: 'view', view: viewFor(room, p.id), seq: room.seq, serverNow: Date.now() });
-  }
+  for (const p of room.players.values()) sendTo(room, p, info);
 }
 
 // ---------- Oyun bağlamı ve zamanlayıcı ----------
@@ -241,11 +260,15 @@ function joinRoom(identity, rawCode) {
 function reconnect(identity, room) {
   const p = room.players.get(identity.id);
   if (!p) return;
+  const wasConnected = p.connected;
   p.connected = true;
+  p.sharedKey = null; // yeni soket paylaşılan veriyi almadı
   clearTimeout(p.leaveTimer);
   p.leaveTimer = null;
   clearTimeout(room.emptyTimer);
-  broadcast(room);
+  // Zaten bağlıysa (ör. tekrar "join") sadece ona gönder: herkese yeniden yayın yapıp trafik çoğaltılmasın.
+  if (wasConnected) sendTo(room, p);
+  else broadcast(room);
 }
 
 // Oda sahibi adayı: bağlı oyuncu > bağlı izleyici > herhangi biri; eşitlikte en eski katılan.

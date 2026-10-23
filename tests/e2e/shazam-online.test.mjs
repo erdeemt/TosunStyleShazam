@@ -12,6 +12,10 @@ const TRACKS = [
   { title: 'Şımarık', artist: 'Tarkan', audio: 'https://cdnt-preview.dzcdn.net/api/1/1/a/b/c/0/yok1.mp3' },
   { title: 'Gidiyorum', artist: 'Sezen Aksu', audio: 'https://cdnt-preview.dzcdn.net/api/1/1/a/b/c/0/yok2.mp3' },
   { title: 'Kuzu Kuzu', artist: 'Tarkan', audio: 'https://cdnt-preview.dzcdn.net/api/1/1/a/b/c/0/yok3.mp3' },
+  // en az 3 şarkı her zaman çalınmadan kalır: 6 şarkı → 3 tur
+  { title: 'Dudu', artist: 'Tarkan', audio: 'https://cdnt-preview.dzcdn.net/api/1/1/a/b/c/0/yok4.mp3' },
+  { title: 'Yalnızlar Rıhtımı', artist: 'Sezen Aksu', audio: 'https://cdnt-preview.dzcdn.net/api/1/1/a/b/c/0/yok5.mp3' },
+  { title: 'Bohemian Rhapsody', artist: 'Queen', audio: 'https://cdnt-preview.dzcdn.net/api/1/1/a/b/c/0/yok6.mp3' },
 ];
 let srv;
 let browser;
@@ -55,7 +59,7 @@ test('3 telefon: oda, şarkı gönderme, tahmin, öneri, odak, açılış, final
     const { net } = await import('/net.js');
     net.send({ t: 'prep', data: { op: 'add', source: 'Test', tracks } });
   }, TRACKS);
-  await ayse.page.waitForSelector('text=Odada 3 şarkı');
+  await ayse.page.waitForSelector('text=Odada 6 şarkı');
   await host.page.locator('#shazam-online label', { hasText: 'Şarkı sayısı' }).locator('select').selectOption('5');
   await shot(host, '00-lobby-host');
   await host.page.click('#shazam-online button:has-text("Oyunu başlat")');

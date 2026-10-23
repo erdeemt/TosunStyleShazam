@@ -80,6 +80,7 @@ export function mountLobby(root, game) {
       serverOffset: net.serverOffset,
       act: (action) => net.action(action),
       name: (id) => room.players.find((p) => p.id === id)?.name ?? 'Biri',
+      shared: net.shared?.data ?? null,
       connected: (id) => room.players.find((p) => p.id === id)?.connected !== false,
       hostId: room.hostId,
     };
@@ -155,6 +156,7 @@ export function mountLobby(root, game) {
   const offs = [
     net.on('room', render),
     net.on('view', render),
+    net.on('shared', render),
     net.on('status', render),
     net.on('replaced', render),
     net.on('error', (e) => toast(e.message)),

@@ -15,6 +15,10 @@ const TRACKS = [
   { title: 'Never Gonna Give You Up', artist: 'Rick Astley', ytId: 'dQw4w9WgXcQ', alt: ['Never Gonna Give You Up', 'Rick Astley - Never Gonna Give You Up'] },
   { title: 'Bohemian Rhapsody', artist: 'Queen', audio: 'https://p.scdn.co/mp3-preview/ccc' },
   { title: 'Harder, Better, Faster, Stronger', artist: 'Daft Punk', audio: 'https://cdnt-preview.dzcdn.net/api/1/1/d/e/f/0/ddd.mp3' },
+  // Havuzda her zaman ≥ 3 çalınmayan şarkı kalır; 5 tur için en az 8 şarkı gerekir.
+  { title: 'Kuzu Kuzu', artist: 'Tarkan', audio: 'https://p.scdn.co/mp3-preview/eee' },
+  { title: 'Yalnızlar Rıhtımı', artist: 'Sezen Aksu', audio: 'https://p.scdn.co/mp3-preview/fff' },
+  { title: 'Dudu', artist: 'Tarkan', audio: 'https://p.scdn.co/mp3-preview/ggg' },
 ];
 const SECRET_WORDS = ['Şımarık', 'Tarkan', 'Gidiyorum', 'Sezen', 'Rick Astley', 'Bohemian', 'Queen', 'Daft Punk', 'abcdefghij12345678', 'cover/1.jpg'];
 
@@ -49,7 +53,7 @@ test('prep: sadece host, geçersiz şarkılar elenir, kötü adresler süzülür
   // başlatılamaz: şarkı yok
   const e2 = host.waitFor((m) => m.t === 'error');
   host.send({ t: 'start' });
-  assert.match((await e2).message, /en az 3 şarkı/);
+  assert.match((await e2).message, /en az 4 şarkı/);
   host.send({ t: 'prep', data: { op: 'add', source: 'Kötü', tracks: [
     { title: 'Kötü ses', audio: 'https://evil.example/track.mp3' },
     { title: 'http', audio: 'http://p.scdn.co/mp3-preview/x' },
@@ -66,15 +70,19 @@ test('prep: sadece host, geçersiz şarkılar elenir, kötü adresler süzülür
   assert.equal((await host.waitRoom((r) => r.prep.trackCount === 0)).prep.sources.length, 0);
 });
 
-test('şarkı adı/sanatçı/kapak tur açıklanana kadar hiçbir mesajda yok; havuzda (öneri listesi) olabilir', async () => {
+test('şarkı adı/sanatçı/kapak tur açıklanana kadar hiçbir görünümde yok; öneri havuzu oyun başına bir kez (shared)', async () => {
   const { bots } = await setup(4);
+  for (const b of bots) {
+    const shared = b.messages.filter((m) => m.t === 'shared');
+    assert.equal(shared.length, 1, 'öneri havuzu bir kez gelmeli');
+    assert.ok(shared[0].data.pool.includes('Şımarık — Tarkan'));
+    assert.ok(b.messages.filter((m) => m.t === 'view').every((m) => !('pool' in m.view)), 'görünümde havuz olmamalı');
+  }
   for (const b of bots) {
     for (const m of b.messages) {
       if (m.t !== 'view' || m.view.reveal) continue;
-      const { pool, ...rest } = m.view;
-      const text = JSON.stringify(rest);
+      const text = JSON.stringify(m.view);
       for (const w of SECRET_WORDS) assert.ok(!text.includes(w), `${b.name} açıklanmadan "${w}" gördü`);
-      assert.ok(pool.includes('Şımarık — Tarkan'), 'öneri havuzu olmalı');
     }
   }
 });
@@ -159,4 +167,40 @@ test('oyuncu ayrılınca tur kalanlarla biter; yeniden bağlanan ilerlemesini ko
   await play(a, { type: 'guess', text: ans.title });
   const v = await play(b, { type: 'guess', text: ans.title });
   assert.equal(v.phase, 'reveal');
+});
+
+test('güvenlik: kullanıcı adı/portlu adresler reddedilir; metindeki kontrol karakterleri atılır; ≥ 3 şarkı çalınmadan kalır', async () => {
+  const { bots, host } = await makeRoom(srv.wsUrl, 'shazam', 2, 'Güv');
+  all.push(...bots);
+  host.send({ t: 'prep', data: { op: 'add', source: 'S', tracks: [
+    { title: 'a', audio: 'https://evil.com@p.scdn.co/x' },
+    { title: 'b', audio: 'https://p.scdn.co:8443/x' },
+    { title: 'Te' + String.fromCharCode(1).repeat(50) + 'mi' + String.fromCharCode(0x202e) + 'z', artist: 'X', audio: 'https://p.scdn.co/mp3-preview/ok1' },
+    { title: 'İki', artist: 'Y', audio: 'https://p.scdn.co/mp3-preview/ok2' },
+    { title: 'Üç', artist: 'Z', audio: 'https://p.scdn.co/mp3-preview/ok3' },
+    { title: 'Dört', artist: 'W', audio: 'https://p.scdn.co/mp3-preview/ok4' },
+  ] } });
+  assert.equal((await host.waitRoom((r) => r.prep?.trackCount > 0)).prep.trackCount, 4);
+  host.send({ t: 'settings', settings: { rounds: 10 } });
+  await host.waitRoom((r) => r.settings.rounds === 10);
+  host.send({ t: 'start' });
+  const v = await host.waitView((x) => x.phase === 'play');
+  assert.equal(v.totalRounds, 1, '4 şarkıda 3 tanesi çalınmadan kalmalı');
+  const pool = host.messages.find((m) => m.t === 'shared').data.pool;
+  assert.ok(pool.includes('Temiz — X'), 'kontrol karakterleri temizlenmeli: ' + JSON.stringify(pool));
+});
+
+test('güvenlik: odadaki birinin tekrar katılması herkese yayın yapmaz; host beklerse açılıştan sonra kendiliğinden geçilir', async () => {
+  const { bots, host } = await setup(2, { rounds: 3 }); // ayar en az 3 şarkı
+  const [, guest] = bots;
+  const before = host.messages.length;
+  guest.send({ t: 'join', code: host.room.code });
+  await guest.waitFor((m) => m.t === 'room');
+  await sleep(100);
+  assert.equal(host.messages.length, before, 'host yeni mesaj almamalı');
+  for (const b of bots) b.action({ type: 'giveUp' });
+  await host.waitView((x) => x.phase === 'reveal');
+  // 30 sn × 0.01 = 0.3 sn sonra kimse basmadan 2. şarkı
+  const next = await host.waitView((x) => x.round === 2 && x.phase === 'play', { timeout: 3000 });
+  assert.equal(next.round, 2);
 });

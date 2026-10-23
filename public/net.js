@@ -16,6 +16,7 @@ class Net {
     this.connected = false;
     this.room = null;
     this.view = null;
+    this.shared = null; // oyun başına bir kez gelen büyük veri { key, data } (ör. Shazam öneri listesi)
     this.serverOffset = 0; // sunucu saati - yerel saat
     this.listeners = new Map();
     this.queue = [];
@@ -78,6 +79,10 @@ class Net {
         this.gotRoom = true;
         if (!msg.room || msg.room.phase === 'lobby') this.view = null;
         this.emit('room', msg.room);
+        break;
+      case 'shared':
+        this.shared = { key: msg.key, data: msg.data };
+        this.emit('shared', this.shared);
         break;
       case 'view':
         this.view = msg.view;

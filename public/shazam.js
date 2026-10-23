@@ -69,7 +69,7 @@ function norm(s) {
     .replace(/\(.*?\)|\[.*?\]/g, ' ')
     .replace(/\b(feat|ft|featuring)\b.*$/, '')
     .replace(/&/g, ' and ')
-    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/[^\p{L}\p{N} ]/gu, ' ') // Türkçe katlandıktan sonra her dildeki harfler kalır
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -103,13 +103,14 @@ function isCorrect(guess, track) {
   const g = norm(guess);
   if (!g) return false;
   const gCompact = g.replace(/ /g, '');
+  const artistLen = norm(track.artist ?? '').length;
   for (const c of answerCandidates(track)) {
     if (g === c || gCompact === c.replace(/ /g, '')) return true;
     // Ufak yazım hataları: kısa isimlerde tam eşleşme, 6+ harfte 1, 9+ harfte 2 hata, uzunlarda ~%20.
     const maxEdits = Math.max(c.length >= 9 ? 2 : c.length >= 6 ? 1 : 0, Math.floor(c.length * 0.2));
     if (maxEdits && levenshtein(g, c) <= maxEdits) return true;
     // "tarkan şımarık" gibi sanatçı + şarkı yazılmışsa
-    if (c.length >= 3 && ` ${g} `.includes(` ${c} `)) return true;
+    if (c.length >= 3 && ` ${g} `.includes(` ${c} `) && g.length <= c.length + artistLen + 3) return true;
     // Uzun isimlerin büyük kısmı yazılmışsa ("bohemian rhapsody" yerine "bohemian rhaps")
     if (g.length >= 6 && c.startsWith(g) && g.length >= c.length * 0.6) return true;
   }
@@ -350,7 +351,7 @@ function renderPlayers() {
 function trackKey(t) {
   const artist = norm((t.artist ?? '').split(/,|&|\s+(?:feat\.?|ft\.?|x|ve|and|with)\s+/i)[0]);
   const title = norm(t.title);
-  return artist && title ? `${title.replace(/ /g, '')}|${artist.replace(/ /g, '')}` : t.id;
+  return artist && title ? `${title.replace(/ /g, '')}|${artist.replace(/ /g, '')}` : t.id ?? `src:${t.ytId ?? t.audio ?? t.title}`;
 }
 
 function allTracks() {
@@ -1178,10 +1179,10 @@ async function playOnlineClip(view) {
   online?.rerender();
 }
 
-function suggestionsFor(view, q) {
+function suggestionsFor(pool, q) {
   const n = norm(q);
   if (!n) return [];
-  return view.pool
+  return pool
     .map((label) => ({ label, key: norm(label) }))
     .filter((x) => x.key.includes(n))
     .sort((a, b) => Number(!a.key.startsWith(n)) - Number(!b.key.startsWith(n)))
@@ -1241,7 +1242,7 @@ function playPanel(view, ctx) {
   const isLast = me.stage >= stages.length - 1;
   const acList = uiEl('ul', { class: 'ol-ac', id: 'ol-ac' });
   const renderAc = () => {
-    acList.replaceChildren(...suggestionsFor(view, ol.draft).map((s) =>
+    acList.replaceChildren(...suggestionsFor(ctx.shared?.pool ?? [], ol.draft).map((s) =>
       uiEl('li', {}, uiEl('button', {
         type: 'button',
         onmousedown: (e) => e.preventDefault(),
