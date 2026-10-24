@@ -420,6 +420,10 @@ const handlers = {
     if (room.phase === 'playing' && target0.connected && !target0.spectator) {
       throw new GameError('Oyun sırasında sadece bağlantısı kopmuş oyuncular çıkarılabilir.');
     }
+    // Oyun ortası gelen izleyici host olduysa, bağlantısı kısa süre kopan oyuncuları atıp oyunu bitiremesin.
+    if (room.phase === 'playing' && room.players.get(identity.id)?.spectator && !target0.spectator) {
+      throw new GameError('İzleyici, oyun sırasında oyuncu çıkaramaz.');
+    }
     const target = identities.get(targetId);
     removePlayer(room, targetId, 'kick');
     send(target?.socket, { t: 'kicked' });

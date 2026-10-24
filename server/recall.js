@@ -460,7 +460,8 @@ export function lobbyGame(gameId) {
         endsAt: state.endsAt,
         memorizeMs: Math.round(def.difficulties[state.settings.difficulty].memorizeMs * TIME_SCALE),
         // Hedef sadece ezber ve açıklama anında görünür.
-        target: showTarget ? state.targets[state.round - 1] : null,
+        // Oyun tur ortasında bittiyse (herkes ayrıldı) oynanmamış turun hedefi değil, son açıklanan gösterilir.
+        target: state.phase === 'over' ? last?.target ?? null : showTarget ? state.targets[state.round - 1] : null,
         me: { submitted: Boolean(mine), guess: mine ? mine.guess : null },
         players: state.players.filter((p) => !p.left).map((p) => ({
           id: p.id,
