@@ -4,6 +4,7 @@ import { el } from '../ui.js';
 import { TONE_RANGES, centsBetween, centsHint, freqAt } from '../recall-math.js';
 import { createRecallGame, secondsTimer, timeBar } from './recall-client.js';
 import { audioReady, playTone, startLive, stopAll, unlockAudio } from './tone-audio.js';
+import { createWave } from './tone-wave.js';
 
 let memoKey = '';
 let memoStop = null;
@@ -24,12 +25,10 @@ function replay(freq) {
 
 const hz = (f) => `${f >= 1000 ? Math.round(f) : f.toFixed(1).replace(/\.0$/, '')} Hz`;
 
-function waves() {
-  return el('div', { class: 'tn-waves', 'aria-hidden': 'true' }, Array.from({ length: 9 }, (_, i) => {
-    const bar = el('span', {});
-    bar.style.animationDelay = `${(i % 5) * 90}ms`;
-    return bar;
-  }));
+// Siyah sahne + dalga. Ezberde dalga hedef perdeden bağımsız (gözle eşleştirilmesin, kulak oyunu).
+function scene(extraClass, ...children) {
+  const wave = createWave({ level: 0.35, active: true });
+  return { wave, node: el('div', { class: `tn-stage ${extraClass}` }, wave.node, ...children) };
 }
 
 // Hedef ton bu ekranda bir kez çalar. Ses kilitliyse (tarayıcı dokunuş istemiş) bir düğmeyle kalan süre çalınır.
@@ -40,15 +39,14 @@ function memorizeView(target, { endsAt, totalMs, key }) {
     memoStop?.();
     memoStop = playTone(target, left);
   };
-  const card = el('section', { class: 'card center tn-memo' });
+  const overlay = el('div', { class: 'tn-overlay' });
+  const { node } = scene('tn-orb tn-memo', overlay);
   const fill = () => {
-    card.replaceChildren(
-      el('div', { class: 'tn-orb' }, el('span', {}, '🎵')),
-      waves(),
-      el('div', { class: 'rc-phase' }, 'Dinle… ', secondsTimer(endsAt, { urgentAt: 0 })),
-      timeBar(endsAt, totalMs),
-      el('p', { class: 'hint' }, 'Bu perdeyi aklında tut — bir daha çalmayacak!'));
+    overlay.replaceChildren(
+      el('div', { class: 'tn-listen' }, 'Dinle… ', secondsTimer(endsAt, { urgentAt: 0 })),
+      el('p', { class: 'tn-note' }, 'Bu perdeyi aklında tut — bir daha çalmayacak!'));
   };
+  const card = el('section', { class: 'card tn-card' }, node, timeBar(endsAt, totalMs));
   if (memoKey !== key) {
     if (audioReady()) {
       memoKey = key;
@@ -57,8 +55,8 @@ function memorizeView(target, { endsAt, totalMs, key }) {
     } else {
       unlockAudio();
       // Bazı tarayıcılar resume'u hemen yapar; kısa bir bekleyişten sonra tekrar dene, olmazsa düğme göster.
-      card.append(el('button', {
-        class: 'btn big primary',
+      overlay.append(el('button', {
+        class: 'btn big tn-lock',
         onclick: () => { unlockAudio(); memoKey = key; setTimeout(play, 30); fill(); },
       }, '🔊 Sesi aç ve dinle'));
       setTimeout(() => { if (memoKey !== key && audioReady() && card.isConnected) { memoKey = key; play(); fill(); } }, 80);
@@ -69,8 +67,9 @@ function memorizeView(target, { endsAt, totalMs, key }) {
   return card;
 }
 
-// Dikey ped: bas-tut-kaydır, parmak bastıkça ton çalar. Konum → frekans logaritmik (eşit kaydırma = eşit sent).
-function createInput({ difficulty }) {
+// Sahne: bas-tut-kaydır (yukarı tiz, aşağı pes), parmak bastıkça ton çalar ve dalga perdeyle sıklaşır.
+// Konum → frekans logaritmik (eşit kaydırma = eşit sent). Kilitle düğmesi sahnenin altında, kartın içinde.
+function createInput({ difficulty, submit }) {
   const range = TONE_RANGES[difficulty] ?? TONE_RANGES.easy;
   const showHz = difficulty !== 'hard';
   let t = 0.1 + Math.random() * 0.8; // her turda rastgele başlangıç (dokunmadan gönderen ortadan puan alamasın)
@@ -80,16 +79,22 @@ function createInput({ difficulty }) {
   let touched = false;
 
   const hzLabel = el('span', { class: 'tn-hz' });
-  const marker = el('div', { class: 'tn-marker' }, el('span', { class: 'tn-dot' }), showHz ? hzLabel : null);
-  const hint = el('span', { class: 'tn-hint' }, '👆 Bas, basılı tut ve yukarı-aşağı kaydır');
-  const pad = el('div', {
-    class: 'tn-pad', tabindex: '0', role: 'slider', 'aria-label': 'Perde',
-    'aria-valuemin': '0', 'aria-valuemax': '100',
-  }, el('span', { class: 'tn-end top' }, '▲ tiz'), el('span', { class: 'tn-end bottom' }, '▼ pes'), hint, marker);
+  const marker = el('div', { class: 'tn-marker' });
+  const hint = el('span', { class: 'tn-hint' }, '↕ Bas, basılı tut ve yukarı-aşağı kaydır');
+  const { wave, node: pad } = scene('tn-pad',
+    el('span', { class: 'tn-end top' }, 'tiz'), el('span', { class: 'tn-end bottom' }, 'pes'),
+    marker, showHz ? hzLabel : null, hint);
+  pad.setAttribute('tabindex', '0');
+  pad.setAttribute('role', 'slider');
+  pad.setAttribute('aria-label', 'Perde');
+  pad.setAttribute('aria-valuemin', '0');
+  pad.setAttribute('aria-valuemax', '100');
+  wave.setActive(false);
 
   const place = () => {
     marker.style.bottom = `${t * 100}%`;
     hzLabel.textContent = hz(freq);
+    wave.setLevel(t);
     pad.setAttribute('aria-valuenow', String(Math.round(t * 100)));
     pad.setAttribute('aria-valuetext', showHz ? hz(freq) : `%${Math.round(t * 100)}`);
   };
@@ -109,6 +114,7 @@ function createInput({ difficulty }) {
     voice?.stop();
     voice = null;
     pad.classList.remove('active');
+    wave.setActive(false);
   };
 
   pad.addEventListener('pointerdown', (e) => {
@@ -117,6 +123,7 @@ function createInput({ difficulty }) {
     pid = e.pointerId;
     try { pad.setPointerCapture(pid); } catch { /* yok say */ }
     pad.classList.add('active');
+    wave.setActive(true);
     if (!touched) { touched = true; hint.remove(); }
     fromEvent(e);
     voice?.stop();
@@ -136,9 +143,10 @@ function createInput({ difficulty }) {
   });
   place();
 
-  const node = el('section', { class: 'card tn-input' },
+  const node = el('section', { class: 'card tn-card tn-input' },
     pad,
-    el('p', { class: 'hint center' }, showHz ? 'Bıraktığında seçtiğin perde kalır; istediğin kadar dene.' : 'Zor mod: frekans gizli, sadece kulağına güven!'));
+    el('p', { class: 'tn-note center' }, showHz ? 'Bıraktığında seçtiğin perde kalır; istediğin kadar dene.' : 'Zor mod: frekans gizli, sadece kulağına güven!'),
+    el('button', { class: 'btn big tn-lock rc-submit', onclick: () => submit?.() }, '🎯 Kilitle'));
   return {
     node,
     value: () => Math.round(freq * 10) / 10,
@@ -189,11 +197,11 @@ const game = createRecallGame({
     { id: 'hard', label: 'Zor', hint: '60–1400 Hz, Hz gizli' },
   ],
   dailyDifficulty: 'easy',
-  verbs: { start: 'Başla', show: 'Tonu dinle', submit: '🎯 Gönder', memorize: 'Dinle!', recall: 'Şimdi aynı perdeyi bul!' },
+  verbs: { start: 'Başla', show: 'Tonu dinle', submit: '🎯 Kilitle', memorize: 'Dinle!', recall: 'Şimdi aynı perdeyi bul!' },
   howTo: [
     'Her turda bir ton 3 saniye çalar — bir kez. İyi dinle!',
-    'Sonra büyük pede bas, basılı tutup yukarı (tiz) ya da aşağı (pes) kaydır; parmağın bastıkça ton çalar.',
-    'Bıraktığında seçtiğin perde kalır; istediğin kadar dene, 30 saniye içinde "Gönder"e bas.',
+    'Sonra siyah sahneye bas, basılı tutup yukarı (tiz) ya da aşağı (pes) kaydır; parmağın bastıkça ton çalar.',
+    'Bıraktığında seçtiğin perde kalır; istediğin kadar dene, 30 saniye içinde "Kilitle"ye bas.',
     'Puan sent farkına göre (10 üzerinden): yarım ton kayma 6 puan, bir oktav kayma neredeyse 0.',
     'Sesi açmayı unutma 🔈',
   ],
@@ -207,6 +215,7 @@ const game = createRecallGame({
   shareText: ({ mode, puzzleNo, total }) => `${mode === 'daily' ? `Tosun Ton Avı #${puzzleNo}` : 'Tosun Ton Avı (sınırsız)'} · ${total.toFixed(2)}/50`,
   unlock: unlockAudio,
   stopSound,
+  inlineSubmit: true,
 });
 
 export const enter = game.enter;

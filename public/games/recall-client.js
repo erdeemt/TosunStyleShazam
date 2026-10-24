@@ -55,7 +55,8 @@ spec = {
   howTo: [metin],
   verbs: { show: 'Rengi göster', submit: 'Rengimi gönder', memorize: 'Ezberle!', recall: 'Hatırla!' },
   memorizeView(target, { endsAt, totalMs, difficulty, key }) → düğüm (tek seferlik ses vb. key ile)
-  createInput({ difficulty }) → { node, value(), stop?() }  (her turda rastgele başlangıç)
+  createInput({ difficulty, submit }) → { node, value(), stop?() }  (her turda rastgele başlangıç)
+  inlineSubmit: true → gönder düğmesini girdi kendisi çizer (submit() çağırır, .rc-submit sınıfıyla); dışarıda düğme yok
   answerChip(guess, { difficulty }) → küçük gösterim (null = cevap yok)
   roundDetail({ round, target, guess, score, timedOut }, { difficulty }) → sonuç satırı
   formatScore(score) → '852' | '6.00'
@@ -203,7 +204,7 @@ export function createRecallGame(spec) {
   function enterRecall() {
     spec.stopSound?.();
     phase = 'recall';
-    input = spec.createInput({ difficulty: game.difficulty });
+    input = spec.createInput({ difficulty: game.difficulty, submit: () => submit(false) });
     render();
     later(() => submit(true), current.endsAt - Date.now());
   }
@@ -345,7 +346,7 @@ export function createRecallGame(spec) {
         return [roundHead(spec.verbs.recall),
           el('div', { class: 'rc-clock' }, '⏱️ ', secondsTimer(current.endsAt), timeBar(current.endsAt, current.recallMs)),
           input.node,
-          el('button', { class: 'btn big primary rc-submit', onclick: () => submit(false) }, spec.verbs.submit),
+          spec.inlineSubmit ? null : el('button', { class: 'btn big primary rc-submit', onclick: () => submit(false) }, spec.verbs.submit),
           progressDots()];
       case 'result':
         return [el('div', { class: 'game-head' }, el('div', { class: 'round' }, `Tur ${lastResult.round + 1} / ${game.rounds} sonucu`)),
@@ -463,7 +464,10 @@ export function createRecallGame(spec) {
             spec.answerChip(view.me.guess, { difficulty: view.difficulty, big: true })) : el('p', { class: 'hint center' }, '👀 İzliyorsun.'),
           el('section', { class: 'card' }, el('h2', {}, '👥 Durum'), mStatusSlot));
       }
-      if (!mInput || mInput.key !== key) mInput = { key, input: spec.createInput({ difficulty: view.difficulty }) };
+      if (!mInput || mInput.key !== key) {
+        const submit = () => { if (net.view && viewKey(net.view) === `${key}:recall`) sendSubmit(net.view, ctx); };
+        mInput = { key, input: spec.createInput({ difficulty: view.difficulty, submit }) };
+      }
       // Kendi süren dolunca son hâlin otomatik gider (sunucu 2 sn daha bekler).
       if (mAutoKey !== key) {
         mAutoKey = key;
@@ -472,7 +476,7 @@ export function createRecallGame(spec) {
       }
       return el('div', { class: `stack recall rc-${spec.id}` }, head, clock,
         mInput.input.node,
-        el('button', { class: 'btn big primary rc-submit', onclick: () => sendSubmit(view, ctx) }, spec.verbs.submit),
+        spec.inlineSubmit ? null : el('button', { class: 'btn big primary rc-submit', onclick: () => sendSubmit(view, ctx) }, spec.verbs.submit),
         el('section', { class: 'card' }, el('h2', {}, '👥 Durum'), mStatusSlot));
     }
 
