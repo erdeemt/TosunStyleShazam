@@ -298,6 +298,7 @@ export function createRecallGame(spec) {
           net.identity.name = name;
           await ensureIdentity().catch((err) => toast(err.message));
           render();
+          if (phase === 'final') loadBoard(); // bitirdikten sonra ad verildiyse sıralamada da görünsün
         },
       }, field, el('button', { class: 'btn primary', type: 'submit' }, 'Kaydet')));
   }
@@ -416,10 +417,15 @@ export function createRecallGame(spec) {
     const rows = [...view.players].sort((a, b) => (withRound && last
       ? (last.answers[b.id]?.score ?? 0) - (last.answers[a.id]?.score ?? 0) : b.total - a.total));
     const medals = ['🥇', '🥈', '🥉'];
+    const valueOf = (p) => (withRound && last ? last.answers[p.id]?.score ?? 0 : p.total);
+    // Eşit puan eşit sıra: 1, 1, 3…
+    const ranks = rows.map((p, i) => (i && valueOf(p) === valueOf(rows[i - 1]) ? null : i + 1));
+    for (let i = 1; i < ranks.length; i++) ranks[i] ??= ranks[i - 1];
     return el('ol', { class: 'rc-rank' }, rows.map((p, i) => {
       const a = last?.answers[p.id];
+      const rank = ranks[i];
       return el('li', { class: `${p.id === ctx.playerId ? 'me' : ''}${withRound ? ' wr' : ''}` },
-        el('span', { class: 'w-rank' }, withRound ? `${i + 1}.` : medals[i] ?? `${i + 1}.`),
+        el('span', { class: 'w-rank' }, withRound ? `${rank}.` : medals[rank - 1] ?? `${rank}.`),
         el('span', { class: 'player-name' }, p.name),
         withRound ? el('b', { class: 'rc-pts' }, `+${a ? spec.formatScore(a.score) : '0'}`) : null,
         el('span', { class: 'rc-sum' }, withRound ? 'Σ ' : null, spec.formatTotal(p.total, { short: true, played: view.history.length })),
@@ -449,7 +455,7 @@ export function createRecallGame(spec) {
     if (view.phase === 'recall') {
       const key = `${view.gameKey}:${view.round}`;
       mStatusSlot = el('div', {}, statusList(view, ctx));
-      const clock = el('div', { class: 'rc-clock' }, '⏱️ ', secondsTimer(endsLocal), timeBar(endsLocal, Math.max(1, endsLocal - Date.now())));
+      const clock = el('div', { class: 'rc-clock' }, '⏱️ ', secondsTimer(endsLocal), timeBar(endsLocal, view.recallMs ?? Math.max(1, endsLocal - Date.now())));
       if (view.me.submitted || !ctx.me || ctx.me.spectator) {
         return el('div', { class: `stack recall rc-${spec.id}` }, head, clock,
           view.me.submitted ? el('section', { class: 'card center' },
@@ -487,11 +493,16 @@ export function createRecallGame(spec) {
     }
 
     // Oyun bitti
-    const myRounds = view.history.map((h) => ({ round: h.round - 1, target: h.target, ...(h.answers[ctx.playerId] ?? { guess: null, score: 0 }) }));
-    const ranked = [...view.players].sort((a, b) => b.total - a.total);
+    const myRounds = view.history.map((h) => {
+      const a = h.answers[ctx.playerId] ?? { guess: null, score: 0 };
+      return { round: h.round - 1, target: h.target, ...a, timedOut: a.guess == null };
+    });
+    const best = Math.max(...view.players.map((p) => p.total));
+    const winners = view.players.filter((p) => p.total === best);
     return el('div', { class: `stack recall rc-${spec.id}` }, head,
       el('section', { class: 'card' }, el('h2', {}, '🏆 Final sıralaması'), rankList(view, ctx, { withRound: false })),
-      ranked[0] ? el('p', { class: 'center rc-winner' }, `👑 ${ranked[0].name} kazandı!`) : null,
+      winners.length === 1 ? el('p', { class: 'center rc-winner' }, `👑 ${winners[0].name} kazandı!`)
+        : winners.length > 1 ? el('p', { class: 'center rc-winner' }, `🤝 Berabere: ${winners.map((p) => p.name).join(', ')}`) : null,
       myRounds.some((r) => r.guess !== undefined) && view.players.some((p) => p.id === ctx.playerId)
         ? el('section', { class: 'card' }, el('h2', {}, '🧾 Senin turların'),
           el('div', { class: 'rc-rounds' }, myRounds.map((r) => spec.roundDetail(r, { difficulty: view.difficulty }))))

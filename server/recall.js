@@ -82,6 +82,7 @@ const cleanDifficulty = (def, raw) => (Object.hasOwn(def.difficulties, str(raw))
 // Günlük hedefler gizli tuz + tarih + tur ile HMAC'ten türetilir: bir turun hedefi açılınca
 // sonraki turlar (veya ertesi gün) hesaplanamaz. Tuz data/secrets.json'da (testler RECALL_SALT verir).
 const secrets = jsonStore('secrets', {});
+const identityStore = jsonStore('identities', {}); // lobby.js ile aynı kayıt (sıralamada güncel ad)
 if (!secrets.data.recallSalt) { secrets.data.recallSalt = randomBytes(16).toString('hex'); secrets.flushNow(); }
 const SALT = process.env.RECALL_SALT || secrets.data.recallSalt;
 
@@ -286,7 +287,7 @@ export function leaderboard(gameId, date, viewerId) {
     entries: Object.entries(day)
       .filter(([, e]) => e.done)
       .map(([id, e]) => ({
-        name: e.name,
+        name: identityStore.data[id]?.name ?? e.name, // oyun bittikten sonra ad değişirse sıralama da güncel olsun
         me: id === viewerId,
         total: e.total,
         finishedAt: e.finishedAt,
@@ -459,6 +460,7 @@ export function lobbyGame(gameId) {
         over: state.over,
         endsAt: state.endsAt,
         memorizeMs: Math.round(def.difficulties[state.settings.difficulty].memorizeMs * TIME_SCALE),
+        recallMs: Math.round(state.settings.recallSeconds * 1000 * TIME_SCALE),
         // Hedef sadece ezber ve açıklama anında görünür.
         // Oyun tur ortasında bittiyse (herkes ayrıldı) oynanmamış turun hedefi değil, son açıklanan gösterilir.
         target: state.phase === 'over' ? last?.target ?? null : showTarget ? state.targets[state.round - 1] : null,

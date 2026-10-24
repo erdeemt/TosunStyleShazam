@@ -64,7 +64,11 @@ function createInput() {
     const norm = normalizeHex(raw);
     hexInput.classList.toggle('bad', !norm && raw.replace('#', '').length >= 6);
     if (!norm) return;
-    hsb = rgbToHsb(...hexToRgb(norm));
+    const next = rgbToHsb(...hexToRgb(norm));
+    // Gri/siyahta ton (ve siyahta doygunluk) tanımsız: önceki değer kalsın, kaydırınca renk kırmızıya kaymasın.
+    if (next.s === 0) next.h = hsb.h;
+    if (next.b === 0) { next.h = hsb.h; next.s = hsb.s; }
+    hsb = next;
     sync({ fromHex: true });
   });
   hexInput.addEventListener('blur', () => { hexInput.classList.remove('bad'); hexInput.value = hex().toUpperCase(); });
