@@ -1,4 +1,4 @@
-# Kaldığımız yer (2026-10-23)
+# Kaldığımız yer (2026-10-24)
 
 Bir sonraki oturum buradan devam eder. Ayrıntılı şartname: `PLAN.md`.
 
@@ -39,11 +39,21 @@ Açık küçük notlar:
 - Puanlama (kullanıcı onayladı): Nüans CIEDE2000, 1000/(1+(ΔE/12)²), 5 tur ortalaması; Ton Avı cent,
   10×max(exp(−(c/140)²), 0.75·exp(−c/390)), 5 tur toplamı.
 
+## 🎨 Nüans + 🔊 Ton Avı — BİTTİ, main'e merge + push edildi (2026-10-24 gece)
+
+- Kullanıcı kararı: tek kişi de oda açıp başlatabilir (minPlayers 1).
+- Güvenlik: ezber bitmeden cevap reddedilir, önceki tur cevaplanmadan yeni hedef verilmez, sıralama ilk 50 + sen,
+  45 günden eski günlük kayıtlar silinir, jsonStore aynı ada aynı kaydı döner (secrets ezilmesin), bozuk JSON'da durur.
+- Lobi (tüm oyunlar): oyun ortası izleyici host olsa da oyuncu atamaz.
+- QA: sonradan verilen ad sıralamada, süre çubuğu, beraberlik, gri hex ton korunur, kaydırıcı 44 px.
+- `npm test` 235/235, `npm run e2e` 34/34. Not: "8 kişi, 5 tur" sürü testi tam turda bir kez yük altında düştü (kararsız).
+- Bilinçli bırakılanlar: hedef istemciye gitmek zorunda (devtools ile görülebilir); tek kişilik odada bağlantı
+  kopunca süre işlemeye devam eder; gece yarısını geçen günlük tur kaybolur; serbest modda yenileyince oyun kaybolur.
+
 ## Sıradaki adımlar
 
-1. game/recall: npm test + npm run e2e (worktree'de) → QA / sürü / güvenlik ajanları → düzelt → main'e merge + push.
-2. Builder'ın açık soruları kullanıcıya: tek kişiyle lobi başlatılabilsin mi? (şu an min 2)
-3. Domain alınınca RPi'ye deploy.
+1. Kullanıcı arkadaşlarla deneyip geri bildirim verecek; "geç" deyince Komik Cevap / Hangimiz? / Tabu.
+2. Domain alınınca RPi'ye deploy.
 
 ## Kullanıcı kararları (2026-10-23)
 
