@@ -25,6 +25,22 @@ export const GAMES = [
     load: () => import('./games/wordle.js'),
   },
   {
+    id: 'nuance',
+    name: 'Nüans',
+    icon: '🎨',
+    desc: 'Rengi gör, aklında tut, yeniden oluştur',
+    categories: ['single', 'multi'],
+    load: () => import('./games/nuance.js'),
+  },
+  {
+    id: 'tone',
+    name: 'Ton Avı',
+    icon: '🔊',
+    desc: 'Tonu dinle, aynı perdeyi bul',
+    categories: ['single', 'multi'],
+    load: () => import('./games/tone.js'),
+  },
+  {
     id: 'spyfall',
     name: 'Casus Kim?',
     icon: '🕵️',

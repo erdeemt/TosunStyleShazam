@@ -21,6 +21,8 @@ ilgili bölümü oku. Burada yazmayan bir karar gerekiyorsa, kendin uydurma; rap
 | **P1** | 🕵️ Casus Kim? (Spyfall) | Çok | Lobi sisteminin ilk gerçek kullanıcısı |
 | **P1** | 🟩 Wordle TR (günlük + sınırsız) | Tek | Günlük bulmaca + arkadaş sıralaması altyapısı |
 | P2 | 🧛 Vampir Köylü | Çok | Gece/gündüz fazları, roller, sunucu anlatıcı |
+| P2 | 🎨 Nüans | Tek + Çok | Renk hafızası; günlük + sınırsız + lobi (§4.4) |
+| P2 | 🔊 Ton Avı | Tek + Çok | Perde hafızası; günlük + sınırsız + lobi (§4.5) |
 | P2 | 👉 Hangimiz? | Çok | Gizli oylama |
 | P2 | 😂 Komik Cevap (Quiplash) | Çok | Yaz → oyla |
 | P2 | 🚫 Tabu | Çok | Takımlar, anlatan + gözcü |
@@ -144,6 +146,7 @@ Mobil öncelikli tasarım: 360 px genişlikte kusursuz çalışmalı, butonlar �
 - Günün bulmacası tarih (Europe/Istanbul) + oyun kimliğiyle tohumlanır; herkese aynı.
 - **Cevap istemciye gitmez** (Wordle: tahmin sunucuda değerlendirilir, `POST /api/wordle/guess`).
 - Sonuçlar `data/daily.json`'da: `{ game, date, playerId, name, score, detail }`. Aynı oyuncu aynı gün bir kez.
+- Hafıza oyunları (Nüans, Ton Avı) kendi uçlarını ve `data/recall-daily.json`'u kullanır (§4.4–4.5 ortak bölüm).
 - Sıralama `GET /api/daily/:game/:date`. Arkadaş ortamı: güven modeli gevşek ama sunucu, sonucun o günün
   bulmacasıyla tutarlı olduğunu doğrulamalı (ör. Wordle: sunucunun gördüğü tahmin geçmişinden puan hesaplanır).
 
@@ -247,7 +250,96 @@ Mobil öncelikli tasarım: 360 px genişlikte kusursuz çalışmalı, butonlar �
   kontrol edilir (`server/matcher.js`, tek oyunculu kontrolle aynı). Sınırlama: ses telefonda çaldığı için YouTube video kimliği
   istemciye gider — geliştirici araçlarıyla bakan biri YouTube şarkısını bulabilir (arkadaş ortamı için kabul edildi).
 
-### 4.5 Sonraki aşamalar (P2 kalanı – P4)
+### 4.5 🎨 Nüans (renk hafızası) — kullanıcı ile netleşti (2026-10-24)
+
+Ortak motor: `server/recall.js` (Ton Avı ile aynı), saf matematik `public/recall-math.js` (sunucu ve istemci aynı dosyayı kullanır),
+istemci `public/games/recall-client.js` + `public/games/nuance.js`, lobi modülü `server/games/nuance.js`.
+
+**Kurallar**
+- 5 tur. Her turda hedef renk büyük bir karede **Normal 5 sn / Uzman 2 sn** görünür (geri sayımlı), sonra kaybolur.
+  Günlük her zaman Normal.
+- Hatırlama: 30 sn. Girdi **HSB kaydırıcıları** (Ton 0–360, Doygunluk 0–100, Parlaklık 0–100) + büyük canlı önizleme
+  + düzenlenebilir **hex kutusu** (`#RRGGBB`), iki yönlü bağlı. Ton kaydırıcısı gökkuşağı, D/P kaydırıcıları seçili tona göre degrade.
+  **Her turda girdi rastgele bir renkten başlar** (dokunmadan gönderen ortadan puan alamasın).
+  Süre dolunca o anki renk kendiliğinden gönderilir; "Rengimi gönder" ile erken gönderilir.
+- Hedefler: HSB'de ton düzgün dağılımlı, doygunluk ve parlaklık 25–100 (neredeyse siyah / gri yığını olmasın).
+
+**Puan (kullanıcı kararı: algısal CIEDE2000)**
+- RGB → doğrusal sRGB → XYZ (D65) → CIELAB → **ΔE00** (Sharma–Wu–Dalal 2005, kL = kC = kH = 1).
+- Tur puanı = `round(1000 / (1 + (ΔE/12)²))` → aynı renk 1000, ΔE 5 → 852, ΔE 10 → 590, ΔE 20 → 265, siyah–beyaz (ΔE 100) → 14.
+- Sonuç (Chroma) = 5 turun ortalaması, yuvarlanmış, 0–1000. Seviyeler: <400 Acemi, 400–600 Orta, 600–750 İyi, 750–880 Uzman, 880+ Elit.
+- Gerekçe: playnuance.com'un RGB-uzaklığı formülü (`1000 × (1 − d/441.67)^2.3`) gözün algısıyla örtüşmez (koyu tonlarda
+  fark abartılır, yeşilde küçümsenir) ve "hep orta gri" stratejisi puan toplar. ΔE00 ile orta gri rastgele hedeflere karşı
+  ortalama ~170 alır (birim test < 300'ü zorlar). Eski formül `scorePlaynuance` adıyla sadece karşılaştırma için duruyor.
+
+**Sonuç ekranı**: her tur hedef karesi + oyuncunun karesi, iki hex, tur puanı; toplam + seviye; paylaşım
+`Tosun Nüans #12 · 812/1000 (Uzman)`.
+
+### 4.6 🔊 Ton Avı (perde hafızası) — kullanıcı ile netleşti (2026-10-24)
+
+İstemci `public/games/tone.js` (+ `tone-audio.js`), lobi modülü `server/games/tone.js`; motor §4.4 ile ortak.
+
+**Kurallar**
+- 5 tur. Sinüs tonu (Web Audio `OscillatorNode`, ses dosyası yok, 30 ms açılış/kapanış rampası, ılımlı seviye;
+  `localStorage['tss:volume']` 0–1, varsayılan 0.6) **3 sn** çalar, nabız/dalga animasyonuyla; **tekrar dinlenemez**.
+  Tarayıcı sesi kilitlemişse "🔊 Sesi aç ve dinle" düğmesi kalan süreyi çalar.
+- Hatırlama: 30 sn. Büyük dikey ped: bas-tut-kaydır (yukarı tiz, aşağı pes), parmak bastıkça ton canlı çalar
+  (pointer olayları, `touch-action: none`); bırakınca ses durur, değer kalır; istediğin kadar dene. Ok tuşlarıyla da ayarlanır.
+  Ped konumu → frekans **logaritmik** (eşit kaydırma = eşit sent). **Her turda ped rastgele bir perdeden başlar.**
+- Modlar: **Kolay** 80–1200 Hz, Hz değeri ayar sırasında görünür; **Zor** 60–1400 Hz, değer gizli. Günlük = Kolay.
+- Hedefler: mod aralığında logaritmik frekansta (sent) düzgün dağılım, 0.1 Hz'e yuvarlanır. Tahmin aralığa kırpılır.
+
+**Puan (perde aralığına göre; frekanstan ve moddan bağımsız)**
+- `c = |1200 · log2(tahmin / hedef)|` (sent).
+- Tur puanı = `10 × max(exp(−(c/140)²), 0.75 · exp(−c/390))`, 2 ondalık (0.00–10.00). Toplam = 5 turun toplamı (0–50).
+- Sabitler: σ = 140 sent (dar Gauss: yakın tahmin cömert ödüllenir), kuyruk 0.75 · e^(−c/390) (uzak tahmin de biraz alır).
+  Sabitlenmiş değerler: 10 sent → 9.95, 50 → 8.80, 100 (yarım ton) → 6.00, 200 → 4.49, 1200 (oktav) → 0.35.
+- Gerekçe: önceki ERB-aralığına-normalize formülde Zor'un geniş aralığı Zor'u Kolay'dan **kolay** yapıyordu ve alçak notalar
+  fazla hoşgörülüydü. Sent farkı kulağın perde algısıyla aynı ölçektir; Zor sadece aralık ve gizli Hz ile zorlaşır.
+
+**Sonuç ekranı**: her tur hedef Hz – senin Hz, işaretli sent farkı + yorum ("Biraz pes", "Yarım ton tiz", "Yaklaşık bir oktav pes"…),
+tur puanı; **sadece sonuç ekranında** hedefi/kendi tonunu tekrar çalma düğmeleri (▶); paylaşım `Tosun Ton Avı · 38.42/50`.
+
+### 4.5–4.6 ortak: modlar, protokol ve kabul kriterleri
+
+**Tek oyunculu (HTTP, Wordle gibi; `server/recall.js`)** — 📅 Günlük (İstanbul günü, herkese aynı hedefler, tek hak,
+arkadaş sıralaması) ve ♾️ Sınırsız (rastgele, zorluk seçilir, sıralama yok). Uçlar `POST /api/recall/<nuance|tone>/<uç>`,
+gövdede `playerId, token`:
+
+| Uç | Alanlar | Yanıt |
+|---|---|---|
+| `start` | `mode: 'daily'\|'free', difficulty` | oyun: `gameId, difficulty, memorizeMs, recallMs, played[], pending, done, total, puzzleNo?` — hedef yok |
+| `round` | `mode, gameId, round` (0'dan) | **o turun hedefi** (bir kez); `startedAt` kaydedilir; başlamış tur tekrar başlatılamaz, tur atlanamaz |
+| `submit` | `mode, gameId, round, guess` | sunucu puanlar; `startedAt + ezber + hatırlama + 3 sn` sonrası gelen cevap sayılmaz (0, `timedOut`) |
+| `leaderboard` | — | bugünün bitirenleri (toplama göre); tur ayrıntıları (hedef/cevap) sadece kendi oyununu bitirene görünür |
+
+- Günlük hedefler `HMAC-SHA256(recallSalt, "tosun-<oyun>-v1:<tarih>:<tur>")`'dan türetilir: bir turun hedefi açılınca
+  sonraki turlar hesaplanamaz. Tuz `data/secrets.json` → `recallSalt` (testler `RECALL_SALT`; `FAKE_TODAY` Wordle'daki gibi).
+  1 numaralı günlük: 2026-10-24. Sonuçlar `data/recall-daily.json` (başlamış tur da kaydedilir; yeniden başlatma turu sıfırlamaz).
+- Cevaplanmadan bırakılan tur, süresi geçince 0 sayılır. Sayfa yenilenirse süren turda hedef tekrar gösterilmez.
+- Süreler `TIME_SCALE` ile ölçeklenir (yanıttaki `memorizeMs/recallMs` ölçekli).
+
+**Çok oyunculu (lobi)** — 1–12 kişi (tek kişi de oda açıp başlatabilir). Ayarlar: tur 3–10 (varsayılan 5), zorluk, hatırlama 15–60 sn (varsayılan 30).
+Herkes aynı hedefleri aynı anda görür. Her tur fazları (isimli zamanlayıcılar):
+`memorize` (hedef görünümde, `endsAt`) → `recall` (hedef **yok**, herkes cevaplar; kimin gönderdiği görünür, cevapları görünmez;
+herkes gönderince hemen biter) → `reveal` (hedef + herkesin cevabı ve puanı yan yana; host "Sonraki" veya 20 sn sonra otomatik)
+→ … → `over` (toplam sıralaması: Nüans ortalama 0–1000, Ton Avı toplam 0–50).
+- Eylemler: `{ type: 'submit', round, guess }`, `{ type: 'next', round }` (sadece host). `round` güncel tur değilse eylem
+  **sessizce yok sayılır** (geç otomatik gönderim, çift dokunma). Ezberde gönderim, çift gönderim, bozuk değer hata verir;
+  Ton Avı tahmini aralığa kırpılır.
+- İstemci kendi süresi dolunca son değeri otomatik gönderir; sunucu `endsAt + 2 sn`'ye kadar kabul eder; göndermeyen 0 alır.
+- Ayrılan oyuncu çıkarılır; kalanların hepsi göndermişse tur hemen biter.
+- İstemci kancası: `mountLobby(..., { patchGame(view, ctx) })` true dönerse ekran baştan çizilmez (kaydırıcı/ped sürüklenirken
+  başkası cevap verince sürükleme kopmasın).
+
+**Kabul kriterleri**
+- Hedef hiçbir görünümde `recall` fazında yok; tek oyunculuda hedef sadece `round` yanıtında, bir kez.
+- Başka oyuncunun o turdaki cevabı `reveal` öncesi hiçbir mesajda yok; sıralamada başkalarının cevapları ancak bitirince.
+- Puanlar sunucuda hesaplanır; birim testler formülleri sabitler (bkz. `tests/unit/recall.test.mjs`).
+- Günlük: kişi başı günde bir deneme; sunucu yeniden başlasa da ilerleme korunur.
+- 360 px'te yatay kaydırma yok, dokunma hedefleri ≥ 44 px; e2e'de konsol hatası yok.
+
+### 4.7 Sonraki aşamalar (P2 kalanı – P4)
 
 Her biri başlamadan önce bu bölüm, aynı ayrıntıda kural + kabul kriteriyle genişletilecek (kullanıcıya danışılarak).
 Ön notlar:

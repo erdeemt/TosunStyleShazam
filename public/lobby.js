@@ -12,10 +12,21 @@ export function mountLobby(root, game) {
   let joinCode = '';
   let draftName = net.name;
 
+  let shellKey = '';
+  let shellNode = null;
   const render = () => {
     if (!active) return;
     const room = net.room;
+    // Opsiyonel: oyun ekranı yerinde güncellenebiliyorsa (ör. kaydırıcı sürüklenirken başka oyuncu cevap verdi)
+    // baştan çizme; game.patchGame(view, ctx) true dönerse kabuk aynı kalır.
+    const inGame = room && room.game === game.id && room.phase !== 'lobby';
+    const key = inGame ? JSON.stringify([room.code, room.phase, room.hostId, net.connected, net.replaced,
+      room.players.map((p) => [p.id, p.connected, p.spectator])]) : '';
+    if (inGame && game.patchGame && net.view && key === shellKey && shellNode?.isConnected
+      && game.patchGame(net.view, gameCtx(room))) return;
     const screen = room && room.game === game.id ? roomScreen(room) : entryScreen(room);
+    shellKey = key;
+    shellNode = screen;
     if (net.replaced && !screen.dataset.replacedBanner) {
       screen.dataset.replacedBanner = '1';
       screen.prepend(el('section', { class: 'card warn' },
@@ -76,10 +87,10 @@ export function mountLobby(root, game) {
   }
 
   // ---------- Oda: bekleme / oyun / sonuç ----------
-  function roomScreen(room) {
+  function gameCtx(room) {
     const me = room.players.find((p) => p.id === net.playerId);
     const isHost = room.hostId === net.playerId;
-    const ctx = {
+    return {
       room, me, isHost,
       playerId: net.playerId,
       serverOffset: net.serverOffset,
@@ -89,6 +100,11 @@ export function mountLobby(root, game) {
       connected: (id) => room.players.find((p) => p.id === id)?.connected !== false,
       hostId: room.hostId,
     };
+  }
+
+  function roomScreen(room) {
+    const ctx = gameCtx(room);
+    const { me, isHost } = ctx;
 
     if (room.phase === 'lobby') { cache = { gameEl: null, screen: null, bar: null, phase: null }; return waitingRoom(room, ctx); }
 
