@@ -116,12 +116,27 @@ const daily = jsonStore('recall-daily', {}); // { game: { date: { playerId: { na
 const freeGames = new Map(); // gameId -> oyun
 const FREE_TTL_MS = 6 * 3600_000;
 const MAX_FREE_GAMES = 5000;
+const BOARD_LIMIT = 50;
+const KEEP_DAYS = 45;
+
+// Eski günlerin kayıtlarını at (dosya sınırsız büyümesin).
+function pruneDaily() {
+  const cutoff = new Date(Date.now() - KEEP_DAYS * 86_400_000).toISOString().slice(0, 10);
+  let changed = false;
+  for (const byDate of Object.values(daily.data)) {
+    for (const date of Object.keys(byDate)) if (date < cutoff) { delete byDate[date]; changed = true; }
+  }
+  if (changed) daily.save();
+}
+pruneDaily();
+setInterval(pruneDaily, 6 * 3600_000).unref();
 
 const timing = (def, difficulty) => ({ memorizeMs: scaled(def.difficulties[difficulty].memorizeMs), recallMs: scaled(RECALL_MS) });
 const deadlineOf = (def, difficulty, startedAt) => {
   const t = timing(def, difficulty);
   return startedAt + t.memorizeMs + t.recallMs;
 };
+const EARLY_SLACK_MS = 150; // saat/ağ farkı payı
 const graceMs = () => Math.max(250, scaled(SUBMIT_GRACE_MS));
 
 // Süresi geçmiş, cevaplanmamış tur 0 puan olur (sayfayı kapatan oyuncu turu "dondurmasın").
@@ -153,7 +168,11 @@ function publicGame(def, game, targetOf, extra) {
     // Bitmiş turların hedefi görünür; süren turunki görünmez.
     played: game.rounds.map((r, i) => (r.guess === undefined ? null
       : { round: i, target: targetOf(i), guess: r.guess, score: r.score, timedOut: Boolean(r.timedOut) })).filter(Boolean),
-    pending: pending >= 0 ? { round: pending, endsAt: deadlineOf(def, game.difficulty, game.rounds[pending].startedAt) } : null,
+    pending: pending >= 0 ? {
+      round: pending,
+      recallAt: game.rounds[pending].startedAt + timing(def, game.difficulty).memorizeMs,
+      endsAt: deadlineOf(def, game.difficulty, game.rounds[pending].startedAt),
+    } : null,
     serverNow: Date.now(),
     done: game.done,
     total: game.done ? game.total : def.total(game.rounds.filter((r) => r.guess !== undefined).map((r) => r.score)),
@@ -182,9 +201,10 @@ function lookup(def, identity, mode, rawGameId, create = false) {
 export function startGame(identity, gameId, mode, rawDifficulty) {
   const def = getDef(gameId);
   if (mode === 'free') {
-    if (freeGames.size >= MAX_FREE_GAMES) pruneFree(true);
     const mine = [...freeGames].filter(([, g]) => g.playerId === identity.id);
     for (const [oldId] of mine.slice(0, Math.max(0, mine.length - 2))) freeGames.delete(oldId); // oyuncu başına en fazla 3
+    if (freeGames.size >= MAX_FREE_GAMES) pruneFree();
+    if (freeGames.size >= MAX_FREE_GAMES) throw new GameError('Sunucu şu an çok yoğun, biraz sonra tekrar dene.');
     const difficulty = cleanDifficulty(def, rawDifficulty);
     const rng = cryptoRng();
     const id = randomUUID();
@@ -219,7 +239,7 @@ export function startRound(identity, gameId, mode, rawGameId, rawRound) {
   if (!Number.isInteger(round) || round < 0 || round >= ROUNDS) throw new GameError('Geçersiz tur.');
   if (game.done) throw new GameError(mode === 'daily' ? 'Bugünkü oyunu bitirdin. Yarın yeni hedefler!' : 'Bu oyun bitti.');
   if (round < game.rounds.length) throw new GameError('Bu tur zaten başladı; hedef tekrar gösterilmez.');
-  if (round > game.rounds.length) throw new GameError('Önce önceki turu bitir.');
+  if (round > game.rounds.length || game.rounds.at(-1)?.guess === undefined && game.rounds.length) throw new GameError('Önce önceki turu bitir.');
   const now = Date.now();
   game.rounds.push({ startedAt: now });
   if (mode === 'daily') { game.name = identity.name ?? game.name; daily.save(); }
@@ -234,6 +254,7 @@ export function submitGuess(identity, gameId, mode, rawGameId, rawRound, rawGues
   const r = Number.isInteger(round) ? game.rounds[round] : null;
   if (!r) throw new GameError('Bu tur başlamadı.');
   if (r.guess !== undefined) throw new GameError('Bu turun cevabı zaten alındı.');
+  if (Date.now() < r.startedAt + timing(def, game.difficulty).memorizeMs - EARLY_SLACK_MS) throw new GameError('Önce ezberleme süresi bitmeli.');
   const late = Date.now() > deadlineOf(def, game.difficulty, r.startedAt) + graceMs();
   if (late) {
     // Süre çoktan doldu: tahmin sayılmaz, tur 0 puan.
@@ -271,18 +292,17 @@ export function leaderboard(gameId, date, viewerId) {
         finishedAt: e.finishedAt,
         rounds: viewerDone ? e.rounds.map((r, i) => ({ target: dailyTarget(def.id, date, i), guess: r.guess, score: r.score })) : null,
       }))
-      .sort((a, b) => b.total - a.total || a.finishedAt - b.finishedAt),
+      .sort((a, b) => b.total - a.total || a.finishedAt - b.finishedAt)
+      .map((e, i) => ({ ...e, rank: i + 1 }))
+      .filter((e) => e.rank <= BOARD_LIMIT || e.me),
+    finishers: Object.values(day).filter((e) => e.done).length,
     playing: Object.values(day).filter((e) => !e.done && e.rounds.length).length,
   };
 }
 
-function pruneFree(force = false) {
+function pruneFree() {
   const cutoff = Date.now() - FREE_TTL_MS;
   for (const [id, g] of freeGames) if (g.createdAt < cutoff) freeGames.delete(id);
-  if (force && freeGames.size >= MAX_FREE_GAMES) {
-    let n = Math.ceil(freeGames.size / 2);
-    for (const id of freeGames.keys()) { if (n-- <= 0) break; freeGames.delete(id); }
-  }
 }
 setInterval(() => pruneFree(), 600_000).unref();
 

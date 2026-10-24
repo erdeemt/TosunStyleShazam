@@ -150,7 +150,10 @@ export function createRecallGame(spec) {
       // Sayfa yenilenmeden önce başlamış tur: hedef tekrar gösterilmez, kalan sürede cevap verilir.
       const endsAt = Date.now() + (g.pending.endsAt - g.serverNow);
       current = { round: g.pending.round, target: null, endsAt, recallMs: g.recallMs };
-      enterRecall();
+      // Ezber sırasında yenilendiyse sunucu erken cevabı reddeder: ezber süresi bitene kadar bekle.
+      const wait = (g.pending.recallAt ?? 0) - g.serverNow;
+      if (wait > 0) later(() => enterRecall(), wait + 100);
+      else enterRecall();
       return;
     }
     phase = 'ready';
@@ -272,7 +275,7 @@ export function createRecallGame(spec) {
       board.entries.length
         ? el('ol', { class: 'w-board rc-board' }, board.entries.map((e, i) =>
           el('li', { class: e.me ? 'me' : '' },
-            el('span', { class: 'w-rank' }, `${i + 1}.`),
+            el('span', { class: 'w-rank' }, `${e.rank ?? i + 1}.`),
             el('span', { class: 'player-name' }, e.name),
             el('span', { class: 'w-tries' }, spec.formatTotal(e.total, { short: true })),
             e.rounds ? el('span', { class: 'rc-mini' }, e.rounds.map((r) => spec.answerChip(r.guess, { difficulty: spec.dailyDifficulty, target: r.target, mini: true }))) : null)))
