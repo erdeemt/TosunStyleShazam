@@ -348,7 +348,7 @@ export function lobbyGame(gameId) {
   return {
     id: def.id,
     name: def.name,
-    minPlayers: 2,
+    minPlayers: 1, // tek kişi de oda açıp oynayabilir (arkadaş gelene kadar ısınma)
     maxPlayers: 12,
     defaultSettings: { rounds: ROUNDS, difficulty: def.defaultDifficulty, recallSeconds: RECALL_MS / 1000 },
 

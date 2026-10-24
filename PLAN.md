@@ -319,7 +319,7 @@ gövdede `playerId, token`:
 - Cevaplanmadan bırakılan tur, süresi geçince 0 sayılır. Sayfa yenilenirse süren turda hedef tekrar gösterilmez.
 - Süreler `TIME_SCALE` ile ölçeklenir (yanıttaki `memorizeMs/recallMs` ölçekli).
 
-**Çok oyunculu (lobi)** — 2–12 kişi. Ayarlar: tur 3–10 (varsayılan 5), zorluk, hatırlama 15–60 sn (varsayılan 30).
+**Çok oyunculu (lobi)** — 1–12 kişi (tek kişi de oda açıp başlatabilir). Ayarlar: tur 3–10 (varsayılan 5), zorluk, hatırlama 15–60 sn (varsayılan 30).
 Herkes aynı hedefleri aynı anda görür. Her tur fazları (isimli zamanlayıcılar):
 `memorize` (hedef görünümde, `endsAt`) → `recall` (hedef **yok**, herkes cevaplar; kimin gönderdiği görünür, cevapları görünmez;
 herkes gönderince hemen biter) → `reveal` (hedef + herkesin cevabı ve puanı yan yana; host "Sonraki" veya 20 sn sonra otomatik)

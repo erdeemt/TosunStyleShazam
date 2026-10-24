@@ -76,7 +76,7 @@ export function recallSuite(gameId, { guessFor, outOfRange, clampedTo, invalid }
     return { target, reveal };
   }
 
-  for (const n of [2, 5, 8]) {
+  for (const n of [1, 2, 5, 8]) { // 1: tek kişilik oda da başlatılabilir
     const rounds = n === 8 ? 5 : 3;
     test(`${n} kişi, ${rounds} tur: tam oyun, puanlar sunucuyla tutarlı, sızıntı yok`, async () => {
       const room = await setup(n, { rounds });
