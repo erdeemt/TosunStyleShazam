@@ -258,8 +258,10 @@ istemci `public/games/recall-client.js` + `public/games/nuance.js`, lobi modül�
 **Kurallar**
 - 5 tur. Her turda hedef renk büyük bir karede **Normal 5 sn / Uzman 2 sn** görünür (geri sayımlı), sonra kaybolur.
   Günlük her zaman Normal.
-- Hatırlama: 30 sn. Girdi **HSB kaydırıcıları** (Ton 0–360, Doygunluk 0–100, Parlaklık 0–100) + büyük canlı önizleme
-  + düzenlenebilir **hex kutusu** (`#RRGGBB`), iki yönlü bağlı. Ton kaydırıcısı gökkuşağı, D/P kaydırıcıları seçili tona göre degrade.
+- Hatırlama: 30 sn. Girdi **HSB yay kadranları** (270°, parmakla çevrilir; Ton 0–360, Doygunluk 0–100, Parlaklık 0–100) +
+  büyük canlı önizleme dairesi + düzenlenebilir **hex kutusu** (`#RRGGBB`), iki yönlü bağlı. Ton halkası gökkuşağı, D/P halkaları
+  seçili tona göre degrade. Her kadranın içinde görünmez bir range girdisi (klavye/ekran okuyucu). Kartın içinde "🎯 Kilitle".
+  (playnuance.com tarzı, kullanıcı isteği 2026-10-25.)
   **Her turda girdi rastgele bir renkten başlar** (dokunmadan gönderen ortadan puan alamasın).
   Süre dolunca o anki renk kendiliğinden gönderilir; "Rengimi gönder" ile erken gönderilir.
 - Hedefler: HSB'de ton düzgün dağılımlı, doygunluk ve parlaklık 25–100 (neredeyse siyah / gri yığını olmasın).
@@ -283,8 +285,9 @@ istemci `public/games/recall-client.js` + `public/games/nuance.js`, lobi modül�
 - 5 tur. Sinüs tonu (Web Audio `OscillatorNode`, ses dosyası yok, 30 ms açılış/kapanış rampası, ılımlı seviye;
   `localStorage['tss:volume']` 0–1, varsayılan 0.6) **3 sn** çalar, nabız/dalga animasyonuyla; **tekrar dinlenemez**.
   Tarayıcı sesi kilitlemişse "🔊 Sesi aç ve dinle" düğmesi kalan süreyi çalar.
-- Hatırlama: 30 sn. Büyük dikey ped: bas-tut-kaydır (yukarı tiz, aşağı pes), parmak bastıkça ton canlı çalar
+- Hatırlama: 30 sn. Siyah sahne + parlak dalga şeritleri (canvas, `public/games/tone-wave.js`; dialed.gg tarzı): bas-tut-kaydır (yukarı tiz, aşağı pes), parmak bastıkça ton canlı çalar
   (pointer olayları, `touch-action: none`); bırakınca ses durur, değer kalır; istediğin kadar dene. Ok tuşlarıyla da ayarlanır.
+  Dalgalar perdeyle sıklaşır, basılıyken parlar; ezberde dalga hedeften bağımsızdır (gözle eşleştirilmesin). Kartın içinde "🎯 Kilitle".
   Ped konumu → frekans **logaritmik** (eşit kaydırma = eşit sent). **Her turda ped rastgele bir perdeden başlar.**
 - Modlar: **Kolay** 80–1200 Hz, Hz değeri ayar sırasında görünür; **Zor** 60–1400 Hz, değer gizli. Günlük = Kolay.
 - Hedefler: mod aralığında logaritmik frekansta (sent) düzgün dağılım, 0.1 Hz'e yuvarlanır. Tahmin aralığa kırpılır.
