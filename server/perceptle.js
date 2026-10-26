@@ -11,7 +11,8 @@ import {
   TESTS, TEMPO, SPLIT_RANGE, evaluate, splitLabel, finalScore, gradeOf, makeStimulus, stimulusMs, truthOf,
 } from '../public/perceptle-math.js';
 
-const TIME_SCALE = Number(process.env.TIME_SCALE) > 0 ? Number(process.env.TIME_SCALE) : 1;
+// Süre ölçeği sadece test modunda (TEST_GAMES=1): üretimde yanlışlıkla bırakılırsa süreler değişmesin.
+const TIME_SCALE = process.env.TEST_GAMES === '1' && Number(process.env.TIME_SCALE) > 0 ? Number(process.env.TIME_SCALE) : 1;
 const scaled = (ms) => Math.max(1, Math.round(ms * TIME_SCALE));
 
 const EPOCH = '2026-10-26'; // 1 numaralı günlük
@@ -51,8 +52,20 @@ function hmacRng(text) {
 // İstanbul tarihinin haftanın günü (tarih zaten İstanbul günü; öğlen UTC güvenli)
 export const isFriday = (date) => new Date(`${date}T12:00:00Z`).getUTCDay() === 5;
 
+// Uyaran üretimi pahalı (nokta yerleştirme): gün başına 5 uyaran bir kez üretilir, kopyası verilir.
+// Sadece son iki günün kaydı tutulur (gece yarısını geçen istekler için dün de lazım olabilir).
+const stimulusCache = new Map(); // `${date}:${index}` -> uyaran
+
 export function dailyStimulus(date, index) {
-  return makeStimulus(TESTS[index], hmacRng(`tosun-perceptle-v1:${date}:${index}`), isFriday(date));
+  const key = `${date}:${index}`;
+  let s = stimulusCache.get(key);
+  if (!s) {
+    s = makeStimulus(TESTS[index], hmacRng(`tosun-perceptle-v1:${date}:${index}`), isFriday(date));
+    stimulusCache.set(key, s);
+    const days = [...new Set([...stimulusCache.keys()].map((k) => k.split(':')[0]))].sort();
+    for (const old of days.slice(0, -2)) for (const k of stimulusCache.keys()) if (k.startsWith(`${old}:`)) stimulusCache.delete(k);
+  }
+  return structuredClone(s);
 }
 
 const dayIndex = (date) => Math.round((Date.parse(`${date}T00:00:00Z`) - Date.parse(`${EPOCH}T00:00:00Z`)) / 86_400_000);
