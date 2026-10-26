@@ -11,8 +11,8 @@ import {
   TONE_RANGES, hexToRgb, hsbToRgb, normalizeHex, rgbToHex, round2, scoreColor, scoreTone, freqAt,
 } from '../public/recall-math.js';
 
-// Süre ölçeği sadece test modunda (TEST_GAMES=1): üretimde yanlışlıkla bırakılırsa süreler değişmesin.
-const TIME_SCALE = process.env.TEST_GAMES === '1' && Number(process.env.TIME_SCALE) > 0 ? Number(process.env.TIME_SCALE) : 1;
+// Süre ölçeği sadece test sunucusunda (TEST_MODE=1, tests/lib/server.js): üretimde yanlışlıkla bırakılırsa süreler değişmesin.
+const TIME_SCALE = process.env.TEST_MODE === '1' && Number(process.env.TIME_SCALE) > 0 ? Number(process.env.TIME_SCALE) : 1;
 const scaled = (ms) => Math.max(1, Math.round(ms * TIME_SCALE));
 
 export const ROUNDS = 5;

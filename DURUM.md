@@ -66,3 +66,13 @@ Açık küçük notlar:
 ## Kullanıcı kararları (2026-10-23)
 
 - Wordle sınırda kelimeler: hepsi kalsın. Mevcut geçmiş main'e doğrudan push edildi; yeni oyunlar kendi dalında.
+
+## 👁️ Algıla — kaldığımız yer (2026-10-26 gece, PC kapatıldı)
+
+- Dal: game/perceptle (worktree .claude/worktrees/perceptle), GitHub'a gönderildi, main'e HENÜZ birleştirilmedi.
+- Builder bitirdi; QA + güvenlik turları yapıldı, bulgular düzeltildi: günlük uyaran önbelleği, TIME_SCALE sadece
+  TEST_MODE=1 (tests/lib/server.js verir), ağ kesintisinde otomatik yeniden deneme + "Tekrar gönder" ekranı,
+  Açı/Böl'de Kilitle dokununca açılır, normal Açı'da tek dokunuş göndermez, canvas ölçüsü, 44 px dokunma, touch-action.
+- Bilinçli bırakılan: günlük uyaranlar herkese aynı (yan hesapla önizleme mümkün, Wordle gibi).
+- Son tam tur çalışırken PC kapandı. Sıradaki: `npm test` + `npm run e2e` tekrar çalıştır → yeşilse main'e merge (--no-ff) + push.
+  Önceki turda npm test 260/260 yeşildi; e2e'deki 7 hata TIME_SCALE kapısındandı, TEST_MODE ile düzeltildi ve o testler tek tek geçti.

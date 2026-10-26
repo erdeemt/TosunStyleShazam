@@ -111,7 +111,7 @@ test('günlük: 5 test dokunmatikle, sonuçlar, not, sıralama, yenileyince bitm
   assert.match(await page.locator('.pc-detail').textContent(), /İniş \d+ · Sen \d+ · \d+ birim fark/);
   await page.screenshot({ path: `${SHOTS}08-track-result.png`, fullPage: true });
 
-  // 3. Açı: hedef açıya dokun-bırak (bırakınca kilitlenir); değer ekranda yazmaz
+  // 3. Açı: hedef açıya dokun, sonra Kilitle (tek dokunuş göndermez; sürükleyip bırakmak gönderir); değer ekranda yazmaz
   await next(page, 'Sonraki test');
   await next(page);
   await page.waitForSelector('.pc-dial');
@@ -124,6 +124,7 @@ test('günlük: 5 test dokunmatikle, sonuçlar, not, sıralama, yenileyince bitm
   const R = db.width * 0.4;
   const rad = (target * Math.PI) / 180;
   await page.touchscreen.tap(cx + Math.cos(rad) * R, cy - Math.sin(rad) * R);
+  await page.click(".pc-lock"); // tek dokunuş göndermez (kaza dokunuşu), Kilitle gönderir
   await page.waitForSelector('.pc-big-score');
   assert.ok(await lastScore(page) >= 90, `açı puanı ${await lastScore(page)}`);
   assert.match(await page.locator('.pc-detail').textContent(), new RegExp(`Hedef ${target}° · Sen [\\d,]+° · [\\d,]+° fark`));
@@ -137,7 +138,6 @@ test('günlük: 5 test dokunmatikle, sonuçlar, not, sıralama, yenileyince bitm
   const tempoStim = (await stimuli.at(3)).stimulus;
   await tapTempo(page, tempoStim, false, 30);
   await page.waitForTimeout(1500 + (60_000 / tempoStim.bpm) * 2);
-  await page.screenshot({ path: `${SHOTS}11-tempo.png`, fullPage: true });
   await page.waitForSelector('.pc-big-score', { timeout: 15000 });
   assert.ok(await lastScore(page) >= 80, `ritim puanı ${await lastScore(page)}`);
   assert.match(await page.locator('.pc-detail').textContent(), new RegExp(`${tempoStim.bpm} BPM · 8/8 vuruş`));
@@ -242,7 +242,6 @@ test('sınırsız Cuma kuralları: hareketli noktalar, duvarlı saha, sarımlı 
   await tapTempo(page, stim, true);
   await page.waitForSelector('.pc-tempo-label.go', { timeout: 8000 });
   assert.match(await page.locator('.pc-tempo-label').textContent(), /ARASINA/);
-  await page.screenshot({ path: `${SHOTS}26-friday-tempo.png`, fullPage: true });
   await page.waitForSelector('.pc-big-score', { timeout: 15000 });
   assert.ok(await lastScore(page) >= 80, `Cuma ritim puanı ${await lastScore(page)}`);
 

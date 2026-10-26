@@ -11,8 +11,8 @@ import {
   TESTS, TEMPO, SPLIT_RANGE, evaluate, splitLabel, finalScore, gradeOf, makeStimulus, stimulusMs, truthOf,
 } from '../public/perceptle-math.js';
 
-// Süre ölçeği sadece test modunda (TEST_GAMES=1): üretimde yanlışlıkla bırakılırsa süreler değişmesin.
-const TIME_SCALE = process.env.TEST_GAMES === '1' && Number(process.env.TIME_SCALE) > 0 ? Number(process.env.TIME_SCALE) : 1;
+// Süre ölçeği sadece test sunucusunda (TEST_MODE=1, tests/lib/server.js): üretimde yanlışlıkla bırakılırsa süreler değişmesin.
+const TIME_SCALE = process.env.TEST_MODE === '1' && Number(process.env.TIME_SCALE) > 0 ? Number(process.env.TIME_SCALE) : 1;
 const scaled = (ms) => Math.max(1, Math.round(ms * TIME_SCALE));
 
 const EPOCH = '2026-10-26'; // 1 numaralı günlük

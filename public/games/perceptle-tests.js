@@ -23,7 +23,7 @@ export function stage(cls, aspect) {
   let h = 0;
   let draw = () => {};
   const resize = () => {
-    const r = node.getBoundingClientRect();
+    const r = canvas.getBoundingClientRect(); // kenarlık içi (dış kutu değil): keskin ve kaymasız
     if (!r.width) return;
     const dpr = window.devicePixelRatio || 1;
     w = r.width;
@@ -71,7 +71,7 @@ function dragOn(node, { down, move, up }) {
 }
 
 const local = (node, e) => {
-  const r = node.getBoundingClientRect();
+  const r = (node.querySelector('canvas.pc-canvas') ?? node).getBoundingClientRect();
   return { x: e.clientX - r.left, y: e.clientY - r.top, w: r.width, h: r.height };
 };
 
@@ -307,6 +307,8 @@ function angleTest({ stim, friday, submit }) {
   do value = Math.random() * 360; while (angleError(value, target, friday) < 40);
   let touched = false;
   let sent = false;
+  let downAt = null; // sürükleme başı (kaza dokunuşu ayırt etmek için)
+  let moved = 0;
   const st = stage('pc-square pc-dial', 1);
   st.setDraw((ctx, w, h) => {
     drawReference(ctx, w, h);
@@ -327,7 +329,7 @@ function angleTest({ stim, friday, submit }) {
       const cur = ((value % 360) + 360) % 360;
       value += ((((a - cur) % 360) + 540) % 360) - 180;
     } else value = a;
-    touched = true;
+    if (!touched) { touched = true; lock.disabled = false; }
     st.paint();
   };
   const send = () => {
@@ -336,15 +338,21 @@ function angleTest({ stim, friday, submit }) {
     lock.disabled = true;
     submit(Math.round(value * 10) / 10);
   };
-  dragOn(st.node, { down: follow, move: follow, up: () => { if (!friday && touched) send(); } });
+  dragOn(st.node, {
+    down: (e) => { downAt = [e.clientX, e.clientY]; moved = 0; follow(e); },
+    move: (e) => { if (downAt) moved = Math.max(moved, Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1])); follow(e); },
+    // Normal modda sadece gerçek sürükleme bırakılınca gönderilir; tek dokunuş yönü ayarlar, Kilitle ile gönderilir.
+    up: () => { if (!friday && moved >= 15) send(); downAt = null; },
+  });
   st.node.addEventListener('keydown', (e) => {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
     e.preventDefault();
     const step = (e.shiftKey ? 10 : 1) * (e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? 1 : -1);
     value = friday ? value + step : (((value + step) % 360) + 360) % 360;
+    if (!touched) { touched = true; lock.disabled = false; }
     st.paint();
   });
-  const lock = lockButton(send);
+  const lock = lockButton(send, true);
   const node = el('section', { class: 'card pc-card' },
     el('div', { class: 'pc-target' }, `${target}°`),
     st.node,
@@ -495,6 +503,7 @@ function splitTest({ stim, friday, submit }) {
     const p = local(st.node, e);
     const { a, len } = splitGeom(p.w, friday);
     value = Math.min(hi, Math.max(lo, (p.x - a) / len));
+    lock.disabled = false;
     st.paint();
   };
   dragOn(st.node, { down: follow, move: follow });
@@ -502,9 +511,10 @@ function splitTest({ stim, friday, submit }) {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
     e.preventDefault();
     value = Math.min(hi, Math.max(lo, value + (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 0.02 : 0.002)));
+    lock.disabled = false;
     st.paint();
   });
-  const lock = lockButton(() => { lock.disabled = true; submit(Math.round(value * 10000) / 10000); });
+  const lock = lockButton(() => { lock.disabled = true; submit(Math.round(value * 10000) / 10000); }, true);
   const node = el('section', { class: 'card pc-card' },
     el('div', { class: 'pc-target' }, splitLabel(stim)),
     st.node,

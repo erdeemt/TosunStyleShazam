@@ -99,7 +99,7 @@ let root = null;
 let mode = 'daily';
 let rules = 'normal'; // sınırsız: 'normal' | 'friday'
 let game = null; // sunucunun publicGame'i
-let phase = 'loading'; // loading | error | setup | ready | intro | running | result | final
+let phase = 'loading'; // loading | error | setup | ready | intro | running | retry | result | final
 let current = null; // { index, resp, ui, stim }
 let lastPlayed = null;
 let lastStim = null;
@@ -124,14 +124,20 @@ async function ensureIdentity() {
   try { localStorage.setItem('tss:identity', JSON.stringify(net.identity)); } catch { /* yok say */ }
 }
 
+// Ağ hatası / 5xx: err.retry = true (tekrar denenebilir), Türkçe mesajla.
 async function api(path, body = {}) {
-  const res = await fetch(base + path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ playerId: net.identity.playerId, token: net.identity.token, ...body }),
-  });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error ?? 'Sunucu hatası');
+  let res;
+  try {
+    res = await fetch(base + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId: net.identity.playerId, token: net.identity.token, ...body }),
+    });
+  } catch {
+    throw Object.assign(new Error('Bağlantı koptu, tekrar dene.'), { retry: true });
+  }
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(json.error ?? 'Sunucuya ulaşılamadı, tekrar dene.'), { retry: res.status >= 500 || !json.error });
   return json;
 }
 
@@ -236,12 +242,29 @@ function runTest(index, r) {
   phase = 'running';
 }
 
+// Gönderim düşerse cevap kaybolmasın (ritim dokunuşları dahil): 3 deneme, sonra "Tekrar gönder" ekranı.
+let pendingAnswer = null;
+const RETRY_DELAYS = [600, 1500];
+
+async function submitWithRetry(body) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await api('/submit', body);
+    } catch (err) {
+      if (!err.retry || attempt >= RETRY_DELAYS.length) throw err;
+      await new Promise((r) => setTimeout(r, RETRY_DELAYS[attempt]));
+    }
+  }
+}
+
 async function sendAnswer(answer) {
-  if (phase !== 'running' || busy || !current) return;
+  if ((phase !== 'running' && phase !== 'retry') || busy || !current) return;
   busy = true;
+  pendingAnswer = answer;
   const { index, stim } = current;
   try {
-    const g = await api('/submit', { mode, gameId: game.gameId, index, answer });
+    const g = await submitWithRetry({ mode, gameId: game.gameId, index, answer });
+    pendingAnswer = null;
     current.ui.stop();
     game = g;
     lastPlayed = g.played.find((p) => p.index === index) ?? null;
@@ -251,7 +274,9 @@ async function sendAnswer(answer) {
     if (g.done) loadBoard();
   } catch (err) {
     toast(err.message);
-    if (mode === 'daily' && /değişti|bulunamadı|başlamadı/.test(err.message)) load(mode);
+    if (err.retry) phase = 'retry';
+    // Cevap aslında ulaşmış (yanıt kaybolmuş) ya da oyun değişmiş: durumu sunucudan yeniden yükle.
+    else if (/zaten alındı|değişti|bulunamadı|başlamadı/.test(err.message)) { pendingAnswer = null; load(mode); }
   } finally {
     busy = false;
   }
@@ -395,6 +420,15 @@ function body() {
       const t = TESTS[current.index];
       return [head(`Test ${current.index + 1} / ${TESTS.length} · ${META[t].icon} ${META[t].name}`), current.ui.node, progress()];
     }
+    case 'retry': {
+      const t = TESTS[current.index];
+      return [head(`Test ${current.index + 1} / ${TESTS.length} · ${META[t].icon} ${META[t].name}`),
+        el('section', { class: 'card center' },
+          el('h2', {}, '📡 Bağlantı koptu'),
+          el('p', {}, 'Cevabın telefonda duruyor, kaybolmadı. İnternet gelince tekrar gönder.'),
+          el('button', { class: 'btn big pc-lock', disabled: busy, onclick: () => sendAnswer(pendingAnswer) }, '🔁 Tekrar gönder')),
+        progress()];
+    }
     case 'result': {
       const p = lastPlayed;
       const view = p ? revealView(p.test, lastStim, p.answer, game.friday) : null;
@@ -419,7 +453,7 @@ function body() {
 
 function render() {
   if (!root) return;
-  const inRun = phase === 'running';
+  const inRun = phase === 'running' || phase === 'retry';
   root.replaceChildren(el('div', { class: 'screen active recall pc' },
     el('div', { class: 'tabs' },
       el('button', { class: `tab${mode === 'daily' ? ' active' : ''}`, disabled: inRun, onclick: () => mode !== 'daily' && load('daily') },

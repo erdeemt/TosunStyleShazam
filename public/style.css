@@ -439,7 +439,7 @@ body { display: flex; }
 .w-rank { color: var(--muted); }
 .w-tries { font-weight: 700; color: var(--accent2); }
 .w-mini { grid-column: 2 / 4; white-space: pre; font-size: 11px; line-height: 1.15; letter-spacing: -1px; }
-.howto-box summary { cursor: pointer; font-weight: 700; }
+.howto-box summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
 .howto-box .howto { margin-top: 10px; }
 
 /* Dokunma hedefleri ≥ 44 px (QA) */
@@ -488,6 +488,7 @@ body:not([data-mode="online"]) .online-only { display: none !important; }
 .play-count { font-size: 40px; font-weight: 900; color: #fff; line-height: 1; }
 
 .btn { min-height: 44px; }
+.btn, .tab { touch-action: manipulation; } /* iOS çift dokunuş yakınlaştırması olmasın */
 
 /* Casus Kim? soru-cevap sırası */
 .qa-pair { display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 24px; margin: 6px 0; flex-wrap: wrap; }

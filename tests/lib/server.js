@@ -15,7 +15,7 @@ export async function startServer({ timeScale = 0.02, seed = 1, env = {}, dataDi
   const dir = dataDir ?? mkdtempSync(join(tmpdir(), 'tss-data-'));
   const child = spawn(process.execPath, ['server.js'], {
     cwd: ROOT,
-    env: { ...process.env, PORT: '0', TIME_SCALE: String(timeScale), SEED: String(seed), TEST_GAMES: '1', DATA_DIR: dir, ...LOOSE_LIMITS, ...env },
+    env: { ...process.env, PORT: '0', TIME_SCALE: String(timeScale), TEST_MODE: '1', SEED: String(seed), TEST_GAMES: '1', DATA_DIR: dir, ...LOOSE_LIMITS, ...env },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let log = '';
