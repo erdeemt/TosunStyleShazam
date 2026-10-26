@@ -50,6 +50,14 @@ Açık küçük notlar:
 - Bilinçli bırakılanlar: hedef istemciye gitmek zorunda (devtools ile görülebilir); tek kişilik odada bağlantı
   kopunca süre işlemeye devam eder; gece yarısını geçen günlük tur kaybolur; serbest modda yenileyince oyun kaybolur.
 
+## 👁️ Algıla — game/perceptle dalında (main'e BİRLEŞTİRİLMEDİ, 2026-10-26)
+
+- perceptle.com tarzı günlük algı testi, sadece tek oyunculu: Say, Yörünge, Açı, Ritim, Böl; Cuma günleri 🃏 Cuma kuralları.
+  Kurallar ve sabitler PLAN.md §4.7. Dosyalar: server/perceptle.js, public/perceptle-math.js, public/games/perceptle(-tests).js.
+- Testler: tests/unit/perceptle.test.mjs, tests/swarm/perceptle-api.test.mjs, tests/security/sec-perceptle-forgery.test.mjs,
+  tests/e2e/perceptle.test.mjs (ekran görüntüleri test-results/perceptle/).
+- Kullanıcı denemeli: özellikle Ritim (telefon ses gecikmesi; ısınma kalibrasyonu) ve Cuma açı sarımı. Sonra main'e merge.
+
 ## Sıradaki adımlar
 
 1. Kullanıcı arkadaşlarla deneyip geri bildirim verecek; "geç" deyince Komik Cevap / Hangimiz? / Tabu.

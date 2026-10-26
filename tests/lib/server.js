@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 // Botlar aynı IP'den bağlandığı için IP sınırları testlerde gevşek; güvenlik testleri env ile sıkılaştırır.
-const LOOSE_LIMITS = { WORDLE_SALT: 'test-salt', RECALL_SALT: 'test-salt', LIMIT_HTTP_PER_MIN: '100000', LIMIT_UPSTREAM_PER_MIN: '100000', LIMIT_IDENTITIES_PER_HOUR: '100000', LIMIT_SOCKETS_PER_IP: '100000', LIMIT_ROOMS_PER_IP: '100000' };
+const LOOSE_LIMITS = { WORDLE_SALT: 'test-salt', RECALL_SALT: 'test-salt', PERCEPTLE_SALT: 'test-salt',LIMIT_HTTP_PER_MIN: '100000', LIMIT_UPSTREAM_PER_MIN: '100000', LIMIT_IDENTITIES_PER_HOUR: '100000', LIMIT_SOCKETS_PER_IP: '100000', LIMIT_ROOMS_PER_IP: '100000' };
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 

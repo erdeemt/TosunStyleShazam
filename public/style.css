@@ -667,3 +667,102 @@ input.nu-range {
 .tn-round.big .tn-cents { font-size: 16px; color: var(--text); }
 .tn-round .nu-score { grid-row: 1 / 3; grid-column: 3; }
 .tn-round.big .nu-score { font-size: 40px; }
+
+/* ---------- 👁️ Algıla ---------- */
+
+.btn.pc-lock { background: #fff; color: #111; border: none; border-radius: 999px; font-weight: 800; }
+.btn.pc-lock:active { transform: scale(.98); }
+.btn.pc-lock:disabled { opacity: .35; }
+.pc-card { background: #0d0b14; border-color: #ffffff14; display: flex; flex-direction: column; gap: 12px; }
+.pc-stage {
+  position: relative; width: 100%; border-radius: 16px; overflow: hidden; background: #000;
+  border: 1px solid #ffffff12; touch-action: none; user-select: none; -webkit-user-select: none; outline: none;
+}
+.pc-stage:focus-visible { box-shadow: inset 0 0 0 2px var(--accent2); }
+.pc-stage.pc-square { max-width: min(100%, 52vh); margin: 0 auto; }
+.pc-stage.pc-small { max-width: 220px; margin: 0 auto; }
+.pc-stage.pc-field, .pc-stage.pc-dial, .pc-stage.pc-line { cursor: crosshair; }
+.pc-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.pc-overlay {
+  position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; text-align: center;
+  pointer-events: none; color: #fff; text-shadow: 0 2px 12px #000;
+}
+.pc-ask b { font-size: 22px; }
+.pc-tip { align-items: start; font-weight: 700; color: #ffffffcc; padding-top: 14px; }
+.pc-answer { display: flex; justify-content: center; }
+input.pc-num {
+  width: 160px; font-size: 40px; font-weight: 900; text-align: center; padding: 8px; min-height: 64px;
+  font-variant-numeric: tabular-nums; background: #000; border-color: #ffffff33;
+}
+input.pc-num:disabled { opacity: .35; }
+.pc-target { text-align: center; font-size: 44px; font-weight: 900; color: #fff; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.pc-note { margin: 0; color: #ffffff99; font-size: 14px; }
+.pc-friday {
+  display: inline-block; font-size: 13px; font-weight: 700; color: var(--accent2); border: 1px solid var(--accent2);
+  border-radius: 999px; padding: 3px 10px; background: #ffb5471a;
+}
+.pc-start .pc-friday { margin-top: 6px; }
+.pc-dots .rc-dot { min-width: 52px; }
+.pc-start .pc-dots { margin: 12px 0 14px; }
+.rc-dot.done.good { color: var(--good); border-color: var(--good); }
+.rc-dot.done.mid { color: var(--accent2); border-color: var(--accent2); }
+.rc-dot.done.bad { color: var(--bad); border-color: var(--bad); }
+.pc-intro-icon { font-size: 56px; line-height: 1; margin-bottom: 4px; }
+.pc-intro p { margin: 0 0 14px; line-height: 1.45; }
+
+/* Ritim */
+.pc-tempo { align-items: center; }
+.pc-tempo-label { font-size: 20px; font-weight: 800; color: #fff; text-align: center; min-height: 52px; display: grid; place-items: center; }
+.pc-tempo-label.go { color: var(--accent2); }
+.pc-beats { display: flex; gap: 10px; }
+.pc-beats i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #ffffff44; }
+.pc-beats i.on { background: var(--accent2); border-color: var(--accent2); }
+.pc-beats.off i { opacity: .25; }
+.pc-pad {
+  width: min(64vw, 240px); aspect-ratio: 1 / 1; border-radius: 50%; border: 3px solid #ffffff33; background: radial-gradient(circle at 50% 40%, #2e1d47, #000);
+  color: #fff; font-size: 64px; cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none;
+  transition: transform .06s, border-color .1s; -webkit-tap-highlight-color: transparent;
+}
+.pc-pad.beat { border-color: var(--accent2); box-shadow: 0 0 0 10px #ffb54722; }
+.pc-pad.hit { animation: pc-hit .18s ease-out; }
+@keyframes pc-hit { from { transform: scale(.94); border-color: #fff; } to { transform: scale(1); } }
+
+/* Sonuçlar */
+.pc-result-icon { font-weight: 700; color: var(--muted); }
+.pc-big-score { font-size: 64px; font-weight: 900; line-height: 1; margin: 6px 0; font-variant-numeric: tabular-nums; }
+.pc-big-score small { font-size: 16px; color: var(--muted); font-weight: 500; }
+.pc-big-score.good, .pc-row-score.good { color: var(--good); }
+.pc-big-score.mid, .pc-row-score.mid { color: var(--accent2); }
+.pc-big-score.bad, .pc-row-score.bad { color: var(--bad); }
+.pc-detail { margin: 0 0 10px; font-size: 16px; overflow-wrap: anywhere; }
+.pc-reveal { margin: 0 0 12px; }
+.pc-legend { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+.pc-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: middle; }
+.pc-legend i.good { background: var(--good); }
+.pc-legend i.you { background: var(--accent); }
+.pc-grade {
+  font-size: 96px; font-weight: 900; line-height: 1; margin: 4px auto 0;
+  background: linear-gradient(180deg, var(--accent2), var(--accent)); -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: pc-pop .5s cubic-bezier(.2, 1.6, .4, 1);
+}
+.pc-grade.g-S { background-image: linear-gradient(180deg, #fff6c2, #ffb547 60%, #ff4d8d); }
+.pc-grade.g-F, .pc-grade.g-D { background-image: linear-gradient(180deg, #c9b8e8, #7d6aa0); }
+@keyframes pc-pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.pc-total { font-size: 28px; font-weight: 900; color: var(--text); margin: 4px 0 14px; }
+.pc-total small { font-size: 15px; color: var(--muted); font-weight: 500; }
+.pc-rows { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; text-align: left; }
+.pc-row { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; }
+.pc-row-icon { font-size: 22px; }
+.pc-row-text { display: flex; flex-direction: column; min-width: 0; }
+.pc-row-text small { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.pc-row-score { font-size: 22px; font-variant-numeric: tabular-nums; min-width: 40px; text-align: right; }
+.pc-mini { gap: 4px; }
+.pc-chip { font-size: 12px; border-radius: 6px; padding: 1px 6px; background: var(--card2); font-variant-numeric: tabular-nums; }
+.pc-chip.good { color: var(--good); }
+.pc-chip.mid { color: var(--accent2); }
+.pc-chip.bad { color: var(--bad); }
+
+@media (prefers-reduced-motion: reduce) {
+  .pc-grade, .pc-pad.hit { animation: none; }
+  .pc-pad { transition: none; }
+}
