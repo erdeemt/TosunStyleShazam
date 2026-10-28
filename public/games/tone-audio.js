@@ -83,3 +83,23 @@ export function startLive(freq) {
 export function stopAll() {
   for (const v of [...live]) release(v);
 }
+
+// Ritim testi (👁️ Algıla) için kısa tık sesi; AudioContext zamanında planlanır.
+export const audioContext = () => audioCtx();
+
+export function clickAt(when, { accent = false } = {}) {
+  const c = audioCtx();
+  if (!c) return;
+  const osc = c.createOscillator();
+  osc.type = 'triangle';
+  osc.frequency.value = accent ? 1760 : 1320;
+  const gain = c.createGain();
+  const t = Math.max(c.currentTime, when);
+  gain.gain.setValueAtTime(0, t);
+  gain.gain.linearRampToValueAtTime(Math.max(0.0002, 0.9 * volume()), t + 0.002);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+  osc.connect(gain).connect(c.destination);
+  osc.start(t);
+  osc.stop(t + 0.09);
+  osc.onended = () => { osc.disconnect(); gain.disconnect(); };
+}

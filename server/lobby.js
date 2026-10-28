@@ -8,7 +8,8 @@ import { jsonStore } from './store.js';
 import { IP_LIMITS, clientIp, identityLimiter } from './limits.js';
 import { GAMES } from './games/index.js';
 
-const TIME_SCALE = Number(process.env.TIME_SCALE) > 0 ? Number(process.env.TIME_SCALE) : 1;
+// Süre ölçeği sadece test sunucusunda (TEST_MODE=1, tests/lib/server.js): üretimde yanlışlıkla bırakılırsa süreler değişmesin.
+const TIME_SCALE = process.env.TEST_MODE === '1' && Number(process.env.TIME_SCALE) > 0 ? Number(process.env.TIME_SCALE) : 1;
 const BASE_SEED = process.env.SEED ? Number(process.env.SEED) : null;
 
 export const LIMITS = {

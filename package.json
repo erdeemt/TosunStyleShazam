@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test --test-concurrency=1 \"tests/swarm/**/*.test.mjs\" \"tests/unit/**/*.test.mjs\"",
+    "test": "node --test --test-concurrency=1 \"tests/swarm/**/*.test.mjs\" \"tests/unit/**/*.test.mjs\" \"tests/security/**/*.test.mjs\"",
     "e2e": "node --test --test-concurrency=1 \"tests/e2e/**/*.test.mjs\"",
     "online": "node scripts/online.mjs"
   },

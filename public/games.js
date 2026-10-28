@@ -41,6 +41,14 @@ export const GAMES = [
     load: () => import('./games/tone.js'),
   },
   {
+    id: 'perceptle',
+    name: 'Algıla',
+    icon: '👁️',
+    desc: 'Beş kısa algı testi: say, kestir, ritim tut',
+    categories: ['single'],
+    load: () => import('./games/perceptle.js'),
+  },
+  {
     id: 'spyfall',
     name: 'Casus Kim?',
     icon: '🕵️',

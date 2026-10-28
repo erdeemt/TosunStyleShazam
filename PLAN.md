@@ -23,6 +23,7 @@ ilgili bölümü oku. Burada yazmayan bir karar gerekiyorsa, kendin uydurma; rap
 | P2 | 🧛 Vampir Köylü | Çok | Gece/gündüz fazları, roller, sunucu anlatıcı |
 | P2 | 🎨 Nüans | Tek + Çok | Renk hafızası; günlük + sınırsız + lobi (§4.4) |
 | P2 | 🔊 Ton Avı | Tek + Çok | Perde hafızası; günlük + sınırsız + lobi (§4.5) |
+| P2 | 👁️ Algıla | Tek | Günlük algı testi, 5 test (§4.7) |
 | P2 | 👉 Hangimiz? | Çok | Gizli oylama |
 | P2 | 😂 Komik Cevap (Quiplash) | Çok | Yaz → oyla |
 | P2 | 🚫 Tabu | Çok | Takımlar, anlatan + gözcü |
@@ -342,7 +343,57 @@ herkes gönderince hemen biter) → `reveal` (hedef + herkesin cevabı ve puanı
 - Günlük: kişi başı günde bir deneme; sunucu yeniden başlasa da ilerleme korunur.
 - 360 px'te yatay kaydırma yok, dokunma hedefleri ≥ 44 px; e2e'de konsol hatası yok.
 
-### 4.7 Sonraki aşamalar (P2 kalanı – P4)
+### 4.7 👁️ Algıla (günlük algı testi, perceptle.com tarzı) — 2026-10-26
+
+Sadece tek oyunculu (lobi yok). Sunucu `server/perceptle.js`, saf matematik `public/perceptle-math.js` (sunucu ve istemci ortak),
+istemci `public/games/perceptle.js` (akış) + `public/games/perceptle-tests.js` (beş testin canvas ekranları), tık sesi `tone-audio.js`.
+
+**Puan**: her test `round(100 · e^(−½·(hata/tolerans)²))` (0×tol → 100, 0.5× → 88, 1× → 61, 2× → 14). Sonuç = 5 testin ortalaması
+(yuvarlanmış). Notlar: S 95–100, A 85–94, B 70–84, C 55–69, D 40–54, F 0–39. Paylaşım `Tosun Algıla #3 · 87 (A)` + 5 kare
+(🟩 ≥ 85, 🟨 ≥ 55, 🟥 diğer); Cuma'da başlığa 🃏.
+
+**Testler** (hep bu sırayla; girdi asla doğru cevaptan başlamaz) — tolerans Normal / 🃏 Cuma:
+1. 🔢 **Say** — 45–85 üst üste binmeyen nokta (yarıçap genişliğin %1.2–2.6'sı) 2 sn görünür; büyük sayısal kutuya tahmin (0–999, boş başlar).
+   Hata `|tahmin − gerçek| / gerçek`; 0.20 / 0.32. Cuma: noktalar 0.12–0.30 birim/sn hızla kayar, duvarlardan seker.
+2. ☄️ **Yörünge** — saha 1000 × 700 birim, zemin çizgisi. Top atılır, uçuşun %38–52'si (en az 0.55 sn) yayı çizilerek görünür, sonra
+   kaybolur (yay kalır). Oyuncu sahada dokunur/kaydırır (x'e eşlenir), "🎯 Kilitle". Hata `|x − iniş|` birim; 60 / 90.
+   Normal: g = 600, duvar yok, iniş 40–960. Cuma: g = 320, top yan duvarlardan seker (1–2 yansıma, iniş yansımalarla hesaplanır).
+3. 📐 **Açı** — hedef sayı ("137°") + sağa bakan kesikli 0° çizgisi; sürükleyince çizgi parmağı izler (saat yönünün tersine), canlı yay
+   var ama değer yazmaz; başlangıç hedefe ≥ 40° uzak rastgele. Normal: 10–350°, bırakınca (veya Kilitle) gönderilir, hata en kısa yay
+   (359↔1 = 2°); 8°. Cuma: 30–1080°, sarım (tur) sayılır, yay sarmal çizilir, bırakmak göndermez (yeniden tutmak için) → Kilitle; hata düz fark; 14°.
+4. 🥁 **Ritim** — BPM 80–140. 1.5 sn hazırlık, 4 duyulur tık (0, I, 2I, 3I; birlikte vurmak isteğe bağlı = ısınma), sonra 8 sessiz vuruş
+   oyuncunun: Normal 4I…11I, Cuma vuruş aralarında 4.5I…11.5I. Büyük ped + Boşluk tuşu. Gecikme = ısınma dokunuşlarının (3.5I öncesi,
+   −I/2 sonrası) en yakın duyulur vuruşa göre medyan sapması (yoksa 0), ±150 ms. Her sessiz dokunuş en yakın beklenen vuruşa eşlenir;
+   vuruş başına en iyi |sapma − gecikme| (≤ 250), eksik vuruş 250 ms, aynı vuruşa fazladan her dokunuş ek bir 250 ms terimi (rastgele
+   dokunma ödüllenmesin). Hata = RMS; 60 / 85 ms. İstemci ilk duyulur vuruşa göre ms dizisi (≤ 40) yollar; sunucu kendi BPM'iyle hesaplar.
+5. ✂️ **Böl** — çizgi + istenen kesir ("3/7", payda 2–12, sadeleşmiş) ya da yüzde ("%42", %3–97). İşaretçi rastgele yerden başlar
+   (hedefe ≥ 0.15), kaydırılır, Kilitle. Hata `|konum − hedef|` (çizgi boyu = 1); 0.05. Cuma: değer −0.5…0 ya da 1…1.5 (8/5, −1/4, %130,
+   −%20); çizgi sahnenin ortadaki %50'si, uzantı kesikli; 0.10.
+
+**Modlar ve protokol** — 📅 Günlük (İstanbul günü, herkese aynı, tek hak; Cuma günleri otomatik "🃏 Cuma kuralları"; 1 numara
+2026-10-26) ve ♾️ Sınırsız (rastgele, kayıt yok, Normal/Cuma seçilir, kişi başı en fazla 3 açık oyun, sunucuda 5000 üstü "yoğun").
+Uçlar `POST /api/perceptle/<uç>`, gövdede `playerId, token`:
+
+| Uç | Alanlar | Yanıt |
+|---|---|---|
+| `start` | `mode, rules?: 'friday'` | `gameId, puzzleNo?, friday, tests, played[], pending, done, total, grade` — uyaran yok |
+| `test` | `mode, gameId, index` (0–4) | **o testin uyaranı** (bir kez) + `showMs, leadMs, timeScale, endsAt`; önceki cevaplanmadan başlamaz |
+| `submit` | `mode, gameId, index, answer` | sunucu puanlar; `played[i] = { truth, answer, error, score, detail, label? }` |
+| `leaderboard` | — | bugünün bitirenleri (ilk 50 + sen); başkalarının test puanları sadece kendi oyununu bitirene |
+
+- Günlük uyaranlar `HMAC-SHA256(perceptleSalt, "tosun-perceptle-v1:<tarih>:<test>")`'ten; tuz `data/secrets.json` (testler `PERCEPTLE_SALT`).
+  Kayıt `data/perceptle-daily.json` (45 günden eskisi silinir). `FAKE_TODAY` sadece `TEST_GAMES=1` ile.
+- Gösterim süresi (say 2 sn, yörünge görünür kısım, ritim hazırlık + son sessiz vuruş) bitmeden gelen cevap reddedilir (150 ms pay);
+  gösterimden sonra 90 sn + 3 sn pay içinde gelmeyen cevap 0 (`timedOut`), bırakılan test sonradan 0 sayılır. Süreler `TIME_SCALE` ile ölçeklenir.
+- Sayfa test sürerken yenilenirse zamanlı uyaran (noktalar, top, ritim) tekrar gelmez (ritim boş gönderilir); açı/böl hedefi tekrar gelir.
+- Sonuç ekranı: test başına "Gerçek 63 · Sen 58 · %8 hata" + büyük puan; yörünge/açı/böl için doğru (yeşil) ve senin (pembe) çizimin.
+  Final: büyük harf notu, toplam, 5 satır, paylaş, sıralama.
+
+**Kabul**: uyaran sadece `test` yanıtında, bir kez; sıra atlanamaz; erken cevap reddedilir; puanlar sunucuda (`tests/unit/perceptle.test.mjs`
+formülleri sabitler); 360 px'te yatay kaydırma yok, dokunma hedefleri ≥ 44 px, sürükleme yüzeyleri `touch-action: none`, canvas DPR'ye göre.
+Bilinçli sınırlama: uyaran (nokta listesi, atış parametreleri) istemciye gitmek zorunda — geliştirici araçlarıyla bakan hile yapabilir.
+
+### 4.8 Sonraki aşamalar (P2 kalanı – P4)
 
 Her biri başlamadan önce bu bölüm, aynı ayrıntıda kural + kabul kriteriyle genişletilecek (kullanıcıya danışılarak).
 Ön notlar:
