@@ -67,12 +67,11 @@ Açık küçük notlar:
 
 - Wordle sınırda kelimeler: hepsi kalsın. Mevcut geçmiş main'e doğrudan push edildi; yeni oyunlar kendi dalında.
 
-## 👁️ Algıla — kaldığımız yer (2026-10-26 gece, PC kapatıldı)
+## 👁️ Algıla — BİTTİ, main'e merge + push edildi (2026-10-28)
 
-- Dal: game/perceptle (worktree .claude/worktrees/perceptle), GitHub'a gönderildi, main'e HENÜZ birleştirilmedi.
-- Builder bitirdi; QA + güvenlik turları yapıldı, bulgular düzeltildi: günlük uyaran önbelleği, TIME_SCALE sadece
-  TEST_MODE=1 (tests/lib/server.js verir), ağ kesintisinde otomatik yeniden deneme + "Tekrar gönder" ekranı,
-  Açı/Böl'de Kilitle dokununca açılır, normal Açı'da tek dokunuş göndermez, canvas ölçüsü, 44 px dokunma, touch-action.
+- perceptle.com tarzı tek oyunculu günlük algı testi: Say, Yörünge, Açı, Ritim, Böl; Cuma kuralları; Günlük + Sınırsız.
+- QA + güvenlik turları yapıldı, bulgular düzeltildi: günlük uyaran önbelleği, TIME_SCALE sadece TEST_MODE=1
+  (tests/lib/server.js verir), ağ kesintisinde otomatik yeniden deneme + "Tekrar gönder", Açı/Böl'de Kilitle dokununca açılır,
+  normal Açı'da tek dokunuş göndermez, canvas ölçüsü, 44 px dokunma, touch-action. npm test artık tests/security'yi de çalıştırır.
 - Bilinçli bırakılan: günlük uyaranlar herkese aynı (yan hesapla önizleme mümkün, Wordle gibi).
-- Son tam tur çalışırken PC kapandı. Sıradaki: `npm test` + `npm run e2e` tekrar çalıştır → yeşilse main'e merge (--no-ff) + push.
-  Önceki turda npm test 260/260 yeşildi; e2e'deki 7 hata TIME_SCALE kapısındandı, TEST_MODE ile düzeltildi ve o testler tek tek geçti.
+- npm test 260/260, npm run e2e 46/46.
