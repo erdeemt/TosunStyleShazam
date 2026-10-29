@@ -175,6 +175,8 @@ export function mountLobby(root, game) {
           playerCount: connectedCount,
           room,
           sendPrep: (data) => net.send({ t: 'prep', data }),
+          lobbyAction: (data) => net.send({ t: 'lobbyAction', data }),
+          playerId: ctx.playerId,
         }),
         ctx.isHost ? null : el('p', { class: 'hint' }, 'Ayarları oda sahibi değiştirir.')) : null,
       ctx.isHost

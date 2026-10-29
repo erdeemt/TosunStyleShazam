@@ -75,3 +75,14 @@ Açık küçük notlar:
   normal Açı'da tek dokunuş göndermez, canvas ölçüsü, 44 px dokunma, touch-action. npm test artık tests/security'yi de çalıştırır.
 - Bilinçli bırakılan: günlük uyaranlar herkese aynı (yan hesapla önizleme mümkün, Wordle gibi).
 - npm test 260/260, npm run e2e 46/46.
+
+## ⚽ Tosun Top — game/haxball dalında (main'e BİRLEŞTİRİLMEDİ, 2026-10-29)
+
+- HaxBall tarzı gerçek zamanlı futbol, sadece lobili (2–8 kişi, 1'e 1 olur). Kurallar, fizik sabitleri ve ağ tasarımı
+  PLAN.md §4.8; lobi çekirdeğine eklenen genel kancalar §3.7 (`realtime` döngüsü, hızlı `input`/`ping` yolu, `frame` mesajı,
+  `lobbyAction`, `onConnection`, `canStart` 3. argüman, TEST_GAMES'e özel `/api/_test/stats`).
+- Dosyalar: public/haxball-physics.js (saf fizik), server/games/haxball.js, public/games/haxball.js, tests/unit/haxball.test.mjs,
+  tests/swarm/haxball(-load).test.mjs + haxball-lib.mjs, tests/e2e/haxball.test.mjs (ekran görüntüleri test-results/haxball/).
+- Ölçüm: 8 kişilik kare ~200 bayt; 4 oda × 8 bot sunucu işlemcisi ~%8, kare hızı 30/sn.
+- İstemci tahmini yok (sadece 100 ms ara değer): kendi diskinde gecikme ≈ RTT + 100 ms. Kullanıcı tünel üzerinden telefonla
+  denemeli; ağır gelirse kendi disk için tahmin eklenebilir. Sonra main'e merge.

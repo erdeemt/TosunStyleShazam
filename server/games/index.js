@@ -5,6 +5,7 @@ import vampir from './vampir.js';
 import nuance from './nuance.js';
 import tone from './tone.js';
 import shazam from './shazam.js';
+import haxball from './haxball.js';
 
 export const GAMES = {
   [spyfall.id]: spyfall,
@@ -12,6 +13,7 @@ export const GAMES = {
   [nuance.id]: nuance,
   [tone.id]: tone,
   [shazam.id]: shazam,
+  [haxball.id]: haxball,
 };
 
 // Lobi altyapısını gerçek oyunlardan bağımsız test etmek için; sadece TEST_GAMES=1 iken açık.

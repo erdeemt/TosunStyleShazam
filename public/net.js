@@ -24,6 +24,7 @@ class Net {
     this.stopped = false;
     this.replaced = false; // aynı kimlik başka sekmede açıldı; kullanıcı onaylamadan geri bağlanma
     this.gotRoom = false; // bağlandıktan sonra ilk oda bilgisi geldi mi
+    this.frame = null; // gerçek zamanlı oyunların son karesi (PLAN.md §3.7)
   }
 
   // Eski sürümler ad seçilmeden "Oyuncu" kaydediyordu; onu seçilmemiş say.
@@ -89,6 +90,13 @@ class Net {
         this.serverOffset = msg.serverNow - Date.now();
         this.emit('view', msg.view);
         break;
+      case 'frame': // gerçek zamanlı oyun karesi (~30 Hz); lobi ekranını yeniden çizdirmez
+        this.frame = msg;
+        this.emit('frame', msg);
+        break;
+      case 'pong':
+        this.emit('pong', msg);
+        break;
       case 'kicked':
         this.emit('kicked');
         break;
@@ -106,6 +114,13 @@ class Net {
       this.queue.push(msg);
       this.connect();
     }
+  }
+
+  // Hızlı/geçici mesaj (gerçek zamanlı girdi, ping): bağlı değilse kuyruğa girmez, düşer.
+  sendFast(msg) {
+    if (!this.connected || this.ws?.readyState !== 1) return false;
+    this.ws.send(JSON.stringify(msg));
+    return true;
   }
 
   setName(name) {

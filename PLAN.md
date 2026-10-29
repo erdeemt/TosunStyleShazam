@@ -24,6 +24,7 @@ ilgili bölümü oku. Burada yazmayan bir karar gerekiyorsa, kendin uydurma; rap
 | P2 | 🎨 Nüans | Tek + Çok | Renk hafızası; günlük + sınırsız + lobi (§4.4) |
 | P2 | 🔊 Ton Avı | Tek + Çok | Perde hafızası; günlük + sınırsız + lobi (§4.5) |
 | P2 | 👁️ Algıla | Tek | Günlük algı testi, 5 test (§4.7) |
+| P2 | ⚽ Tosun Top | Çok | HaxBall tarzı gerçek zamanlı futbol (§4.8, altyapı §3.7) |
 | P2 | 👉 Hangimiz? | Çok | Gizli oylama |
 | P2 | 😂 Komik Cevap (Quiplash) | Çok | Yaz → oyla |
 | P2 | 🚫 Tabu | Çok | Takımlar, anlatan + gözcü |
@@ -107,6 +108,9 @@ export default {
 | `rename` | `name` | Ad değiştir (bekleme odasında). |
 | `prep` | `data` | Host: bekleme odasında oyuna özel hazırlık verisi (ör. Shazam şarkı listesi). Oyun modülü `prep(prev, data)` ile doğrular; `room.prep` alanında sadece `prepInfo` özeti herkese gider. |
 | `backToLobby` | — | Host: oyun **bittikten sonra** bekleme odasına dön (oyun sürerken reddedilir). |
+| `lobbyAction` | `data` | Bekleme odasında **her oyuncunun** yapabildiği oyuna özel seçim (ör. Tosun Top takım seçimi). `game.lobbyAction(prep, playerId, data, { isHost, playerIds, rng })` doğrular, yeni `prep` döner. |
+| `input` | `x, y, k` | Gerçek zamanlı oyun girdisi (§3.7): yön vektörü + şut. Hızlı yol; yanıt yok. |
+| `ping` | `c` (sayı) | Gecikme ölçümü; sunucu `pong` ile aynı `c`'yi döner. Hızlı yol. |
 
 Sunucu → istemci:
 
@@ -117,6 +121,8 @@ Sunucu → istemci:
 | `view` | `view` (o oyuncuya özel oyun görünümü), `seq` |
 | `error` | `code, message` (Türkçe, kullanıcıya gösterilebilir) |
 | `kicked` | — |
+| `frame` | `s` (gönderim sırası), `k` (sunucu fizik adımı), oyuna özel kısa alanlar — gerçek zamanlı kare (§3.7) |
+| `pong` | `c, now` |
 
 Kurallar:
 - Oda kodu: 4 harf, karışabilen harfler yok (`ABCDEFGHJKLMNPRSTUVYZ`). Paylaşım linki: `#/join/ABCD`.
@@ -150,6 +156,27 @@ Mobil öncelikli tasarım: 360 px genişlikte kusursuz çalışmalı, butonlar �
 - Hafıza oyunları (Nüans, Ton Avı) kendi uçlarını ve `data/recall-daily.json`'u kullanır (§4.4–4.5 ortak bölüm).
 - Sıralama `GET /api/daily/:game/:date`. Arkadaş ortamı: güven modeli gevşek ama sunucu, sonucun o günün
   bulmacasıyla tutarlı olduğunu doğrulamalı (ör. Wordle: sunucunun gördüğü tahmin geçmişinden puan hesaplanır).
+
+### 3.7 Gerçek zamanlı oyunlar (lobi çekirdeği kancaları) — 2026-10-29
+
+Hızlı akan oyunlar (Tosun Top) için lobiye eklenen, oyundan bağımsız ve opsiyonel kancalar. Diğer oyunlar etkilenmez.
+
+- `game.realtime = { hz, sendHz, step(state, ctx) → bool, frame(state) → nesne }`. Faz `playing` iken lobi oda başına **tek
+  `setInterval`** kurar (aralık ⌊1000/hz⌋ ms) ve `performance.now()` birikimiyle sabit adım atar: saniyede `hz` kez `step`,
+  `hz/sendHz` adımda bir `frame`. Takılmadan sonra en fazla 8 adım yetişilir (spiral yok). `step` true dönerse (gol, faz,
+  disk listesi değişti) lobi `afterChange` ile `room` + `view` yayınlar; yani `view` sadece yavaş değişen durumu taşır.
+  Kare **bir kez** JSON'lanır ve tüm soketlere aynı metin gider (`{t:'frame', s, ...}`); soketin `bufferedAmount`'ı 32 KB'ı
+  aşarsa o kare o sokete **atlanır** (bağlantı kesilmez; diğer mesajlar için 1 MB'ta kesme kuralı aynen geçerli).
+- Döngü maç bitince (`isOver`), `backToLobby`'de ve oda silinince durur; `step` hata fırlatırsa döngü durur ve bir kez loglanır.
+  Ctx: `{ timeScale, rng, log }` (TIME_SCALE fiziğe uygulanmaz; oyun isterse süreleri ölçekler).
+- `game.input(state, playerId, msg)`: `input` mesajı **hızlı yoldan** gelir — genel 30/5 sn sayacını tüketmez, görünüm üretmez,
+  hata yanıtı yoktur. Hızlı yolun kendi sınırı: soket başına 1 sn pencerede ≤ 64 mesaj işlenir, fazlası sessizce düşer;
+  600'ü aşan bağlantı 1008 ile kapanır. Hızlı mesaj ≤ 256 bayt (büyüğü normal yoldan geçer → "Bilinmeyen mesaj").
+  İzleyici, kimliksiz soket veya oyun dışındaki girdi yok sayılır. Değerleri oyun modülü temizler (asla konum kabul edilmez).
+- `game.onConnection(state, playerId, connected, ctx)`: oyun sırasında oyuncunun bağlantısı koptu/geri geldi (opsiyonel).
+- `game.canStart(prep, settings, players)`: üçüncü argüman `[{ id, connected }]` (eski oyunlar yok sayar).
+- `stats()` → `loops` (çalışan döngü sayısı). `GET /api/_test/stats` sadece `TEST_GAMES=1` iken: `stats()` + `process.cpuUsage()`.
+- İstemci: `net.on('frame')`, `net.frame` (son kare), `net.sendFast(msg)` (bağlı değilse kuyruğa girmez, düşer).
 
 ## 4. Oyun kuralları ve kabul kriterleri
 
@@ -393,7 +420,55 @@ Uçlar `POST /api/perceptle/<uç>`, gövdede `playerId, token`:
 formülleri sabitler); 360 px'te yatay kaydırma yok, dokunma hedefleri ≥ 44 px, sürükleme yüzeyleri `touch-action: none`, canvas DPR'ye göre.
 Bilinçli sınırlama: uyaran (nokta listesi, atış parametreleri) istemciye gitmek zorunda — geliştirici araçlarıyla bakan hile yapabilir.
 
-### 4.8 Sonraki aşamalar (P2 kalanı – P4)
+### 4.8 ⚽ Tosun Top (HaxBall tarzı gerçek zamanlı futbol) — 2026-10-29
+
+Sadece lobili, 2–8 kişi (1'e 1 olur). Fizik `public/haxball-physics.js` (saf, deterministik; sunucu çalıştırır), sunucu
+`server/games/haxball.js`, istemci `public/games/haxball.js`. Altyapı §3.7.
+
+**Bekleme odası**: herkes 🔴 Kırmızı / 🔵 Mavi / 👀 İzle seçer (`lobbyAction {type:'team'}`); host "🔀 Takımları karıştır /
+dengele" (`{type:'shuffle'}`, izleyiciler izleyici kalır). Seçmeyenler başlarken az olan takıma konur; iki takımda da en az bir
+bağlı oyuncu yoksa başlamaz. Ayarlar (host): süre 2/3/5 dk (3), gol limiti 3/5/sınırsız (3), saha Otomatik/Küçük/Orta
+(otomatik: sahada ≤ 4 kişi küçük, fazlası orta).
+
+**Fizik** (HaxBall birimleri, 60 adım/sn, hız birim/adım): oyuncu r 15, top r 10, direk r 8 (sabit disk). İvme 0.1
+(şut tuşu basılıyken 0.07), sürtünme oyuncu 0.96 (→ en yüksek hız 2.4 = 144 birim/sn), top 0.99. Ters kütle oyuncu 0.5,
+top 1. Disk–disk esnek çarpışma, katsayı iki diskin çarpımı (0.5·0.5); top–duvar 0.5. Şut: tuş basılı ve diskler arası boşluk
+≤ 4 ise topa oyuncudan topa doğru +5 hız; sonra 12 adım (200 ms) bekleme. Hız sınırı top 16, oyuncu 6 (tünelleme yok;
+top–duvar tarafı adımın başındaki konumdan belirlenir). Küçük saha: top alanı ±370×±170, kale ağzı ±64, ağ derinliği 30,
+oyuncu sınırı ±420×±200, orta yuvarlak 70. Orta: ±550×±240, kale ±85, derinlik 35, sınır ±610×±275, yuvarlak 80.
+Top sadece kenar çizgileri + ağlarla sınırlı; oyuncular dış sınırla (ağa girmezler, direkler herkese katı).
+**Gol**: top kale çizgisini **tamamen** geçince (`|x| − r > w`, ağız içinde); çizgide duran veya direkten dönen top gol değil.
+Golcü = topa son dokunan (şut veya çarpışma); rakip kaleye değilse "kendi kalesine".
+**Başlama vuruşu**: maç başı Kırmızı, her golden sonra yiyen takım. Herkes diziliş yerine, top ortada; top dokunulana kadar
+herkes kendi yarısında, vuruşu yapmayan takım orta yuvarlağa da giremez (yapan girebilir). Gol sevinci 2.5 sn (saat durur).
+**Bitiş**: gol limiti → biter; süre dolunca önde olan kazanır, berabereyse ⚡ **altın gol** (ilk gol kazanır; en fazla 3 dk,
+sonra berabere). Bir takımın sahada kimsesi kalmazsa hükmen biter. Sonuç ekranı: skor, kazanan, goller (dakika, golcü, kk),
+takımlar; host "Bekleme odasına dön".
+**Kopma / katılma**: oyun sırasında bağlantısı kopan oyuncu durur; 5 sn içinde dönmezse diski kalkar (`view.removed`) ve maçı
+izler, sonraki maçta oynar. Oyun ortası katılan izleyicidir. 1.5 sn girdi gelmeyen oyuncu durdurulur.
+
+**Ağ**: sunucu 60 Hz adım, 30 Hz kare: `{t:'frame', s, k, v, c, b:[x,y], p:[x,y,…], f}` — konumlar ×10 tamsayı, `p`
+`view.discs` sırasında, `v` disk listesi sürümü (sıra değişince artar; istemci uyuşmayan kareyi o sürümün listesiyle çizer),
+`c` saat (sn; eksi = altın gol süresi), `f` şut tuşu basılı disklerin bit maskesi. 8 kişide ~200 bayt (< 1 KB şartı).
+`view` (yavaş): faz (kickoff/play/goal/over), skor, goller, diskler, takımlar, benim takımım, saha, sonuç.
+Girdi `{t:'input', x, y, k}`: istemci değişince (en sık 33 ms'de bir) + 100 ms kalp atışıyla yollar; sunucu sonlu olmayanı 0
+yapar, |(x,y)| > 1 ise birim vektöre indirir, `k` sadece 1/true. **İstemci tahmini yok**: tüm diskler ve top, sunucu
+zamanının 100 ms gerisinden iki kare arasında doğrusal ara değerle çizilir (zaman eşlemesi en hızlı gelen kareye göre, yavaş
+yukarı uyum). Böylece top ile oyuncular hep aynı zaman çizgisinde (şut anı tutarlı); bedeli kendi diskinde ≈ RTT + 100 ms
+gecikme. Ping (2 sn'de bir) HUD'da.
+
+**İstemci**: tam ekran sahne (yatay önerilir; dikeyde "📱 Telefonu yan çevir" ipucu, oynanabilir), tuval DPR'ye göre,
+`requestAnimationFrame` ile çizim, sekme gizlenince durur ve sıfır girdi yollar. Telefon: sol tarafta parmağın indiği yerde
+beliren joystick (ölü bölge 0.15, uzaklaşınca peşinden gelir), sağda büyük ŞUT (ve sağ %40'a dokunmak da şut); çoklu
+dokunuş (Pointer Events), `touch-action: none`. Masaüstü: WASD/oklar + Boşluk/X. HUD: skor, saat, ping, tam ekran, çık.
+Test kancası: `action {type:'debugPlace', ball, me}` sadece `TEST_GAMES=1` (üretimde "Bilinmeyen eylem").
+
+**Kabul**: fizik birim testleri (çarpışma, duvar, tünelleme, gol çizgisi/direk, şut/bekleme, başlama kısıtı, determinizm,
+girdi temizleme); sürü: 2v2 ve 4v4 tam maç (yapay gecikmeyle), kopma/dönme, izleyici, girdi seli/bozuk girdi, host ayrılması,
+paralel odalar, döngü sızıntısı, yük (4 oda × 8 kişi sunucu işlemcisi < %50); e2e: iki yatay + bir dikey telefon, joystick +
+ŞUT aynı anda, gol, maç sonu; masaüstü klavye. 360×800 ve 800×360'ta yatay kaydırma yok, dokunma hedefleri ≥ 44 px.
+
+### 4.9 Sonraki aşamalar (P2 kalanı – P4)
 
 Her biri başlamadan önce bu bölüm, aynı ayrıntıda kural + kabul kriteriyle genişletilecek (kullanıcıya danışılarak).
 Ön notlar:
