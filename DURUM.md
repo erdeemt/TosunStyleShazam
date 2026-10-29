@@ -84,5 +84,11 @@ Açık küçük notlar:
 - Dosyalar: public/haxball-physics.js (saf fizik), server/games/haxball.js, public/games/haxball.js, tests/unit/haxball.test.mjs,
   tests/swarm/haxball(-load).test.mjs + haxball-lib.mjs, tests/e2e/haxball.test.mjs (ekran görüntüleri test-results/haxball/).
 - Ölçüm: 8 kişilik kare ~200 bayt; 4 oda × 8 bot sunucu işlemcisi ~%8, kare hızı 30/sn.
-- İstemci tahmini yok (sadece 100 ms ara değer): kendi diskinde gecikme ≈ RTT + 100 ms. Kullanıcı tünel üzerinden telefonla
-  denemeli; ağır gelirse kendi disk için tahmin eklenebilir. Sonra main'e merge.
+- QA/sürü/güvenlik turu düzeltmeleri (2026-10-29): kopan disk 20 sn donuk bekler, takım bağlantısızken saat durur, hükmen
+  sadece açık ayrılma veya 30 sn boş takım; canlı maçta yeniden bağlanma ≤ 1 sn; step istisnası maçı "Teknik hata" ile bitirir;
+  hız aşımında terminate + dead bayrağı, bayt sayımı, canlı maç sınırı (20 / ağ başına 2), 60 sn girdisiz maç biter, odasız
+  ping yanıtsız, pencereyi aşan son girdi bekletilir; başlama vuruşunda saat durur (5 sn sonra kısıt kalkar).
+- İstemci: uyarlanabilir ara değer (50–150 ms) + kendi disk tahmini (topa yakınken ara değerli konuma geçer). RTT 150'de
+  tuş→ekran 318 → ~50 ms. Dikeyde saha döner (~2 kat büyük), ŞUT sağ boşlukta, "Bağlantı koptu" bandı.
+- Ajan testleri: tests/security/sec-haxball-dos, tests/swarm/swarm-haxball-{core,rules,abuse,load}, tests/e2e/qa-haxball-{play,net}.
+- Kullanıcı tünel üzerinden telefonla denemeli (özellikle tahmin hissi; `localStorage['tss:hx-predict']='0'` ile kapatılabilir). Sonra main'e merge.

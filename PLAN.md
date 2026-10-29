@@ -164,19 +164,29 @@ Hızlı akan oyunlar (Tosun Top) için lobiye eklenen, oyundan bağımsız ve op
 - `game.realtime = { hz, sendHz, step(state, ctx) → bool, frame(state) → nesne }`. Faz `playing` iken lobi oda başına **tek
   `setInterval`** kurar (aralık ⌊1000/hz⌋ ms) ve `performance.now()` birikimiyle sabit adım atar: saniyede `hz` kez `step`,
   `hz/sendHz` adımda bir `frame`. Takılmadan sonra en fazla 8 adım yetişilir (spiral yok). `step` true dönerse (gol, faz,
-  disk listesi değişti) lobi `afterChange` ile `room` + `view` yayınlar; yani `view` sadece yavaş değişen durumu taşır.
+  disk listesi değişti) lobi `afterChange` ile `room` + `view` yayınlar — o adımın karesinden **önce** (istemci yeni disk
+  listesini kareden önce tanır); yani `view` sadece yavaş değişen durumu taşır.
   Kare **bir kez** JSON'lanır ve tüm soketlere aynı metin gider (`{t:'frame', s, ...}`); soketin `bufferedAmount`'ı 32 KB'ı
   aşarsa o kare o sokete **atlanır** (bağlantı kesilmez; diğer mesajlar için 1 MB'ta kesme kuralı aynen geçerli).
-- Döngü maç bitince (`isOver`), `backToLobby`'de ve oda silinince durur; `step` hata fırlatırsa döngü durur ve bir kez loglanır.
+- Döngü maç bitince (`isOver`), `backToLobby`'de ve oda silinince durur. `step` hata fırlatırsa: bir kez loglanır, döngü durur,
+  opsiyonel `game.abort(state, err)` çağrılır (Tosun Top: sonuç "⚠️ Teknik hata"), faz `over` olur ve yayınlanır — host
+  bekleme odasına dönebilir; döngü kendiliğinden yeniden başlamaz.
+- Canlı maç sınırı: sunucu genelinde aynı anda en fazla 20 gerçek zamanlı maç, oda kuran ağ başına 2 (`LIMIT_LIVE_PER_IP`);
+  aşan `start` Türkçe hatayla reddedilir.
   Ctx: `{ timeScale, rng, log }` (TIME_SCALE fiziğe uygulanmaz; oyun isterse süreleri ölçekler).
 - `game.input(state, playerId, msg)`: `input` mesajı **hızlı yoldan** gelir — genel 30/5 sn sayacını tüketmez, görünüm üretmez,
-  hata yanıtı yoktur. Hızlı yolun kendi sınırı: soket başına 1 sn pencerede ≤ 64 mesaj işlenir, fazlası sessizce düşer;
-  600'ü aşan bağlantı 1008 ile kapanır. Hızlı mesaj ≤ 256 bayt (büyüğü normal yoldan geçer → "Bilinmeyen mesaj").
+  hata yanıtı yoktur. Hızlı yolun kendi sınırı: soket başına 1 sn pencerede ≤ 64 mesaj işlenir; fazlası düşer ama pencereyi
+  aşan **en yeni girdi bekletilir** ve pencere sıfırlanınca uygulanır (yön değişimi kaybolmaz). 600'ü aşan bağlantı kapanır.
+  Hızlı yol sadece ≤ 256 **bayt** mesajı önce ayrıştırır; uzun mesaj önce genel hız sınırından geçer, sonra ayrıştırılır.
+  `ping` sadece oynanan bir odadayken `pong` alır.
+- Hız sınırı aşımı (genel 120 / 5 sn veya hızlı 600 / sn): `close(1008)` + `dead` bayrağı (sonraki mesajlar hiç ayrıştırılmaz)
+  + 200 ms sonra `terminate()` (kapanış el sıkışmasını bekleyip 30 sn açık kalmaz).
   İzleyici, kimliksiz soket veya oyun dışındaki girdi yok sayılır. Değerleri oyun modülü temizler (asla konum kabul edilmez).
 - `game.onConnection(state, playerId, connected, ctx)`: oyun sırasında oyuncunun bağlantısı koptu/geri geldi (opsiyonel).
 - `game.canStart(prep, settings, players)`: üçüncü argüman `[{ id, connected }]` (eski oyunlar yok sayar).
 - `stats()` → `loops` (çalışan döngü sayısı). `GET /api/_test/stats` sadece `TEST_GAMES=1` iken: `stats()` + `process.cpuUsage()`.
 - İstemci: `net.on('frame')`, `net.frame` (son kare), `net.sendFast(msg)` (bağlı değilse kuyruğa girmez, düşer).
+  Oynanan odadayken kopunca yeniden bağlanma beklemesi en fazla 1 sn (normalde üstel, 8 sn'ye kadar).
 
 ## 4. Oyun kuralları ve kabul kriterleri
 
@@ -440,24 +450,38 @@ Top sadece kenar çizgileri + ağlarla sınırlı; oyuncular dış sınırla (a�
 **Gol**: top kale çizgisini **tamamen** geçince (`|x| − r > w`, ağız içinde); çizgide duran veya direkten dönen top gol değil.
 Golcü = topa son dokunan (şut veya çarpışma); rakip kaleye değilse "kendi kalesine".
 **Başlama vuruşu**: maç başı Kırmızı, her golden sonra yiyen takım. Herkes diziliş yerine, top ortada; top dokunulana kadar
-herkes kendi yarısında, vuruşu yapmayan takım orta yuvarlağa da giremez (yapan girebilir). Gol sevinci 2.5 sn (saat durur).
+herkes kendi yarısında, vuruşu yapmayan takım orta yuvarlağa da giremez (yapan girebilir). Saat başlama vuruşunda durur;
+vuran takım 5 sn içinde dokunmazsa kısıt kalkar, herkes topa oynayabilir ve saat işler. Gol sevinci 2.5 sn (saat durur).
 **Bitiş**: gol limiti → biter; süre dolunca önde olan kazanır, berabereyse ⚡ **altın gol** (ilk gol kazanır; en fazla 3 dk,
-sonra berabere). Bir takımın sahada kimsesi kalmazsa hükmen biter. Sonuç ekranı: skor, kazanan, goller (dakika, golcü, kk),
-takımlar; host "Bekleme odasına dön".
-**Kopma / katılma**: oyun sırasında bağlantısı kopan oyuncu durur; 5 sn içinde dönmezse diski kalkar (`view.removed`) ve maçı
-izler, sonraki maçta oynar. Oyun ortası katılan izleyicidir. 1.5 sn girdi gelmeyen oyuncu durdurulur.
+sonra berabere). Hükmen: bir takım açıkça ayrılma/atılma (veya 120 sn yer tutma süresinin dolması) ile sahada hiç diski
+kalmayınca hemen, ya da bir takımın 30 sn boyunca hiç bağlı oyuncusu olmazsa. 60 sn kimseden girdi gelmezse maç biter
+("💤 Kimse oynamadı"). Sonuç ekranı: skor, kazanan, goller (dakika, golcü, kk), takımlar; host "Bekleme odasına dön".
+**Kopma / katılma** (arkadaş telefonları kopar-bağlanır): bağlantısı kopan oyuncunun diski girdisiz, donuk (soluk çizilir)
+sahada kalır; 20 sn içinde dönerse kaldığı yerden oynar, dönmezse disk kalkar (`view.removed`) ve maçı izler. Bir takımın
+bağlı kimsesi yokken saat durur (`view.paused`, HUD "⏸️ Bağlantı bekleniyor"). Oyun ortası katılan izleyicidir.
+1.5 sn girdi gelmeyen oyuncu durdurulur.
 
 **Ağ**: sunucu 60 Hz adım, 30 Hz kare: `{t:'frame', s, k, v, c, b:[x,y], p:[x,y,…], f}` — konumlar ×10 tamsayı, `p`
 `view.discs` sırasında, `v` disk listesi sürümü (sıra değişince artar; istemci uyuşmayan kareyi o sürümün listesiyle çizer),
 `c` saat (sn; eksi = altın gol süresi), `f` şut tuşu basılı disklerin bit maskesi. 8 kişide ~200 bayt (< 1 KB şartı).
 `view` (yavaş): faz (kickoff/play/goal/over), skor, goller, diskler, takımlar, benim takımım, saha, sonuç.
 Girdi `{t:'input', x, y, k}`: istemci değişince (en sık 33 ms'de bir) + 100 ms kalp atışıyla yollar; sunucu sonlu olmayanı 0
-yapar, |(x,y)| > 1 ise birim vektöre indirir, `k` sadece 1/true. **İstemci tahmini yok**: tüm diskler ve top, sunucu
-zamanının 100 ms gerisinden iki kare arasında doğrusal ara değerle çizilir (zaman eşlemesi en hızlı gelen kareye göre, yavaş
-yukarı uyum). Böylece top ile oyuncular hep aynı zaman çizgisinde (şut anı tutarlı); bedeli kendi diskinde ≈ RTT + 100 ms
-gecikme. Ping (2 sn'de bir) HUD'da.
+yapar, |(x,y)| > 1 ise birim vektöre indirir, `k` sadece 1/true.
+**Ara değer**: top ve diğer diskler sunucu zamanının `gecikme` kadar gerisinden iki kare arasında doğrusal ara değerle çizilir.
+Zaman eşlemesi en hızlı gelen kareye göre (yavaş yukarı uyum). `gecikme` uyarlanabilir: kare geliş sarsıntısının tepe izleyen
+ortalaması `j` ile `clamp(2j + 25, 50, 150)` ms (LAN ≈ 50 ms). Kare gecikirse son hızla en fazla 100 ms ileri götürülür (donma yok).
+**Kendi disk tahmini** (varsayılan açık; `localStorage['tss:hx-predict']='0'` kapatır): istemci ortak fizikle (`predictDisc`:
+hareket, direkler, sınır, başlama kısıtı) kendi diskini sunucunun girdiyi işleyeceği adıma kadar (son gelen adım + RTT, yavaş
+değişen öndelik) ilerletir ve her adımı geçmişe yazar. Kare gelince sunucunun o adımdaki konumu geçmişle kıyaslanır; fark
+kare başına %8 (küçük) / %20 (büyük) eklenir ve geçmiş de kaydırılır; 60 birimden büyük fark (diziliş, itilme) sunucu konumuna geçer.
+Tahminli disk topla farklı zaman çizgisinde olduğu için topa 80 birimden yakınken çizim yumuşakça ara değerli (sunucu)
+konuma geçer — yoksa sürerken disk topun içine girmiş görünür (ölçüm: %66 → %1). Ölçülen tuş → ekran (masaüstü, vekil):
+doğrudan 147 → ~55 ms, RTT 150: 318 → ~40–60 ms, kötü tünel (RTT ~230, sarsıntı 0–150): 391 → ~45 ms ve donma 11/96 → 0.
+Ping (2 sn'de bir) HUD'da; 500 ms kare gelmezse veya soket kapalıysa sahnede "📡 Bağlantı koptu, yeniden bağlanıyor…".
 
-**İstemci**: tam ekran sahne (yatay önerilir; dikeyde "📱 Telefonu yan çevir" ipucu, oynanabilir), tuval DPR'ye göre,
+**İstemci**: tam ekran sahne (yatay önerilir; dikeyde "📱 Telefonu yan çevir" ipucu, ama saha 90° döner — kendi takımın yukarı
+hücum eder, joystick/klavye yönü de döner; saha ≈ 2 kat büyük), yatay dokunmatikte saha sola kayar ve ŞUT sağ boşlukta
+durur (kaleyi örtmez), tam ekran düğmesi sadece destekleniyorsa, disklerde baş harfler (tam ad sadece kendi diskinde), tuval DPR'ye göre,
 `requestAnimationFrame` ile çizim, sekme gizlenince durur ve sıfır girdi yollar. Telefon: sol tarafta parmağın indiği yerde
 beliren joystick (ölü bölge 0.15, uzaklaşınca peşinden gelir), sağda büyük ŞUT (ve sağ %40'a dokunmak da şut); çoklu
 dokunuş (Pointer Events), `touch-action: none`. Masaüstü: WASD/oklar + Boşluk/X. HUD: skor, saat, ping, tam ekran, çık.

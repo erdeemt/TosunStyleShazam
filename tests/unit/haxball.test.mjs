@@ -267,15 +267,23 @@ test('kendi kalesine gol "kk" olarak işaretlenir', () => {
   assert.equal(s.lastGoal.name, 'B');
 });
 
+// Başlama vuruşunu hemen kaldır (saat başlama vuruşunda durur): testlerde süre hesabı sade kalsın.
+const play = (state) => { state.world.kickoff = null; state.phase = 'play'; };
+// Herkes kalp atışı gönderiyormuş gibi (60 sn girdisiz maç biter kuralı tetiklenmesin).
+const alive = (state) => { for (const id of state.discById.keys()) state.slots.get(id).lastInput = state.tick; state.lastInput = state.tick; };
+const stepAlive = (state, n) => { let c = 0; for (let i = 0; i < n; i++) { alive(state); if (game.realtime.step(state)) c++; } return c; };
+
 test('süre biter: önde olan kazanır; berabere ise altın gol', () => {
   const s = newGame({ a: 'red', b: 'blue' }, { minutes: 2 }, 0.01); // 2 dk × 0.01 = 72 adım
   scoreFor(s, 'blue'); stepN(s, 200);
+  play(s);
   stepN(s, 100);
   assert.equal(s.phase, 'over');
   assert.equal(s.result.winner, 'blue');
   assert.equal(s.result.reason, 'time');
 
   const t = newGame({ a: 'red', b: 'blue' }, { minutes: 2 }, 0.01);
+  play(t);
   stepN(t, 100);
   assert.equal(t.overtime, true, 'berabere → uzatma');
   assert.notEqual(t.phase, 'over');
@@ -287,26 +295,101 @@ test('süre biter: önde olan kazanır; berabere ise altın gol', () => {
   assert.equal(t.result.winner, 'red');
 });
 
-test('bağlantısı kopan oyuncu 5 sn sonra sahadan kalkar; takım boşalırsa hükmen biter', () => {
+test('başlama vuruşu: saat dokunuşa kadar durur; 5 sn dokunulmazsa kısıt kalkar ve saat işler', () => {
+  const s = newGame({ a: 'red', b: 'blue' });
+  stepAlive(s, 4 * HZ);
+  assert.equal(s.phase, 'kickoff');
+  assert.equal(s.clock, 0, 'başlama vuruşunda saat durmalı');
+  stepAlive(s, HZ + 1);
+  assert.equal(s.phase, 'play', '5 sn sonra kısıt kalkar');
+  assert.equal(s.world.kickoff, null);
+  stepAlive(s, 60);
+  assert.ok(s.clock >= 59 && s.clock <= 63, `saat işlemeli (${s.clock})`);
+  // Vuran takım dokununca hemen başlar
+  const t = newGame({ a: 'red', b: 'blue' });
+  const red = t.world.players.find((d) => d.team === RED);
+  red.x = -30; red.y = 0;
+  game.input(t, 'a', { x: 1, y: 0, k: 0 });
+  stepAlive(t, 30);
+  assert.equal(t.phase, 'play');
+  assert.ok(t.clock > 0);
+});
+
+test('kopma: disk 20 sn donuk kalır ve dönünce geri verilir; takımın bağlı kimsesi yoksa saat durur', () => {
   const s = newGame({ a: 'red', b: 'blue', c: 'blue' });
+  play(s);
   const ver = s.ver;
+  game.input(s, 'c', { x: 0, y: 1, k: 1 });
   game.onConnection(s, 'c', false);
-  stepN(s, 4 * HZ);
-  assert.equal(s.world.players.length, 3, '4 sn: hâlâ sahada');
-  game.onConnection(s, 'c', true); // döndü
-  stepN(s, 2 * HZ);
-  assert.equal(s.world.players.length, 3);
-  game.onConnection(s, 'c', false);
-  const changed = stepN(s, 5 * HZ + 1);
-  assert.ok(changed >= 1);
+  const d = s.discById.get('c');
+  assert.deepEqual([d.ix, d.iy, d.kick], [0, 0, false], 'kopunca girdi sıfırlanır (donuk)');
+  stepAlive(s, 10 * HZ);
+  assert.equal(s.world.players.length, 3, '10 sn: hâlâ sahada');
+  assert.equal(game.view(s, 'a').offline.includes('c'), true);
+  game.onConnection(s, 'c', true);
+  assert.equal(game.view(s, 'c').myTeam, 'blue', 'dönünce diski geri');
+  assert.equal(game.view(s, 'c').removed, false);
+  // Mavi takımın ikisi de koparsa saat durur
+  game.onConnection(s, 'b', false); game.onConnection(s, 'c', false);
+  const c0 = s.clock;
+  stepAlive(s, 5 * HZ);
+  assert.equal(s.clock, c0, 'takımın bağlı kimsesi yokken saat durmalı');
+  assert.equal(s.paused, true);
+  assert.equal(game.view(s, 'a').paused, true);
+  game.onConnection(s, 'b', true);
+  stepAlive(s, HZ);
+  assert.ok(s.clock > c0, 'biri dönünce saat yeniden işler');
+  // 20 sn dönmeyen c'nin diski kalkar ama maç sürer (takımda b var)
+  stepAlive(s, 15 * HZ);
   assert.equal(s.world.players.length, 2);
   assert.ok(s.ver > ver);
   assert.equal(game.view(s, 'c').removed, true);
   assert.equal(game.view(s, 'c').myTeam, null);
-  game.onPlayerLeave(s, 'a');
+  assert.notEqual(s.phase, 'over');
+  game.onConnection(s, 'c', true); // geç dönen sahaya giremez
+  assert.equal(s.world.players.length, 2);
+});
+
+test('hükmen: sadece açık ayrılmada ya da takım 30 sn boş kalınca', () => {
+  // 1'e 1, mavi koptu: 29 sn sürer, 30 sn'de hükmen
+  const s = newGame({ a: 'red', b: 'blue' });
+  play(s);
+  game.onConnection(s, 'b', false);
+  stepAlive(s, 29 * HZ);
+  assert.notEqual(s.phase, 'over', '29 sn: hâlâ sürüyor');
+  stepAlive(s, HZ + 1);
   assert.equal(s.phase, 'over');
   assert.equal(s.result.reason, 'forfeit');
-  assert.equal(s.result.winner, 'blue');
+  assert.equal(s.result.winner, 'red');
+  // Açık ayrılma: hemen
+  const t = newGame({ a: 'red', b: 'blue', c: 'blue' });
+  game.onPlayerLeave(t, 'b');
+  assert.notEqual(t.phase, 'over', 'takımda c var');
+  game.onPlayerLeave(t, 'a');
+  assert.equal(t.phase, 'over');
+  assert.equal(t.result.winner, 'blue');
+  // Takımın kalanı kopuk (donuk) ama sahada: ayrılma hemen hükmen değil, 30 sn kuralı
+  const u = newGame({ a: 'red', b: 'blue', c: 'blue' });
+  game.onConnection(u, 'c', false);
+  game.onPlayerLeave(u, 'b');
+  assert.notEqual(u.phase, 'over');
+});
+
+test('60 sn hiç girdi yoksa maç biter; teknik hata (abort) maçı bitirir', () => {
+  const s = newGame({ a: 'red', b: 'blue' });
+  stepN(s, 59 * HZ);
+  assert.notEqual(s.phase, 'over');
+  game.input(s, 'a', { x: 0, y: 0, k: 0 });
+  stepN(s, 59 * HZ);
+  assert.notEqual(s.phase, 'over', 'girdi gelince sayaç sıfırlanır');
+  stepN(s, HZ + 1);
+  assert.equal(s.phase, 'over');
+  assert.equal(s.result.reason, 'idle');
+  const t = newGame({ a: 'red', b: 'blue' });
+  game.abort(t);
+  assert.equal(t.phase, 'over');
+  assert.equal(t.result.reason, 'error');
+  assert.equal(game.isOver(t), true);
 });
 
 test('girdi: kötü değerler oyunu bozmaz; izleyicinin girdisi yok sayılır; kare küçük', () => {

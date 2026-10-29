@@ -8,6 +8,7 @@ export const IP_LIMITS = {
   newIdentitiesPerHour: env('LIMIT_IDENTITIES_PER_HOUR', 30),
   socketsPerIp: env('LIMIT_SOCKETS_PER_IP', 30), // aynı evdeki telefonlar aynı IP'den gelebilir
   roomsPerIp: env('LIMIT_ROOMS_PER_IP', 10),
+  liveLoopsPerIp: env('LIMIT_LIVE_PER_IP', 2), // aynı anda süren gerçek zamanlı maç (Tosun Top), oda kuran ağ başına
 };
 
 // Sabit pencereli sayaç: hit(key) false dönerse sınır aşıldı.

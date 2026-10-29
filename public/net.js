@@ -60,7 +60,9 @@ class Net {
       this.emit('status', { connected: false });
       if (e.code === 4000) { this.stopped = true; this.replaced = true; this.emit('replaced'); return; } // başka sekmeden bağlanıldı
       if (this.stopped) return;
-      const delay = Math.min(8000, 500 * 2 ** this.retry++);
+      let delay = Math.min(8000, 500 * 2 ** this.retry++);
+      // Canlı maçtayken (Tosun Top) hızlı dön: sunucu yeri 20 sn tutar, üstel bekleme bunu boşa harcamasın.
+      if (this.room?.phase === 'playing') delay = Math.min(delay, 1000);
       setTimeout(() => this.connect(), delay);
     };
   }

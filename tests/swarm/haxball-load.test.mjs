@@ -31,11 +31,11 @@ test('döngü: maç bitince ve oda silinince durur (açık interval kalmaz)', as
   s = await stats(srv.url);
   assert.equal(s.loops, 0, 'maç bitince döngü durmalı');
   assert.ok(s.rooms >= 1);
-  // 3) Herkesin bağlantısı koparsa: 5 sn sonra diskler kalkar → maç biter → döngü durur
+  // 3) Herkesin bağlantısı koparsa: diskler donuk bekler; yer tutma süresi (12 sn ölçekli) dolunca oda silinir
   const g3 = track(await setupMatch(srv.wsUrl, 2, { prefix: 'Kop' }));
   assert.equal((await stats(srv.url)).loops, 1);
   g3.bots.forEach((b) => b.drop());
-  await sleep(5600);
+  await sleep(12_600);
   assert.equal((await stats(srv.url)).loops, 0, 'herkes kopunca döngü durmalı');
   // 4) Lobiye dön → yeni maç → yine tek döngü
   g2.host.send({ t: 'backToLobby' });

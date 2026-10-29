@@ -1,14 +1,21 @@
 // ⚽ Tosun Top — istemci. Fizik sunucuda (server/games/haxball.js + public/haxball-physics.js).
-// İstemci sadece girdi yollar ve gelen kareleri (~30 Hz) ~100 ms geriden ara değerleyerek (interpolasyon) 60 fps çizer.
-// Kendi oyuncu için tahmin (prediction) YOK: herkes aynı zaman çizgisinde, top ile oyuncu hep tutarlı. Bkz. PLAN.md §4.8.
+// İstemci girdi yollar; top ve diğer diskler gelen karelerden (~30 Hz) uyarlanabilir gecikmeyle (≈2× ölçülen sarsıntı,
+// 50–150 ms) ara değerlenir. KENDİ disk ise ortak fizikle istemcide tahmin edilir (girdiye anında tepki) ve sunucu
+// konumuna yumuşakça düzeltilir. Bkz. PLAN.md §4.8.
 import { mountLobby } from '../lobby.js';
 import { net } from '../net.js';
 import { $, el } from '../ui.js';
-import { HZ, PITCHES, PHYS } from '../haxball-physics.js';
+import { HZ, PITCHES, PHYS, RED, BLUE, predictDisc } from '../haxball-physics.js';
 
 const TICK_MS = 1000 / HZ;
-const INTERP_MS = 100; // çizim sunucu zamanının bu kadar gerisinden (2–3 kare tampon: sarsıntı ve kayıp kare emilir)
+const DELAY_MIN = 50; // ara değer gecikmesi sınırları (ms)
+const DELAY_MAX = 150;
+const EXTRAPOLATE_MS = 100; // kare gecikirse son hızla en fazla bu kadar ileri götür (donma yerine)
 const BUFFER = 40; // saklanan kare sayısı (~1.3 sn)
+const HIST = 128; // tahmin geçmişi (adım)
+const OFFLINE_MS = 500; // bu kadar kare gelmezse "bağlantı koptu" bandı
+// Kendi disk tahmini: varsayılan açık; localStorage 'tss:hx-predict' = '0' ile kapatılır (karşılaştırma/geri dönüş için).
+const PREDICT = (() => { try { return localStorage.getItem('tss:hx-predict') !== '0'; } catch { return true; } })();
 const INPUT_MIN_MS = 33; // değişince en sık bu aralıkla gönder
 const HEARTBEAT_MS = 100; // değişmese de bu aralıkla tekrar gönder (sunucu 1.5 sn girdi görmezse durdurur)
 const JOY_RADIUS = 52; // px
@@ -19,6 +26,8 @@ const REASONS = {
   limit: '🎯 Gol limitine ulaşıldı',
   golden: '⚡ Altın gol!',
   forfeit: '🚪 Bir takım sahada kalmadı',
+  idle: '💤 Kimse oynamadı, maç kapandı',
+  error: '⚠️ Teknik hata — maç durduruldu',
 };
 
 let lobby = null;
@@ -72,14 +81,15 @@ function createUI() {
   const ping = el('span', { class: 'hx-ping' }, '— ms');
   const status = el('span', { class: 'hx-status' });
   const banner = el('div', { class: 'hx-banner hidden' });
+  const offline = el('div', { class: 'hx-offline hidden', role: 'status' }, '📡 Bağlantı koptu, yeniden bağlanıyor…');
   const joyBase = el('div', { class: 'hx-joy hidden' }, el('div', { class: 'hx-knob' }));
   const kickBtn = el('button', { class: 'hx-kick', type: 'button', 'aria-label': 'Şut' }, 'ŞUT');
   const touch = el('div', { class: 'hx-touch' }, joyBase, kickBtn);
-  const wrap = el('div', { class: 'hx-canvas-wrap' }, canvas, banner,
+  const wrap = el('div', { class: 'hx-canvas-wrap' }, canvas, banner, offline,
     el('div', { class: 'hx-rotate' }, '📱 Telefonu yan çevir, daha rahat oynarsın'),
     el('div', { class: 'hx-keys' }, 'WASD / oklar: koş · Boşluk / X: şut'),
     touch);
-  const fsBtn = el('button', { class: 'hx-btn', type: 'button', title: 'Tam ekran', 'aria-label': 'Tam ekran', onclick: () => toggleFullscreen() }, '⛶');
+  const fsBtn = el('button', { class: `hx-btn${document.fullscreenEnabled ? '' : ' hidden'}`, type: 'button', title: 'Tam ekran', 'aria-label': 'Tam ekran', onclick: () => toggleFullscreen() }, '⛶');
   const exitBtn = el('button', {
     class: 'hx-btn', type: 'button', title: 'Maçtan çık', 'aria-label': 'Maçtan çık',
     onclick: () => { if (confirm('Maçtan çıkmak istiyor musun?')) net.send({ t: 'leave' }); },
@@ -90,8 +100,11 @@ function createUI() {
   const root = el('div', { class: 'hx' }, stage, end);
 
   const u = {
-    root, stage, end, canvas, wrap, scoreRed, scoreBlue, clock, ping, status, banner, joyBase, kickBtn, touch,
+    root, stage, end, canvas, wrap, scoreRed, scoreBlue, clock, ping, status, banner, offline, joyBase, kickBtn, touch,
     view: null,
+    delay: 100, jit: 0, lastFrameAt: 0, blend: 1, // blend: kendi diskte tahmin payı (topa yakınken 0) // uyarlanabilir ara değer gecikmesi (ms), sarsıntı tahmini, son kare anı
+    rot: 0, // dikey ekranda saha 90° döner (radyan; dünya → ekran)
+    pred: { on: PREDICT, d: null, pt: 0, hist: new Float64Array(HIST * 4), has: new Int32Array(HIST).fill(-1), ver: -1, frac: 0 },
     discsByVer: new Map(), // ver → [{ id, name, team }]
     frames: [], // { k, v, c, b, p, f, at }
     offset: null, // yerel saat − sunucu adımı·TICK_MS (en hızlı gelen kareye göre)
@@ -104,7 +117,13 @@ function createUI() {
   // ----- Kareler -----
   u.offFrame = net.on('frame', (m) => onFrame(u, m));
   // Odadan çıkınca / bekleme odasına dönünce tam ekran sahne kapanır.
-  u.offRoom = net.on('room', (r) => { if (!r || r.game !== 'haxball' || r.phase !== 'playing') setLive(u, false); });
+  u.offRoom = net.on('room', (r) => {
+    if (r && r.game === 'haxball' && r.phase === 'playing') return;
+    setLive(u, false);
+    // Rövanşta eski maçın disk listesi/kareleri kullanılmasın (sürüm numarası 1'den başlar).
+    if (!r || r.phase === 'lobby') { u.discsByVer.clear(); u.frames.length = 0; u.offset = null; u.pred.d = null; }
+  });
+  u.offStatus = net.on('status', () => showOffline(u));
   u.offPong = net.on('pong', (m) => {
     if (typeof m.c !== 'number') return;
     const rtt = performance.now() - m.c;
@@ -221,7 +240,7 @@ function placeJoy(u, dx, dy) {
 
 function destroyUI(u) {
   stopLoop(u, true);
-  u.offFrame(); u.offPong(); u.offRoom();
+  u.offFrame(); u.offPong(); u.offRoom(); u.offStatus();
   window.removeEventListener('keydown', u.onKey);
   window.removeEventListener('keyup', u.onKey);
   window.removeEventListener('blur', u.onBlur);
@@ -242,8 +261,15 @@ function currentInput(u) {
     y = (k.has('KeyS') || k.has('ArrowDown') ? 1 : 0) - (k.has('KeyW') || k.has('ArrowUp') ? 1 : 0);
     if (x && y) { x *= Math.SQRT1_2; y *= Math.SQRT1_2; }
   }
-  u.input.x = Math.round(x * 100) / 100;
-  u.input.y = Math.round(y * 100) / 100;
+  if (u.rot) { // ekran vektörünü dünyaya çevir: R(−θ)
+    const c = Math.round(Math.cos(u.rot));
+    const sn = Math.round(Math.sin(u.rot));
+    const wx = x * c + y * sn;
+    const wy = -x * sn + y * c;
+    x = wx; y = wy;
+  }
+  u.input.x = Math.round(x * 100) / 100 + 0; // +0: -0 olmasın
+  u.input.y = Math.round(y * 100) / 100 + 0;
   u.input.k = u.kickPointers.size > 0 || u.keys.has('Space') || u.keys.has('KeyX');
   return u.input;
 }
@@ -282,8 +308,15 @@ function onFrame(u, m) {
   // En hızlı gelen kareyi izle; ağ yavaşlarsa (ya da saatler kayarsa) yavaşça yukarı uyum sağla.
   if (u.offset == null || sample < u.offset) u.offset = sample;
   else u.offset += (sample - u.offset) * 0.02;
+  // Sarsıntı: karenin en hızlı karelere göre gecikmesi. Tepeleri hızlı yakala, yavaş unut.
+  const late = sample - u.offset;
+  u.jit += (late - u.jit) * (late > u.jit ? 0.3 : 0.01);
+  const target = Math.max(DELAY_MIN, Math.min(DELAY_MAX, 2 * u.jit + 25));
+  u.delay += (target - u.delay) * 0.05;
+  u.lastFrameAt = now;
   u.frames.push({ k: m.k, v: m.v, c: m.c, b: m.b, p: m.p, f: m.f | 0 });
   if (u.frames.length > BUFFER) u.frames.shift();
+  reconcile(u, m);
   if (typeof m.c === 'number') {
     const txt = m.c >= 0 ? fmtClock(m.c) : `+${fmtClock(-m.c)}`;
     if (u.clock.textContent !== txt) u.clock.textContent = txt;
@@ -294,10 +327,19 @@ function onFrame(u, m) {
 function sample(u, now) {
   const fr = u.frames;
   if (!fr.length) return null;
-  const rt = (now - u.offset - INTERP_MS) / TICK_MS;
+  const rt = (now - u.offset - u.delay) / TICK_MS;
   let a = fr[0];
   let b = fr[0];
-  if (rt >= fr[fr.length - 1].k) { a = b = fr[fr.length - 1]; } else if (rt > fr[0].k) {
+  const last = fr[fr.length - 1];
+  if (rt >= last.k) {
+    // Kare gecikti: son iki kareden hızla en fazla EXTRAPOLATE_MS ileri git (donup sıçramasın).
+    const prev = fr[fr.length - 2];
+    if (prev && prev.v === last.v && prev.p.length === last.p.length && last.k > prev.k) {
+      const t = Math.min(rt - last.k, EXTRAPOLATE_MS / TICK_MS) / (last.k - prev.k);
+      return { a: prev, b: last, t: 1 + t, same: true };
+    }
+    a = b = last;
+  } else if (rt > fr[0].k) {
     for (let i = fr.length - 1; i > 0; i--) {
       if (fr[i - 1].k <= rt) { a = fr[i - 1]; b = fr[i]; break; }
     }
@@ -306,11 +348,139 @@ function sample(u, now) {
   return { a, b, t, same: a.v === b.v && a.p.length === b.p.length };
 }
 
+// "Bağlantı koptu" bandı: soket kapalıysa veya 500 ms'dir kare gelmiyorsa.
+function showOffline(u, now = performance.now()) {
+  const down = u.live && (!net.connected || (u.lastFrameAt > 0 && now - u.lastFrameAt > OFFLINE_MS));
+  if (u.offline.classList.contains('hidden') === down) u.offline.classList.toggle('hidden', !down);
+}
+
+// ----- Kendi disk tahmini -----
+// Tahmin adımı pt, sunucunun girdimizi işleyeceği adıma hizalanır: son gelen adım + RTT (ms → adım).
+// Her adımın sonucu geçmişe yazılır; kare gelince sunucunun o adımdaki konumu geçmişle kıyaslanır ve fark
+// yumuşakça (kare başına %25) eklenir; büyük fark (gol sonrası diziliş, itilme) doğrudan sunucu konumuna geçer.
+
+function myIndex(u, v) {
+  const discs = u.discsByVer.get(v) ?? (u.view?.ver === v ? u.view.discs : null);
+  return discs ? discs.findIndex((d) => d.id === net.playerId) : -1;
+}
+
+// Öndelik (adım): RTT'ye göre ama çok yavaş değişir — ping sarsıntısı tahmini durdurup sıçratmasın.
+function predTarget(u, now) {
+  if (u.rtt != null) {
+    const want = u.rtt / TICK_MS;
+    u.lead = u.lead == null ? want : u.lead + (want - u.lead) * 0.01;
+  }
+  return (now - u.offset) / TICK_MS + (u.lead ?? 0);
+}
+
+function kickoffTeam(u) {
+  if (u.view?.phase !== 'kickoff') return null;
+  return u.view.kickoffTeam === 'blue' ? BLUE : RED;
+}
+
+function pitchOf(u) {
+  return PITCHES[u.view?.pitch] ?? PITCHES.small;
+}
+
+function resetPrediction(u, m, i) {
+  const P = u.pred;
+  const team = u.view?.myTeam === 'blue' ? BLUE : RED;
+  const x = m.p[2 * i] / 10;
+  const y = m.p[2 * i + 1] / 10;
+  const prev = u.frames[u.frames.length - 2];
+  let vx = 0;
+  let vy = 0;
+  if (prev && prev.v === m.v && m.k > prev.k) { vx = (x - prev.p[2 * i] / 10) / (m.k - prev.k); vy = (y - prev.p[2 * i + 1] / 10) / (m.k - prev.k); }
+  P.d = { team, x, y, vx, vy, ix: 0, iy: 0, kick: false, r: PHYS.playerRadius };
+  P.resets = (P.resets ?? 0) + 1;
+  u.root.dataset.predResets = String(P.resets);
+  P.pt = m.k;
+  P.ver = m.v;
+  P.has.fill(-1);
+  store(P, m.k);
+}
+
+function store(P, k) {
+  const j = ((k % HIST) + HIST) % HIST;
+  P.has[j] = k;
+  P.hist[4 * j] = P.d.x; P.hist[4 * j + 1] = P.d.y; P.hist[4 * j + 2] = P.d.vx; P.hist[4 * j + 3] = P.d.vy;
+}
+
+function reconcile(u, m) {
+  const P = u.pred;
+  if (!P.on || !u.view?.myTeam || u.view.phase === 'over') { P.d = null; return; }
+  const i = myIndex(u, m.v);
+  if (i < 0) { P.d = null; return; }
+  if (!P.d) { resetPrediction(u, m, i); return; }
+  P.ver = m.v; // disk listesi değişti (biri ayrıldı): geçmiş konumlar hâlâ geçerli, sadece sıra değişti
+  const j = ((m.k % HIST) + HIST) % HIST;
+  if (P.has[j] !== m.k) { if (P.pt < m.k || P.pt - m.k > HIST - 2) resetPrediction(u, m, i); return; }
+  const ex = m.p[2 * i] / 10 - P.hist[4 * j];
+  const ey = m.p[2 * i + 1] / 10 - P.hist[4 * j + 1];
+  if (Math.hypot(ex, ey) > 60) { resetPrediction(u, m, i); return; }
+  // Sunucu hızı (son iki kareden) ile tahmin edilen hızın farkı da düzeltilir (itilme, çarpışma).
+  const prev = u.frames[u.frames.length - 2];
+  let evx = 0;
+  let evy = 0;
+  if (prev && prev.v === m.v && m.k > prev.k) {
+    const jp = ((prev.k % HIST) + HIST) % HIST;
+    if (P.has[jp] === prev.k) {
+      evx = ((m.p[2 * i] - prev.p[2 * i]) / 10 / (m.k - prev.k)) - (P.hist[4 * j] - P.hist[4 * jp]) / (m.k - prev.k);
+      evy = ((m.p[2 * i + 1] - prev.p[2 * i + 1]) / 10 / (m.k - prev.k)) - (P.hist[4 * j + 1] - P.hist[4 * jp + 1]) / (m.k - prev.k);
+    }
+  }
+  // Küçük hata (sarsıntı kaynaklı) yavaş, büyük hata (itilme) daha hızlı düzeltilir.
+  const a = Math.hypot(ex, ey) < 4 ? 0.08 : 0.2;
+  const dx = ex * a;
+  const dy = ey * a;
+  P.d.x += dx; P.d.y += dy;
+  P.d.vx += evx * a; P.d.vy += evy * a;
+  // Kare ile şimdi arasındaki geçmiş de kaydırılır: aynı hata sonraki karelerde ikinci kez düzeltilmesin.
+  for (let k = m.k; k < P.pt; k++) {
+    const q = ((k % HIST) + HIST) % HIST;
+    if (P.has[q] === k) { P.hist[4 * q] += dx; P.hist[4 * q + 1] += dy; }
+  }
+}
+
+function advancePrediction(u, now) {
+  const P = u.pred;
+  if (!P.d || u.offset == null) return;
+  const target = predTarget(u, now);
+  if (target - P.pt > HIST / 2) { P.d = null; return; } // uzun takılma: sonraki karede yeniden kur
+  const pitch = pitchOf(u);
+  const ko = kickoffTeam(u);
+  const inp = u.input;
+  while (P.pt < Math.floor(target)) {
+    P.d.ix = canPlay(u) ? inp.x : 0;
+    P.d.iy = canPlay(u) ? inp.y : 0;
+    P.d.kick = canPlay(u) && inp.k;
+    // Sunucuda şut bekleme sayacı tutulur; burada sadece şut basılıyken yavaşlama önemli.
+    predictDisc(pitch, P.d, ko);
+    P.pt++;
+    store(P, P.pt);
+  }
+  P.frac = Math.max(0, Math.min(1, target - P.pt)); // hist[pt−1] → hist[pt] arası (bir adım geriden, pürüzsüz)
+}
+
+// Çizim için kendi diskin konumu: son iki tahmin adımı arasında ara değer.
+function predictedPos(u) {
+  const P = u.pred;
+  if (!P.d) return null;
+  const j1 = ((P.pt % HIST) + HIST) % HIST;
+  const j0 = (((P.pt - 1) % HIST) + HIST) % HIST;
+  if (P.has[j1] !== P.pt) return { x: P.d.x, y: P.d.y };
+  if (P.has[j0] !== P.pt - 1) return { x: P.hist[4 * j1], y: P.hist[4 * j1 + 1] };
+  const t = P.frac;
+  return { x: P.hist[4 * j0] + (P.hist[4 * j1] - P.hist[4 * j0]) * t, y: P.hist[4 * j0 + 1] + (P.hist[4 * j1 + 1] - P.hist[4 * j0 + 1]) * t };
+}
+
 function startLoop(u) {
   if (u.raf || document.hidden) return;
   const frame = (now) => {
     u.raf = 0;
     if (!u.live || !u.root.isConnected) return;
+    showOffline(u, now);
+    advancePrediction(u, now);
     draw(u, now);
     u.fps.n++;
     if (now - u.fps.start > 1000) { u.fps.value = Math.round((u.fps.n * 1000) / (now - u.fps.start)); u.fps.n = 0; u.fps.start = now; u.root.dataset.fps = String(u.fps.value); }
@@ -340,10 +510,15 @@ function stopLoop(u, sendStop) {
 
 function resize(u) {
   const pitch = PITCHES[u.view?.pitch] ?? PITCHES.small;
-  const W = u.wrap.clientWidth;
-  const H = u.wrap.clientHeight;
+  const cs = getComputedStyle(u.wrap);
+  const W = u.wrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const H = u.wrap.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
   if (!W || !H) return;
-  const aspect = pitch.outerW / pitch.outerH;
+  // Dikey ekran: saha 90° döner (yaklaşık iki kat büyük). Kendi takımın yukarı hücum eder.
+  const portrait = H > W * 1.15;
+  const rot = portrait ? (u.view?.myTeam === 'blue' ? Math.PI / 2 : -Math.PI / 2) : 0;
+  if (rot !== u.rot) { u.rot = rot; u.sizeKey = ''; }
+  const aspect = portrait ? pitch.outerH / pitch.outerW : pitch.outerW / pitch.outerH;
   let cw = W;
   let ch = W / aspect;
   if (ch > H) { ch = H; cw = H * aspect; }
@@ -355,7 +530,7 @@ function resize(u) {
   u.canvas.style.height = `${Math.floor(ch)}px`;
   u.canvas.width = Math.floor(cw * dpr);
   u.canvas.height = Math.floor(ch * dpr);
-  u.scale = (cw * dpr) / (2 * pitch.outerW);
+  u.scale = (cw * dpr) / (2 * (portrait ? pitch.outerH : pitch.outerW));
   u.pitch = pitch;
 }
 
@@ -370,6 +545,7 @@ function draw(u, now) {
   g.fillStyle = '#2f6b32';
   g.fillRect(0, 0, c.width, c.height);
   g.setTransform(s, 0, 0, s, c.width / 2, c.height / 2);
+  if (u.rot) g.rotate(u.rot);
   // Çim şeritleri
   const stripe = (p.w * 2) / 10;
   g.fillStyle = '#3a7d3c';
@@ -398,15 +574,31 @@ function draw(u, now) {
   const { a, b, t, same } = smp;
   const lerp = (arr1, arr2, i) => (same ? arr1[i] + (arr2[i] - arr1[i]) * t : arr2[i]) / 10;
   const discs = u.discsByVer.get(b.v) ?? (u.view?.ver === b.v ? u.view.discs : null);
+  const bx = lerp(a.b, b.b, 0);
+  const by = lerp(a.b, b.b, 1);
+  // Metin dönmesin: konuma git, sahanın dönüşünü geri al.
+  // dy: ekranda aşağı kaydırma (dünya birimi), saha dönse de yazı diskin altında kalır.
+  const text = (str, x, y, dy = 0) => { g.save(); g.translate(x, y); if (u.rot) g.rotate(-u.rot); g.fillText(str, 0, dy); g.restore(); };
   if (discs && discs.length * 2 === b.p.length) {
-    g.font = `bold ${PHYS.playerRadius * 1.15}px Rubik, system-ui, sans-serif`;
+    const offline = new Set(u.view?.offline ?? []);
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     for (let i = 0; i < discs.length; i++) {
-      const x = lerp(a.p, b.p, 2 * i);
-      const y = lerp(a.p, b.p, 2 * i + 1);
       const d = discs[i];
       const mine = d.id === net.playerId;
+      let x = lerp(a.p, b.p, 2 * i);
+      let y = lerp(a.p, b.p, 2 * i + 1);
+      const own = mine ? predictedPos(u) : null;
+      if (own) {
+        // Tahminli disk top ile farklı zaman çizgisinde: topa yaklaşınca (≤ 80 birim) sunucu zaman çizgisindeki
+        // (ara değerli) konuma yumuşakça geç, yoksa disk topun içine girmiş görünür. Uzakta tam tahmin.
+        const dist = Math.hypot(own.x - bx, own.y - by);
+        const want = Math.max(0, Math.min(1, (dist - 35) / 45));
+        u.blend += (want - u.blend) * 0.15;
+        x += (own.x - x) * u.blend;
+        y += (own.y - y) * u.blend;
+      }
+      g.globalAlpha = offline.has(d.id) ? 0.4 : 1; // bağlantısı kopan disk soluk (donuk bekler)
       if (mine) { // kendi diskin: sarı hale
         g.beginPath(); g.arc(x, y, PHYS.playerRadius + 6, 0, Math.PI * 2);
         g.fillStyle = 'rgba(255,214,0,0.35)'; g.fill();
@@ -417,16 +609,17 @@ function draw(u, now) {
       g.strokeStyle = (b.f >> i) & 1 ? '#ffffff' : '#111';
       g.stroke();
       g.fillStyle = '#fff';
-      g.fillText(initials(d.name), x, y + 1);
-      g.font = `600 ${11}px Rubik, system-ui, sans-serif`;
-      g.fillStyle = 'rgba(255,255,255,0.85)';
-      g.fillText(d.name, x, y + PHYS.playerRadius + 10);
-      g.font = `bold ${PHYS.playerRadius * 1.15}px Rubik, system-ui, sans-serif`;
+      g.font = `bold ${PHYS.playerRadius * 1.1}px Rubik, system-ui, sans-serif`;
+      text(initials(d.name), x, y, 1);
+      if (mine) { // tam ad sadece kendi diskinde (kalabalık olmasın)
+        g.font = '600 10px Rubik, system-ui, sans-serif';
+        g.fillStyle = 'rgba(255,255,255,0.8)';
+        text(d.name, x, y, PHYS.playerRadius + 9);
+      }
+      g.globalAlpha = 1;
     }
   }
   // Top
-  const bx = lerp(a.b, b.b, 0);
-  const by = lerp(a.b, b.b, 1);
   g.beginPath(); g.arc(bx, by, PHYS.ballRadius, 0, Math.PI * 2);
   g.fillStyle = '#ffffff'; g.fill(); g.lineWidth = 2; g.strokeStyle = '#111'; g.stroke();
 }
@@ -451,7 +644,9 @@ function update(u, view, ctx) {
   const live = ctx.room.phase === 'playing' && view.phase !== 'over';
   setLive(u, live);
   u.root.classList.toggle('player', !!view.myTeam);
-  u.status.textContent = view.overtime ? '⚡ Altın gol' : !view.myTeam ? (view.removed ? '📴 Sahadan çıktın' : '👀 İzliyorsun') : '';
+  u.status.textContent = view.paused ? '⏸️ Bağlantı bekleniyor' : view.overtime ? '⚡ Altın gol'
+    : !view.myTeam ? (view.removed ? '📴 Sahadan çıktın' : '👀 İzliyorsun') : '';
+
 
   // Bant: gol / başlama vuruşu
   let text = '';

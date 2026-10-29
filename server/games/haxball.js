@@ -8,7 +8,11 @@ import {
 
 const SEND_HZ = 30;
 const GOAL_PAUSE_TICKS = Math.round(2.5 * HZ); // gol sevinci; sonra başlama vuruşu
-const DISCONNECT_REMOVE_TICKS = 5 * HZ; // bağlantısı kopan oyuncunun diski bu kadar sonra sahadan kalkar
+// Telefonlar kopar-bağlanır: kopan oyuncunun diski girdisiz (donuk) sahada kalır, dönünce geri verilir.
+const DISCONNECT_REMOVE_TICKS = 20 * HZ; // bu kadar dönmezse disk sahadan kalkar (oyuncu izler)
+const TEAM_EMPTY_FORFEIT_TICKS = 30 * HZ; // bir takımın bağlı kimsesi bu kadar kalmazsa hükmen biter
+const KICKOFF_WAIT_TICKS = 5 * HZ; // başlama vuruşu bu kadar yapılmazsa kısıt kalkar, saat işler
+const IDLE_END_TICKS = 60 * HZ; // kimseden bu kadar girdi gelmezse maç biter (boşta döngü kalmasın)
 const INPUT_STALE_TICKS = Math.round(1.5 * HZ); // girdi (kalp atışı) gelmezse oyuncu durur
 const OVERTIME_MAX_MIN = 3; // altın gol en fazla bu kadar sürer, sonra berabere
 const TEAM_KEYS = ['red', 'blue'];
@@ -44,25 +48,36 @@ function finish(state, reason) {
   state.result = { winner: r > b ? 'red' : b > r ? 'blue' : 'draw', reason };
 }
 
-// Bir takımın sahada hiç oyuncusu kalmazsa maç biter (diğer takım hükmen kazanır).
+function forfeit(state, n) {
+  state.phase = 'over';
+  state.result = { winner: n[RED] ? 'red' : n[BLUE] ? 'blue' : 'draw', reason: 'forfeit' };
+}
+
+// Açıkça ayrılma/atılma sonrası: bir takımın sahada hiç diski kalmadıysa hükmen biter.
 function checkForfeit(state) {
   if (state.phase === 'over') return;
   const n = [0, 0];
   for (const d of state.world.players) n[d.team]++;
   if (n[RED] > 0 && n[BLUE] > 0) return;
-  state.phase = 'over';
-  state.result = { winner: n[RED] ? 'red' : n[BLUE] ? 'blue' : 'draw', reason: 'forfeit' };
+  forfeit(state, n);
 }
 
-function dropDisc(state, id) {
+function dropDisc(state, id, { leave = false } = {}) {
   const slot = state.slots.get(id);
   if (!slot || slot.removed) return false;
   slot.removed = true;
   removePlayer(state.world, id);
   state.discById.delete(id);
   state.ver++;
-  checkForfeit(state);
+  if (leave) checkForfeit(state);
   return true;
+}
+
+// Takım başına sahadaki BAĞLI disk sayısı.
+function connectedCounts(state) {
+  const n = [0, 0];
+  for (const d of state.world.players) if (state.slots.get(d.id).offAt == null) n[d.team]++;
+  return n;
 }
 
 export default {
@@ -143,6 +158,10 @@ export default {
       lastGoal: null,
       result: null,
       tick: 0,
+      kickoffTicks: 0, // başlama vuruşunda geçen adım (saat durur)
+      emptySince: [null, null], // takımın bağlı kimsesi olmadığı ilk adım
+      paused: false, // bir takımın bağlı kimsesi yok: saat durur
+      lastInput: 0, // herhangi birinden son girdi (adım)
     };
     return state;
   },
@@ -162,23 +181,38 @@ export default {
         if (slot.offAt != null && tick - slot.offAt >= DISCONNECT_REMOVE_TICKS) { changed = dropDisc(state, slot.id) || changed; continue; }
         if (tick - slot.lastInput > INPUT_STALE_TICKS && (d.ix || d.iy || d.kick)) setInput(d, 0, 0, false);
       }
-      if (state.phase === 'over') return true;
+      // Bir takımın bağlı kimsesi yoksa saat durur; 30 sn sürerse hükmen.
+      const n = connectedCounts(state);
+      for (const t of [RED, BLUE]) {
+        if (n[t] > 0) state.emptySince[t] = null;
+        else state.emptySince[t] ??= tick;
+      }
+      if (state.emptySince.some((since) => since != null && tick - since >= TEAM_EMPTY_FORFEIT_TICKS)) { forfeit(state, n); return true; }
+      const paused = n[RED] === 0 || n[BLUE] === 0;
+      if (paused !== state.paused) { state.paused = paused; changed = true; }
+      if (tick - state.lastInput >= IDLE_END_TICKS) { finish(state, 'idle'); return true; }
 
       const world = state.world;
       const ev = step(world);
-      if (state.phase === 'kickoff' && world.kickoff == null) { state.phase = 'play'; changed = true; }
+      if (state.phase === 'kickoff') {
+        // Vuran takım 5 sn dokunmazsa kısıt kalkar, herkes topa oynayabilir. O zamana kadar saat durur.
+        if (world.kickoff != null && !paused && ++state.kickoffTicks >= KICKOFF_WAIT_TICKS) world.kickoff = null;
+        if (world.kickoff == null) { state.phase = 'play'; state.kickoffTicks = 0; changed = true; }
+        else if (ev.goal < 0) return changed;
+      }
 
       if (state.phase === 'goal') {
         if (--state.pause <= 0) {
           if (state.endAfterPause) { finish(state, state.overtime ? 'golden' : 'limit'); return true; }
           resetKickoff(world, teamOf(state.kickoffTeam));
           state.phase = 'kickoff';
+          state.kickoffTicks = 0;
           changed = true;
         }
         return changed;
       }
 
-      state.clock++;
+      if (!paused) state.clock++;
       if (ev.goal >= 0) {
         const team = TEAM_KEYS[ev.goal];
         state.score[ev.goal]++;
@@ -227,19 +261,28 @@ export default {
     if (!d) return;
     setInput(d, num(msg.x), num(msg.y), msg.k === 1 || msg.k === true);
     state.slots.get(playerId).lastInput = state.tick;
+    state.lastInput = state.tick;
   },
 
-  // Bağlantı koptu/geri geldi (oyun sırasında). Kopan oyuncu durur; 5 sn içinde dönmezse diski kalkar.
+  // Bağlantı koptu/geri geldi (oyun sırasında). Kopan oyuncunun diski girdisiz sahada kalır;
+  // 20 sn içinde dönerse kaldığı yerden oynar, dönmezse disk kalkar.
   onConnection(state, playerId, connected) {
     const slot = state.slots.get(playerId);
     if (!slot || slot.removed) return;
     slot.offAt = connected ? null : state.tick;
+    if (connected) slot.lastInput = state.tick;
     const d = state.discById.get(playerId);
     if (d && !connected) setInput(d, 0, 0, false);
   },
 
+  // Açık ayrılma, atılma veya yer tutma süresinin dolması: disk hemen kalkar, takım boşaldıysa hükmen.
   onPlayerLeave(state, playerId) {
-    dropDisc(state, playerId);
+    dropDisc(state, playerId, { leave: true });
+  },
+
+  // Lobi döngüsü istisna verdiğinde: maç "teknik hata" ile biter (oda kilitli kalmasın).
+  abort(state) {
+    if (state.phase !== 'over') finish(state, 'error');
   },
 
   action(state, playerId, action) {
@@ -278,6 +321,8 @@ export default {
       ver: state.ver,
       roster,
       myTeam: slot && slot.team !== 'spec' && !slot.removed ? slot.team : null,
+      offline: [...state.slots.values()].filter((x) => x.offAt != null && !x.removed).map((x) => x.id),
+      paused: state.paused,
       removed: !!slot?.removed,
       pitch: state.settings.size,
       minutes: state.settings.minutes,

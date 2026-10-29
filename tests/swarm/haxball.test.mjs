@@ -109,33 +109,36 @@ test('4v4 + yapay ağ gecikmesi (75 ms tek yön): oynanabilir ve tutarlı', asyn
   g.bots.forEach((b) => { b.latency = 0; b.leave(); });
 });
 
-test('kopma: 5 sn içinde dönen oyuncu sahada kalır; dönmeyenin diski kalkar, izleyici olur', async () => {
+test('kopma: 1.5 / 4 / 10 sn kopan oyuncu diskini korur, maç sürer; dönmeyen yer tutma süresinde çıkar', async () => {
   const g = track(await setupMatch(srv.wsUrl, 4));
   const [, , c] = g.bots; // c: kırmızı
+  for (const ms of [1500, 4000, 10_000]) {
+    c.drop();
+    const off = await g.host.waitView((v) => v.offline.includes(c.playerId));
+    assert.equal(off.discs.length, 4, 'kopunca disk donuk kalır');
+    await sleep(ms);
+    await c.connect();
+    const v = await c.waitFreshView();
+    assert.notEqual(v.phase, 'over', `${ms} ms kopmada maç sürmeli`);
+    assert.equal(v.discs.length, 4, `${ms} ms kopmada disk kalmalı`);
+    assert.equal(v.myTeam, 'red');
+    assert.equal(v.removed, false);
+    // Döndükten sonra girdisi işler
+    const before = myDisc(c);
+    const iv = setInterval(() => c.input(0, 1, false), 50);
+    await c.waitFrame(() => { const d = myDisc(c); return d && before && d.y > before.y + 5; }, { timeout: 3000 });
+    clearInterval(iv);
+    c.input(0, 0, false);
+    await sleep(200);
+  }
+  // Kalıcı kopuş: yer tutma süresi (120 sn × 0.1 = 12 sn) dolunca odadan çıkar, diski kalkar; takımda biri var → sürer
   const ver0 = g.host.view.ver;
   c.drop();
-  await sleep(1500);
-  await c.connect();
-  const v1 = await c.waitFreshView();
-  assert.equal(v1.discs.length, 4, 'kısa kopmada disk kalmalı');
-  assert.equal(v1.myTeam, 'red');
-  c.input(1, 0, false);
-  await sleep(200);
-  c.drop();
-  const v2 = await g.host.waitView((v) => v.discs.length === 3, { timeout: 8000 });
+  const v2 = await g.host.waitView((v) => v.discs.length === 3, { timeout: 16_000 });
   assert.ok(v2.ver > ver0);
-  assert.ok(!v2.discs.some((d) => d.id === c.playerId));
+  assert.notEqual(v2.phase, 'over');
   const f = await g.host.waitFrame((x) => x.v === v2.ver);
   assert.equal(f.p.length, 6, 'kare 3 disk içermeli');
-  await c.connect();
-  const v3 = await c.waitFreshView();
-  assert.equal(v3.removed, true);
-  assert.equal(v3.myTeam, null);
-  // Girdisi yok sayılır, disk geri gelmez
-  for (let i = 0; i < 10; i++) c.input(1, 1, true);
-  await sleep(200);
-  assert.equal(g.host.view.discs.length, 3);
-  assert.equal(c.room.players.find((p) => p.id === c.playerId).spectator, false, 'odada kalır (bir sonraki maçta oynar)');
   g.bots.forEach((b) => b.leave());
 });
 

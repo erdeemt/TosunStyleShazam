@@ -242,6 +242,45 @@ function kickoffLimit(world, d) {
 
 const POST = { x: 0, y: 0, vx: 0, vy: 0, r: PHYS.postRadius };
 
+// Oyuncu diskinin girdiyle hareketi (ivme, hız sınırı, sürtünme).
+function moveDisc(d) {
+  const P = PHYS;
+  const acc = d.kick ? P.playerKickAccel : P.playerAccel;
+  d.vx += d.ix * acc;
+  d.vy += d.iy * acc;
+  clampSpeed(d, P.maxPlayerSpeed);
+  d.x += d.vx; d.y += d.vy;
+  d.vx *= P.playerDamping; d.vy *= P.playerDamping;
+}
+
+// Oyuncu dış sınırda kalır (+ başlama vuruşu kısıtı). world: { pitch, kickoff }.
+function limitDisc(world, d) {
+  const { pitch } = world;
+  const r = PHYS.playerRadius;
+  if (world.kickoff != null) kickoffLimit(world, d);
+  const mx = pitch.outerW - r;
+  const my = pitch.outerH - r;
+  if (d.x < -mx) { d.x = -mx; if (d.vx < 0) d.vx = 0; } else if (d.x > mx) { d.x = mx; if (d.vx > 0) d.vx = 0; }
+  if (d.y < -my) { d.y = -my; if (d.vy < 0) d.vy = 0; } else if (d.y > my) { d.y = my; if (d.vy > 0) d.vy = 0; }
+}
+
+// İstemci tahmini: sadece KENDİ diskinin bir adımı — sunucudaki adımın oyuncuyu ilgilendiren kısmı
+// (hareket, direkler, dış sınır, başlama vuruşu kısıtı). Diğer disk ve top çarpışmaları sunucu düzeltmesine kalır.
+// d: { team, x, y, vx, vy, ix, iy, kick, r }, kickoff: vuruşu yapan takım (RED/BLUE) veya null.
+export function predictDisc(pitch, d, kickoff) {
+  moveDisc(d);
+  for (const sx of [-1, 1]) {
+    for (const sy of [-1, 1]) {
+      POST.x = sx * pitch.w; POST.y = sy * pitch.goal; POST.vx = 0; POST.vy = 0;
+      collide(d, PHYS.playerInvMass, POST, 0, PHYS.playerBounce * PHYS.postBounce);
+    }
+  }
+  PREDICT_WORLD.pitch = pitch;
+  PREDICT_WORLD.kickoff = kickoff;
+  limitDisc(PREDICT_WORLD, d);
+}
+const PREDICT_WORLD = { pitch: null, kickoff: null };
+
 // Bir fizik adımı. Dönen nesne her adımda aynıdır: { goal: -1 | RED | BLUE (gol atan takım), kicks, touched }.
 export function step(world) {
   const ev = world.events;
@@ -269,15 +308,7 @@ export function step(world) {
   }
 
   // 2) Hareket + sürtünme.
-  for (let i = 0; i < ps.length; i++) {
-    const d = ps[i];
-    const acc = d.kick ? P.playerKickAccel : P.playerAccel;
-    d.vx += d.ix * acc;
-    d.vy += d.iy * acc;
-    clampSpeed(d, P.maxPlayerSpeed);
-    d.x += d.vx; d.y += d.vy;
-    d.vx *= P.playerDamping; d.vy *= P.playerDamping;
-  }
+  for (let i = 0; i < ps.length; i++) moveDisc(ps[i]);
   b.px = b.x; b.py = b.y;
   clampSpeed(b, P.maxBallSpeed);
   b.x += b.vx; b.y += b.vy;
@@ -298,16 +329,8 @@ export function step(world) {
   // 4) Top duvarlardan seker; oyuncular dış sınırda kalır (+ başlama vuruşu kısıtı).
   ballWalls(world);
   const { pitch } = world;
-  const r = P.playerRadius;
   if (ev.touched) world.kickoff = null;
-  for (let i = 0; i < ps.length; i++) {
-    const d = ps[i];
-    if (world.kickoff != null) kickoffLimit(world, d);
-    const mx = pitch.outerW - r;
-    const my = pitch.outerH - r;
-    if (d.x < -mx) { d.x = -mx; if (d.vx < 0) d.vx = 0; } else if (d.x > mx) { d.x = mx; if (d.vx > 0) d.vx = 0; }
-    if (d.y < -my) { d.y = -my; if (d.vy < 0) d.vy = 0; } else if (d.y > my) { d.y = my; if (d.vy > 0) d.vy = 0; }
-  }
+  for (let i = 0; i < ps.length; i++) limitDisc(world, ps[i]);
   // Güvenlik ağı: sayısal bir hata topu sahadan dışarı atamasın.
   const lim = pitch.w + pitch.depth;
   if (!(Math.abs(b.x) <= lim) || !(Math.abs(b.y) <= pitch.h)) {
