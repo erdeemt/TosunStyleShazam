@@ -788,3 +788,7 @@ input.pc-num:disabled { opacity: .35; }
 .pl-table th:first-child, .pl-table td:first-child { text-align: left; width: 34%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pl-table td.pc-row-score { font-size: 15px; min-width: 0; }
 .pl-table tr.me td:first-child { color: var(--accent2); }
+.pl-muted {
+  min-height: 44px; padding: 8px 14px; border-radius: 999px; border: 2px dashed var(--bad); background: var(--bg);
+  color: var(--text); font: inherit; font-weight: 800; cursor: pointer;
+}

@@ -5,7 +5,7 @@
 import { randomBytes } from 'node:crypto';
 import { cryptoRng } from '../rng.js';
 import { GameError, num, str } from '../errors.js';
-import { cleanAnswer } from '../perceptle.js';
+import { cleanAnswer, isFriday, todayIstanbul } from '../perceptle.js';
 import { TESTS, TEMPO, evaluate, finalScore, gradeOf, makeStimulus, splitLabel, stimulusMs, truthOf } from '../../public/perceptle-math.js';
 
 const INTRO_MS = 4000; // test adı + kural, 3-2-1 (host atlayabilir)
@@ -105,7 +105,10 @@ export default {
   name: 'Algıla',
   minPlayers: 1, // tek kişi de oda açıp başlatabilir
   maxPlayers: 12,
-  defaultSettings: { rules: 'normal', tests: DEFAULT_TESTS },
+  // İstanbul'da Cuma günü kurulan odada varsayılan 🃏 Cuma kuralları (host değiştirebilir). Oda kurulurken okunur.
+  get defaultSettings() {
+    return { rules: isFriday(todayIstanbul()) ? 'friday' : 'normal', tests: DEFAULT_TESTS };
+  },
 
   validateSettings(s) {
     return {

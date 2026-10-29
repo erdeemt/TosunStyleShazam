@@ -17,7 +17,9 @@ const { cleanAnswer } = await import('../../server/perceptle.js');
 
 let srv;
 const all = [];
-before(async () => { srv = await startServer({ timeScale: TS }); });
+const MONDAY = '2026-11-02';
+const FRIDAY = '2026-10-30';
+before(async () => { srv = await startServer({ timeScale: TS, env: { FAKE_TODAY: MONDAY } }); }); // Cuma varsayılanı karışmasın
 after(async () => { all.forEach((b) => b.close()); await srv.stop(); });
 
 async function room(n, settings = {}, prefix = 'Göz') {
@@ -420,4 +422,28 @@ test('paralel odalar: 4 oda aynı anda, uyaranlar odalar arasında farklı, puan
   const gk = await start(r);
   const again = await playAll(r, gk);
   assert.notDeepEqual(again.stimuli[0], results[0].stimuli[0]);
+});
+
+test('varsayılan kurallar: İstanbul Cuma günü kurulan oda 🃏 Cuma, diğer günler Normal; host değiştirebilir', async () => {
+  const fri = await startServer({ timeScale: TS, env: { FAKE_TODAY: FRIDAY } });
+  try {
+    const { bots, host } = await makeRoom(fri.wsUrl, 'perceptle', 2, 'Cum');
+    all.push(...bots);
+    assert.equal(host.room.settings.rules, 'friday');
+    assert.equal(bots[1].room.settings.rules, 'friday');
+    host.send({ t: 'settings', settings: { rules: 'normal' } });
+    await bots[1].waitRoom((x) => x.settings.rules === 'normal');
+    host.send({ t: 'settings', settings: { rules: 'friday' } });
+    await host.waitRoom((x) => x.settings.rules === 'friday');
+    host.send({ t: 'start' });
+    const v = await host.waitView((x) => x.phase === 'intro');
+    assert.equal(v.friday, true);
+  } finally {
+    await fri.stop();
+  }
+  const { bots, host } = await makeRoom(srv.wsUrl, 'perceptle', 1, 'Pzt');
+  all.push(...bots);
+  assert.equal(host.room.settings.rules, 'normal', 'Pazartesi varsayılan Normal');
+  host.send({ t: 'settings', settings: { rules: 'friday' } });
+  await host.waitRoom((x) => x.settings.rules === 'friday');
 });

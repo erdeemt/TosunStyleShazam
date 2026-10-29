@@ -395,7 +395,7 @@ Bilinçli sınırlama: uyaran (nokta listesi, atış parametreleri) istemciye gi
 
 **Çok oyunculu (lobi, 2026-10-29)** — sunucu `server/games/perceptle.js`, istemci `public/games/perceptle-lobby.js`
 (test ekranları yine `perceptle-tests.js`; `perceptle.js` `enter('multi')` ile lobiye geçer). 1–12 kişi (tek kişi de başlatabilir).
-Ayarlar (host): `rules: 'normal'|'friday'` (varsayılan normal), `tests`: virgüllü test listesi (varsayılan hepsi; en az 1, sıra hep
+Ayarlar (host): `rules: 'normal'|'friday'` (varsayılan: oda İstanbul'da Cuma günü kurulursa 🃏 Cuma, yoksa Normal; host değiştirir), `tests`: virgüllü test listesi (varsayılan hepsi; en az 1, sıra hep
 Say, Yörünge, Açı, Ritim, Böl; bilinmeyen/boş → hepsi). Uyaranlar oyun başında **kripto RNG** ile (oda tohumu değil), herkese aynı.
 Her test fazları (isimli zamanlayıcılar, `TIME_SCALE` ile ölçekli):
 `intro` (ad + kural, 4 sn geri sayım; host `go` ile atlar) → `play` (uyaran **ilk kez burada**; `startAt = şimdi + 0.7 sn`
@@ -413,7 +413,9 @@ hemen biter) → `reveal` (gerçek değer, herkesin cevabı ve puanı, eşit pua
 - Oyun ortası katılan izleyicidir (intro/açıklama/final görür, cevap veremez). Ayrılan oyuncu kalan testlerden 0 alır ve
   sıralamadan düşer; kalanların hepsi cevapladıysa test hemen biter; kimse kalmazsa oyun biter.
 - İstemci: girdi düğümü (sürükleme/yazı) aynı görünüm anahtarında korunur (`patchGame` + aynı-öğe önbelleği); süre dolunca
-  dokunulmuş son değer otomatik gönderilir; ses kapalıysa Ritim'de "🔊 Sesi aç".
+  dokunulmuş son değer otomatik gönderilir; ses kapalıysa Ritim introsunda "🔊 Sesi aç", ritim başladığında hâlâ kapalıysa
+  pedde "🔇 Ses kapalı — dokun". Gönderilen cevap 1.5 sn içinde (ya da yeniden bağlanınca) onaylanmazsa bir kez kendiliğinden
+  yeniden gönderilir, o da tutmazsa Kilitle tekrar açılır. Host değişince (intro/açıklama) yeni hostun düğmeleri hemen görünür.
 - Testler: `tests/swarm/perceptle-lobby.test.mjs`, `tests/e2e/perceptle-lobby.test.mjs` (ekranlar `test-results/perceptle-lobby/`).
 
 ### 4.8 Sonraki aşamalar (P2 kalanı – P4)

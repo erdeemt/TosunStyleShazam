@@ -274,3 +274,52 @@ test('2 telefon: tek test (Böl), beraberlik, geç katılan izleyici, tek oyuncu
   assert.equal(await a.page.locator('#game-perceptle .lobby-code, #game-perceptle .code-input').count(), 0, 'lobi ekranı kalmamalı');
   for (const p of [a, b, c]) assert.deepEqual(p.errors, [], `${p.name} konsol hatası`);
 });
+
+test('kaybolan cevap: bir kez kendiliğinden yeniden gönderilir; o da kaybolursa Kilitle tekrar açılır ve cevap sayılır', async () => {
+  const p = await phone('Deniz');
+  await p.page.click('text=Yeni oda kur');
+  await p.page.waitForSelector('.lobby-code');
+  for (const t of ['Say', 'Yörünge', 'Ritim']) await p.page.click(`.pl-test:has-text("${t}")`);
+  await p.page.waitForSelector('#game-perceptle .settings:has-text("Testler: 2 / 5")');
+  // Sonraki n "answer" mesajını ağa hiç çıkarmadan düşür (bağlantı kopmuş gibi)
+  const dropAnswers = (n) => p.page.evaluate((k) => {
+    window.__drop = k;
+    if (window.__patched) return;
+    window.__patched = true;
+    const orig = WebSocket.prototype.send;
+    WebSocket.prototype.send = function send(data) {
+      if (window.__drop > 0 && String(data).includes('"type":"answer"')) { window.__drop--; return; }
+      return orig.call(this, data);
+    };
+  }, n);
+  await p.page.click('#game-perceptle button:has-text("Oyunu başlat")');
+
+  // 1) Açı: ilk gönderim kaybolur, otomatik yeniden gönderim tutar
+  await hostGo(p, [p]);
+  await p.page.waitForSelector('.pc-dial');
+  const target = (await stimOf(p, 0)).target;
+  await dropAnswers(1);
+  const db = await box(p.page, '.pc-dial');
+  const rad = (target * Math.PI) / 180;
+  await p.page.touchscreen.tap(db.x + db.width / 2 + Math.cos(rad) * db.width * 0.4, db.y + db.height / 2 - Math.sin(rad) * db.width * 0.4);
+  await p.page.click('.pc-lock');
+  await waitReveal([p], 8000);
+  assert.ok(await myScore(p.page) >= 90, `yeniden gönderilen açı sayılmalı (${await myScore(p.page)})`);
+  await p.page.click('button:has-text("Sonraki test")');
+
+  // 2) Böl: iki gönderim de kaybolur → Kilitle açılır, tekrar basınca sayılır
+  await hostGo(p, [p]);
+  await p.page.waitForSelector('.pc-line');
+  const v = splitValue(await stimOf(p, 1));
+  await dropAnswers(2);
+  const sb = await box(p.page, '.pc-line');
+  await p.page.touchscreen.tap(sb.x + sb.width * (0.08 + 0.84 * v), sb.y + sb.height / 2);
+  await p.page.click('.pc-lock');
+  assert.equal(await p.page.locator('.pc-lock').isDisabled(), true);
+  await p.page.waitForSelector('.pc-lock:not([disabled])', { timeout: 6000 });
+  await p.page.screenshot({ path: `${SHOTS}30-lock-reopened.png`, fullPage: true });
+  await p.page.click('.pc-lock');
+  await waitReveal([p], 8000);
+  assert.ok(await myScore(p.page) >= 90, `tekrar gönderilen böl sayılmalı (${await myScore(p.page)})`);
+  assert.deepEqual(p.errors, []);
+});

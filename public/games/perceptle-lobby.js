@@ -24,15 +24,19 @@ const lobbyHowTo = () => [
 let root = null;
 let lobby = null;
 let onGesture = null;
+let offStatus = null;
 
-// Oynanan testin canlı ekranı: { key, ui, stage, timers, sent, stim }
+// Oynanan testin canlı ekranı: { key, index, ui, stage, timers, sent, resent, lastAnswer, stim }
 let cur = null;
 // Aynı görünüm anahtarında aynı öğe döner (lobby.js aynı-öğe önbelleği): { key, node }
 let cached = { key: '', node: null };
 let statusSlot = null;
 
 const phaseKey = (v) => `${v.gameKey}:${v.index}:${v.phase}`;
-const fullKey = (v) => `${phaseKey(v)}:${v.me.playing ? 1 : 0}:${v.me.answered ? 1 : 0}`;
+// Host bilgisi de anahtarda: host ayrılınca yeni host "Hemen başla"/"Sonraki test" düğmelerini görsün.
+// (Girdi düğümü phaseKey'e bağlı; host değişse de oynanan test ekranı korunur.)
+const fullKey = (v, ctx) => `${phaseKey(v)}:${v.me.playing ? 1 : 0}:${v.me.answered ? 1 : 0}:${ctx.isHost ? 1 : 0}`;
+const RESEND_CHECK_MS = 1500;
 
 function stopPlay() {
   if (!cur) return;
@@ -185,14 +189,25 @@ function ensurePlay(view, ctx) {
   const recallLocal = view.recallAt - ctx.serverOffset;
   const endsLocal = view.endsAt - ctx.serverOffset;
   const stage = el('div', { class: 'pl-stage' });
-  const c = { key, ui: null, stage, timers: [], sent: false, stim: view.stimulus };
+  const c = { key, index: view.index, ui: null, stage, timers: [], sent: false, resent: false, lastAnswer: undefined, stim: view.stimulus };
   cur = c;
   const later = (fn, ms) => c.timers.push(setTimeout(fn, Math.max(0, ms)));
   const submit = (answer) => {
     if (c.sent || cur !== c) return;
     c.sent = true;
+    c.lastAnswer = answer;
     net.action({ type: 'answer', index: view.index, answer });
+    c.check = () => verifySent(c);
+    later(c.check, RESEND_CHECK_MS);
   };
+  c.submit = submit;
+  // Kilit açıldıktan sonra (cevap kayboldu/reddedildi) Kilitle tekrar gönderebilsin: testin kendi düğmesi
+  // bir kez gönderdikten sonra susar (ör. açı), o yüzden tıklamayı burada da yakala.
+  stage.addEventListener('click', (e) => {
+    if (!e.target.closest?.('.pc-lock') || c.sent) return;
+    const v = c.ui?.value?.();
+    setTimeout(() => submit(v != null ? v : c.lastAnswer), 0);
+  });
   const make = () => {
     if (cur !== c) return;
     const now = Date.now();
@@ -212,6 +227,7 @@ function ensurePlay(view, ctx) {
       submit,
     });
     stage.replaceChildren(c.ui.node);
+    if (test === 'tempo') mutedHint(c.ui.node);
   };
   const wait = startLocal - Date.now();
   if (wait > 0) {
@@ -224,6 +240,44 @@ function ensurePlay(view, ctx) {
   // Süre dolunca son hâlin otomatik gider (sunucu 2 sn daha bekler). Ritim kendi bitince gönderir.
   if (test !== 'tempo') later(() => { const v = c.ui?.value?.(); if (v != null) submit(v); }, endsLocal - Date.now() - 150);
   return c;
+}
+
+// Gönderilen cevap sunucuya ulaşmadı ya da reddedildi mi? (görünüm hâlâ "cevaplamadın" diyor)
+// Bir kez kendiliğinden yeniden gönderilir; o da tutmazsa Kilitle tekrar açılır.
+function verifySent(c) {
+  const v = net.view;
+  if (cur !== c || !c.sent || !v || phaseKey(v) !== c.key || v.me.answered) return;
+  if (!c.resent && c.lastAnswer !== undefined) {
+    c.resent = true;
+    net.action({ type: 'answer', index: c.index, answer: c.lastAnswer });
+    c.timers.push(setTimeout(() => verifySent(c), RESEND_CHECK_MS));
+    return;
+  }
+  c.sent = false;
+  for (const b of c.stage.querySelectorAll('.pc-lock')) b.disabled = false;
+}
+
+// Yeniden bağlanınca (welcome) gönderilmiş ama onaylanmamış cevabı tekrar dene.
+function onStatus(s) {
+  if (!s?.connected || !cur?.sent) return;
+  const c = cur;
+  c.resent = false;
+  c.timers.push(setTimeout(() => verifySent(c), 600));
+}
+
+// Ritim başladığında ses hâlâ kilitliyse pedin üstünde ipucu: dokununca ses açılır.
+function mutedHint(node) {
+  unlockAudio();
+  setTimeout(() => {
+    if (audioReady() || !node.isConnected) return;
+    const pad = node.querySelector('.pc-pad');
+    const hint = el('button', {
+      type: 'button',
+      class: 'pl-muted',
+      onclick: () => { unlockAudio(); setTimeout(() => { if (audioReady()) hint.remove(); }, 60); },
+    }, '🔇 Ses kapalı — dokun');
+    (pad ?? node).before(hint);
+  }, 120);
 }
 
 function playScreen(view, ctx, endsLocal) {
@@ -316,7 +370,7 @@ function overScreen(view, ctx) {
 }
 
 function renderGame(view, ctx) {
-  const key = fullKey(view);
+  const key = fullKey(view, ctx);
   if (cached.key === key && cached.node) {
     // Aynı faz: sadece durum listesini yenile, girdi düğümü aynı kalsın.
     if (statusSlot) statusSlot.replaceChildren(statusList(view, ctx));
@@ -336,7 +390,7 @@ function renderGame(view, ctx) {
 
 // Yerinde güncelleme: test sürerken başkası cevap verince ekranı baştan çizme.
 function patchGame(view, ctx) {
-  if (fullKey(view) !== cached.key || !statusSlot?.isConnected) return false;
+  if (fullKey(view, ctx) !== cached.key || !statusSlot?.isConnected) return false;
   statusSlot.replaceChildren(statusList(view, ctx));
   return true;
 }
@@ -349,6 +403,7 @@ export function enterLobby(node) {
   onGesture = () => unlockAudio();
   root.addEventListener('pointerdown', onGesture, true);
   root.addEventListener('keydown', onGesture, true);
+  offStatus = net.on('status', onStatus);
   lobby = mountLobby(root, {
     id: 'perceptle',
     name: 'Algıla',
@@ -361,6 +416,8 @@ export function enterLobby(node) {
 }
 
 export function leaveLobby() {
+  offStatus?.();
+  offStatus = null;
   stopPlay();
   cached = { key: '', node: null };
   statusSlot = null;
