@@ -5,6 +5,7 @@ import vampir from './vampir.js';
 import nuance from './nuance.js';
 import tone from './tone.js';
 import shazam from './shazam.js';
+import haxball from './haxball.js';
 import perceptle from './perceptle.js';
 
 export const GAMES = {
@@ -13,6 +14,7 @@ export const GAMES = {
   [nuance.id]: nuance,
   [tone.id]: tone,
   [shazam.id]: shazam,
+  [haxball.id]: haxball,
   [perceptle.id]: perceptle,
 };
 

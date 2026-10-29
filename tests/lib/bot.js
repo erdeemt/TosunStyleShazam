@@ -17,6 +17,13 @@ export class Bot {
     this.closed = null;
     this.taps = []; // her gelen mesajda çağrılır: (msg, bot) => void (değişmez/invariant kontrolleri için)
     this.connections = 0; // kaçıncı bağlantı; yeniden bağlanınca artar
+    // Gerçek zamanlı oyunlar: kareler (t:'frame') messages'a girmez (bellek), sadece son kare + sayaç tutulur.
+    this.frame = null;
+    this.frameCount = 0;
+    this.frameMaxBytes = 0;
+    this.frameWaiters = [];
+    this.keepFrames = false;
+    this.latency = 0; // ms, tek yön: >0 ise gelen ve giden her mesaj bu kadar geciktirilir (yapay ağ gecikmesi)
   }
 
   get isOpen() {
@@ -30,7 +37,10 @@ export class Bot {
     this.connections++;
     this.connectIndex = this.messages.length; // bu bağlantıdan sonra gelen ilk mesajın sırası (bayat görünüm ayırt etmek için)
     // Eski (kopmuş) soketten geç gelen mesaj/kapanış yeni bağlantının durumunu bozmasın.
-    ws.on('message', (data) => { if (this.ws === ws) this.#onMessage(JSON.parse(String(data)), data.length); });
+    ws.on('message', (data) => {
+      const handle = () => { if (this.ws === ws) this.#onMessage(JSON.parse(String(data)), data.length); };
+      if (this.latency > 0) setTimeout(handle, this.latency); else handle();
+    });
     ws.on('close', (code, reason) => { if (this.ws !== ws) return; this.closed = { code, reason: String(reason) }; this.#check(); });
     ws.on('error', () => {});
     await new Promise((resolve, reject) => {
@@ -49,6 +59,17 @@ export class Bot {
   #onMessage(msg, bytes) {
     msg.receivedAt = Date.now();
     msg.bytes = bytes; // ham mesaj boyutu (yan kanal ölçümleri için)
+    if (msg.t === 'frame') {
+      this.frame = msg;
+      this.frameCount++;
+      if (bytes > this.frameMaxBytes) this.frameMaxBytes = bytes;
+      this.frameWaiters = this.frameWaiters.filter((w) => {
+        if (!w.pred(msg)) return true;
+        clearTimeout(w.timer); w.resolve(msg); return false;
+      });
+      for (const tap of this.taps) tap(msg, this);
+      if (!this.keepFrames) return;
+    }
     this.messages.push(msg);
     if (msg.t === 'room') this.room = msg.room;
     if (msg.t === 'view') this.view = msg.view;
@@ -104,8 +125,30 @@ export class Bot {
   // Bağlantı açık değilse sessizce düşer (kaos testlerinde kopuk bot da eylem denemeye devam eder).
   sendRaw(obj) {
     if (!this.isOpen) return false;
-    this.ws.send(typeof obj === 'string' ? obj : JSON.stringify(obj));
+    const data = typeof obj === 'string' ? obj : JSON.stringify(obj);
+    if (this.latency > 0) {
+      const ws = this.ws;
+      setTimeout(() => { if (ws.readyState === 1) ws.send(data); }, this.latency);
+    } else this.ws.send(data);
     return true;
+  }
+
+  // Gerçek zamanlı girdi (Tosun Top): yön + şut.
+  input(x, y, k = false) {
+    return this.sendRaw({ t: 'input', x, y, k: k ? 1 : 0 });
+  }
+
+  // Koşulu sağlayan bir sonraki kareyi bekler (mevcut kare uyuyorsa hemen döner).
+  waitFrame(pred = () => true, { timeout = 5000 } = {}) {
+    if (this.frame && pred(this.frame)) return Promise.resolve(this.frame);
+    return new Promise((resolve, reject) => {
+      const w = { pred, resolve };
+      w.timer = setTimeout(() => {
+        this.frameWaiters = this.frameWaiters.filter((x) => x !== w);
+        reject(new Error(`${this.name}: kare beklenirken zaman aşımı`));
+      }, timeout);
+      this.frameWaiters.push(w);
+    });
   }
 
   send(obj) {
@@ -167,6 +210,8 @@ export class Bot {
   close() {
     this.waiters.forEach((w) => clearTimeout(w.timer));
     this.waiters = [];
+    this.frameWaiters.forEach((w) => clearTimeout(w.timer));
+    this.frameWaiters = [];
     this.ws?.terminate();
   }
 

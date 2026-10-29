@@ -3,7 +3,7 @@ import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { attachLobby, resolveIdentity, verifyIdentity } from './server/lobby.js';
+import { attachLobby, resolveIdentity, verifyIdentity, stats as lobbyStats } from './server/lobby.js';
 import * as wordle from './server/wordle.js';
 import * as recall from './server/recall.js';
 import * as perceptle from './server/perceptle.js';
@@ -306,6 +306,10 @@ async function handleApi(url, res, req) {
     if (endpoint === 'test') return sendJson(res, 200, perceptle.startTest(identity, mode, body.gameId, body.index));
     if (endpoint === 'submit') return sendJson(res, 200, perceptle.submitAnswer(identity, mode, body.gameId, body.index, body.answer));
     return sendJson(res, 200, perceptle.leaderboard(perceptle.todayIstanbul(), identity.id));
+  }
+  // Sadece testlerde (TEST_GAMES=1): oda/döngü sayısı + işlemci süresi (sızıntı ve yük testleri için).
+  if (process.env.TEST_GAMES === '1' && url.pathname === '/api/_test/stats') {
+    return sendJson(res, 200, { ...lobbyStats(), cpu: process.cpuUsage(), uptimeMs: Math.round(process.uptime() * 1000), rss: process.memoryUsage().rss });
   }
   switch (url.pathname) {
     // ---------- Kimlik + günlük bulmacalar ----------

@@ -26,6 +26,15 @@ export const LIMITS = {
   emptyRoomMs: 600_000, // herkes kopmuşsa oda bu süre sonra silinir
   idleRoomMs: Number(process.env.ROOM_IDLE_MS) || 2 * 3600_000, // 2 saat hiç mesaj yoksa oda silinir
   hellosPerSocket: 3, // tek bağlantıdan sınırsız kimlik üretilmesin
+  // Gerçek zamanlı oyunlar (PLAN.md §3.7): girdi + ping genel sayaçtan ayrı, saniyede en fazla bu kadar işlenir.
+  fastWindowMs: 1000,
+  fastMaxMessages: 64, // fazlası sessizce düşer
+  fastKillMessages: 600, // pencerede bunu aşan bağlantı kapanır (sel)
+  fastMaxBytes: 256,
+  frameSkipBytes: 32 * 1024, // yavaş sokete kare biriktirme: tampon doluysa kare atlanır (bağlantı kesilmez)
+  maxLoopCatchUp: 8, // takılmadan sonra en fazla bu kadar adım yetişilir
+  maxLiveLoops: 20, // sunucu genelinde aynı anda en fazla bu kadar gerçek zamanlı maç
+  killGraceMs: 200, // hız sınırı aşan bağlantı: kapanış çerçevesi gider, bu kadar sonra soket yok edilir
 };
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPRSTUVYZ';
@@ -44,6 +53,7 @@ function persistIdentity(identity) {
   identityStore.save();
 }
 const rooms = new Map(); // code -> room
+const loops = new Set(); // gerçek zamanlı döngüsü çalışan odalar (testler sızıntı için sayar)
 let roomCounter = 0;
 
 const scaled = (ms) => Math.max(1, Math.round(ms * TIME_SCALE));
@@ -181,7 +191,75 @@ function afterChange(room) {
     room.phase = 'over';
     clearAllTimers(room);
   }
+  if (room.phase === 'playing' && room.state && room.game.realtime) startLoop(room);
+  else stopLoop(room);
   broadcast(room);
+}
+
+// ---------- Gerçek zamanlı döngü (opsiyonel oyun kancası) ----------
+// game.realtime = { hz, sendHz, step(state, ctx) → görünüm değişti mi, frame(state) → herkese aynı kısa kare }.
+// Faz 'playing' iken oda başına tek setInterval; birikimli sabit adım (performance.now) ile hz kez/sn step,
+// sendHz kez/sn kare. Kare bir kez JSON'lanır, tüm soketlere aynı metin gider. Bkz. PLAN.md §3.7.
+
+function startLoop(room) {
+  if (room.loop) return;
+  const rt = room.game.realtime;
+  const stepMs = 1000 / rt.hz;
+  const loop = {
+    handle: null, last: performance.now(), acc: 0, ticks: 0, seq: 0, stepMs,
+    sendEvery: Math.max(1, Math.round(rt.hz / rt.sendHz)),
+    ctx: { timeScale: TIME_SCALE, rng: room.rng, log: (...args) => console.log(`[${room.code}]`, ...args) },
+  };
+  loop.handle = setInterval(() => runLoop(room, loop), Math.max(1, Math.floor(stepMs)));
+  room.loop = loop;
+  loops.add(room);
+}
+
+function stopLoop(room) {
+  if (!room.loop) return;
+  clearInterval(room.loop.handle);
+  room.loop = null;
+  loops.delete(room);
+}
+
+function runLoop(room, loop) {
+  if (rooms.get(room.code) !== room || room.loop !== loop || room.phase !== 'playing' || !room.state) return stopLoop(room);
+  const rt = room.game.realtime;
+  const now = performance.now();
+  loop.acc = Math.min(loop.acc + now - loop.last, loop.stepMs * LIMITS.maxLoopCatchUp);
+  loop.last = now;
+  try {
+    while (loop.acc >= loop.stepMs) {
+      loop.acc -= loop.stepMs;
+      // Görünüm (ör. yeni disk listesi) aynı adımın karesinden ÖNCE gider: istemci yeni sürümü tanısın.
+      if (rt.step(room.state, loop.ctx) || room.game.isOver(room.state)) {
+        afterChange(room);
+        if (room.loop !== loop) return; // maç bitti
+      }
+      if (++loop.ticks % loop.sendEvery === 0) sendFrame(room, loop);
+    }
+  } catch (err) {
+    // Bir kez loglanır; maç "teknik hata" ile biter (oda kilitli kalmaz, host bekleme odasına dönebilir).
+    console.error(`[${room.code}] realtime hatası:`, err);
+    stopLoop(room);
+    try { room.game.abort?.(room.state, err); } catch { /* yok say */ }
+    room.phase = 'over';
+    clearAllTimers(room);
+    broadcast(room);
+  }
+}
+
+function sendFrame(room, loop) {
+  const frame = room.game.realtime.frame(room.state);
+  frame.t = 'frame';
+  frame.s = ++loop.seq;
+  const data = JSON.stringify(frame);
+  for (const p of room.players.values()) {
+    const socket = identities.get(p.id)?.socket;
+    if (!socket || socket.readyState !== 1) continue;
+    if (socket.bufferedAmount > LIMITS.frameSkipBytes) { socket.framesSkipped = (socket.framesSkipped ?? 0) + 1; continue; }
+    socket.send(data);
+  }
 }
 
 function runTick(room, name, token) {
@@ -267,9 +345,20 @@ function reconnect(identity, room) {
   clearTimeout(p.leaveTimer);
   p.leaveTimer = null;
   clearTimeout(room.emptyTimer);
+  if (!wasConnected) notifyConnection(room, p, true);
   // Zaten bağlıysa (ör. tekrar "join") sadece ona gönder: herkese yeniden yayın yapıp trafik çoğaltılmasın.
   if (wasConnected) sendTo(room, p);
   else broadcast(room);
+}
+
+// Opsiyonel oyun kancası: oyun sırasında oyuncunun bağlantısı koptu / geri geldi (ör. Tosun Top diski durdurur).
+function notifyConnection(room, p, connected) {
+  if (!room.state || room.phase !== 'playing' || p.spectator || !room.game.onConnection) return;
+  try {
+    room.game.onConnection(room.state, p.id, connected, makeCtx(room));
+  } catch (err) {
+    console.error(`[${room.code}] onConnection hatası:`, err);
+  }
 }
 
 // Oda sahibi adayı: bağlı oyuncu > bağlı izleyici > herhangi biri; eşitlikte en eski katılan.
@@ -310,6 +399,7 @@ function removePlayer(room, playerId, reason) {
 }
 
 function deleteRoom(room) {
+  stopLoop(room);
   clearAllTimers(room);
   clearTimeout(room.hostTimer);
   clearTimeout(room.emptyTimer);
@@ -329,6 +419,7 @@ function onDisconnect(identity) {
   const p = room.players.get(identity.id);
   if (!p) return;
   p.connected = false;
+  notifyConnection(room, p, false);
   p.leaveTimer = setTimeout(() => removePlayer(room, identity.id, 'timeout'), scaled(LIMITS.seatHoldMs));
   if (room.hostId === identity.id) {
     clearTimeout(room.hostTimer);
@@ -387,13 +478,31 @@ const handlers = {
     room.prep = room.game.prep(room.prep, data);
     broadcast(room);
   },
+  // Bekleme odasında her oyuncunun yapabildiği oyuna özel seçim (ör. Tosun Top takım seçimi). Oyun modülü doğrular
+  // ve yeni prep döner: game.lobbyAction(prep, playerId, data, { isHost, playerIds, rng }).
+  lobbyAction(identity, msg) {
+    const room = requireRoom(identity);
+    if (!room.game.lobbyAction) throw new GameError('Bu oyunda bu işlem yok.');
+    if (room.phase !== 'lobby') throw new GameError('Bu sadece bekleme odasında yapılır.');
+    const data = msg.data && typeof msg.data === 'object' && !Array.isArray(msg.data) ? primitives(msg.data) : {};
+    room.prep = room.game.lobbyAction(room.prep, identity.id, data, {
+      isHost: room.hostId === identity.id, playerIds: [...room.players.keys()], rng: room.rng,
+    });
+    broadcast(room);
+  },
   start(identity) {
     const room = requireRoom(identity);
     requireHost(room, identity);
     if (room.phase !== 'lobby') throw new GameError('Oyun zaten başladı.');
     const players = [...room.players.values()].filter((p) => p.connected).sort((a, b) => a.joinedAt - b.joinedAt);
     if (players.length < room.game.minPlayers) throw new GameError(`Bu oyun için en az ${room.game.minPlayers} kişi gerekli.`);
-    const notReady = room.game.canStart?.(room.prep, room.settings);
+    if (room.game.realtime) {
+      // Gerçek zamanlı maç işlemci yer: sunucu geneli ve oda kuran ağ başına sınır.
+      if (loops.size >= LIMITS.maxLiveLoops) throw new GameError('Sunucuda şu an çok fazla canlı maç var, biraz sonra tekrar dene.');
+      const fromIp = [...loops].filter((r) => r.creatorIp === room.creatorIp).length;
+      if (fromIp >= IP_LIMITS.liveLoopsPerIp) throw new GameError(`Bu ağdan aynı anda en fazla ${IP_LIMITS.liveLoopsPerIp} canlı maç oynanabilir.`);
+    }
+    const notReady = room.game.canStart?.(room.prep, room.settings, [...room.players.values()].map((p) => ({ id: p.id, connected: p.connected })));
     if (notReady) throw new GameError(notReady);
     // Kopuk oyuncular oyuna alınmaz, izleyici olur.
     for (const p of room.players.values()) p.spectator = !p.connected;
@@ -447,6 +556,7 @@ const handlers = {
     // Oyun sürerken host oyunu iptal edemez (ör. asılmak üzere olan vampir host sonucu engelleyemesin).
     if (room.phase === 'playing') throw new GameError('Oyun bitmeden bekleme odasına dönülemez.');
     clearAllTimers(room);
+    stopLoop(room);
     room.state = null;
     room.phase = 'lobby';
     for (const p of room.players.values()) p.spectator = false;
@@ -518,24 +628,92 @@ function pruneIdentities() {
   identityStore.save();
 }
 
-function handleMessage(socket, raw) {
-  // Hız sınırı
+// Hızlı yol: gerçek zamanlı girdi ve ping. Kendi hız sınırı var, görünüm üretmez, hata yanıtı göndermez.
+// Hız sınırını aşan bağlantı: kapanış çerçevesi (1008) gider, kısa süre sonra soket yok edilir. O ana kadar gelen
+// mesajlar hiç ayrıştırılmaz (socket.dead).
+function kill(socket) {
+  if (socket.dead) return;
+  socket.dead = true;
+  clearTimeout(socket.pendingTimer);
+  socket.close(1008, 'rate limit');
+  setTimeout(() => socket.terminate(), LIMITS.killGraceMs);
+}
+
+function playingRoom(identity) {
+  const room = identity?.roomCode && rooms.get(identity.roomCode);
+  return room && room.phase === 'playing' && room.state ? room : null;
+}
+
+function applyInput(socket, msg, now) {
+  const identity = socket.identity;
+  const room = playingRoom(identity);
+  if (!room || !room.game.input) return;
+  const p = room.players.get(identity.id);
+  if (!p || p.spectator) return;
+  room.lastActivity = now;
+  try {
+    room.game.input(room.state, identity.id, msg);
+  } catch (err) {
+    console.error(`[${room.code}] input hatası:`, err);
+  }
+}
+
+function handleFast(socket, msg, now) {
+  if (now - socket.fast.start > LIMITS.fastWindowMs) { socket.fast.start = now; socket.fast.count = 0; }
+  if (++socket.fast.count > LIMITS.fastKillMessages) return kill(socket);
+  const identity = socket.identity;
+  if (!identity) return;
+  if (socket.fast.count > LIMITS.fastMaxMessages) {
+    // Pencere doldu: en yeni girdi bekletilir ve pencere sıfırlanınca uygulanır (yön değişimi kaybolmasın).
+    if (msg.t !== 'input') return;
+    socket.pendingInput = msg;
+    if (!socket.pendingTimer) {
+      socket.pendingTimer = setTimeout(() => {
+        socket.pendingTimer = null;
+        const pending = socket.pendingInput;
+        socket.pendingInput = null;
+        if (!pending || socket.dead || socket.readyState !== 1) return;
+        const t = Date.now();
+        if (t - socket.fast.start > LIMITS.fastWindowMs) { socket.fast.start = t; socket.fast.count = 0; }
+        socket.fast.count++;
+        applyInput(socket, pending, t);
+      }, Math.max(1, socket.fast.start + LIMITS.fastWindowMs - now + 1));
+    }
+    return;
+  }
+  if (msg.t === 'ping') {
+    // Sadece oynanan bir odadayken (gecikme göstergesi); odasız ping yanıtsız düşer.
+    if (playingRoom(identity) && typeof msg.c === 'number' && Number.isFinite(msg.c)) send(socket, { t: 'pong', c: msg.c, now: Date.now() });
+    return;
+  }
+  socket.pendingInput = null; // daha yeni girdi geldi
+  applyInput(socket, msg, now);
+}
+
+// raw: metin, bytes: ham uzunluk (bayt). Kısa mesajlar önce ayrıştırılır (hızlı yol); uzunlar önce hız sınırından geçer.
+function handleMessage(socket, raw, bytes = Buffer.byteLength(raw)) {
+  if (socket.dead) return;
   const now = Date.now();
+  let msg;
+  const parse = () => { try { return JSON.parse(raw); } catch { return undefined; } };
+  const small = bytes <= LIMITS.fastMaxBytes;
+  if (small) {
+    msg = parse();
+    if (msg && (msg.t === 'input' || msg.t === 'ping')) return handleFast(socket, msg, now);
+  }
+
+  // Hız sınırı
   if (now - socket.rate.start > LIMITS.rateWindowMs) socket.rate = { start: now, count: 0, warned: false };
   socket.rate.count++;
-  if (socket.rate.count > LIMITS.rateKillMessages) return socket.close(1008, 'rate limit');
+  if (socket.rate.count > LIMITS.rateKillMessages) return kill(socket);
   if (socket.rate.count > LIMITS.rateMaxMessages) {
     if (!socket.rate.warned) sendError(socket, 'rate', 'Çok hızlı! Biraz yavaşla.');
     socket.rate.warned = true;
     return;
   }
 
-  let msg;
-  try {
-    msg = JSON.parse(raw);
-  } catch {
-    return sendError(socket, 'bad_json', 'Geçersiz mesaj.');
-  }
+  if (!small) msg = parse();
+  if (msg === undefined) return sendError(socket, 'bad_json', 'Geçersiz mesaj.');
   if (!msg || typeof msg !== 'object' || typeof msg.t !== 'string') return sendError(socket, 'bad_msg', 'Geçersiz mesaj.');
 
   if (msg.t === 'hello') return handleHello(socket, msg);
@@ -591,13 +769,16 @@ export function attachLobby(server) {
   wss.on('connection', (socket) => {
     socketsByIp.set(socket.ip, (socketsByIp.get(socket.ip) ?? 0) + 1);
     socket.rate = { start: Date.now(), count: 0, warned: false };
+    socket.fast = { start: Date.now(), count: 0 };
     socket.isAlive = true;
     socket.on('pong', () => { socket.isAlive = true; });
     socket.on('message', (data, isBinary) => {
+      if (socket.dead) return;
       if (isBinary) return socket.close(1003, 'binary');
-      handleMessage(socket, data.toString());
+      handleMessage(socket, data.toString(), data.length);
     });
     socket.on('close', () => {
+      clearTimeout(socket.pendingTimer);
       const n = (socketsByIp.get(socket.ip) ?? 1) - 1;
       if (n > 0) socketsByIp.set(socket.ip, n); else socketsByIp.delete(socket.ip);
       const identity = socket.identity;
@@ -634,5 +815,5 @@ export function attachLobby(server) {
 
 // Testler ve izleme için
 export function stats() {
-  return { rooms: rooms.size, identities: identities.size, timeScale: TIME_SCALE };
+  return { rooms: rooms.size, identities: identities.size, timeScale: TIME_SCALE, loops: loops.size };
 }

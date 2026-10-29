@@ -49,6 +49,14 @@ export const GAMES = [
     load: () => import('./games/perceptle.js'),
   },
   {
+    id: 'haxball',
+    name: 'Tosun Top',
+    icon: '⚽',
+    desc: 'HaxBall gibi gerçek zamanlı futbol',
+    categories: ['multi'],
+    load: () => import('./games/haxball.js'),
+  },
+  {
     id: 'spyfall',
     name: 'Casus Kim?',
     icon: '🕵️',
