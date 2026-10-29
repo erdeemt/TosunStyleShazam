@@ -186,7 +186,7 @@ function lookup(identity, mode, rawGameId, create = false) {
 
 // ---------- Cevap temizliği ----------
 
-function cleanAnswer(test, raw, friday) {
+export function cleanAnswer(test, raw, friday) {
   if (test === 'tempo') {
     if (!Array.isArray(raw) || raw.length > TEMPO.maxTaps) throw new GameError('Geçersiz cevap.');
     const taps = raw.map((v) => {

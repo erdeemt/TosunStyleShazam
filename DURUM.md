@@ -75,3 +75,11 @@ Açık küçük notlar:
   normal Açı'da tek dokunuş göndermez, canvas ölçüsü, 44 px dokunma, touch-action. npm test artık tests/security'yi de çalıştırır.
 - Bilinçli bırakılan: günlük uyaranlar herkese aynı (yan hesapla önizleme mümkün, Wordle gibi).
 - npm test 260/260, npm run e2e 46/46.
+
+## 👁️ Algıla çok oyunculu — game/perceptle-lobby dalında (main'e BİRLEŞTİRİLMEDİ, 2026-10-29)
+
+- Lobili mod: 1–12 kişi, host Normal/🃏 Cuma ve test seçimi yapar; her test intro (4 sn) → play (herkese aynı anda) → açıklama (12 sn) → final.
+  Kurallar PLAN.md §4.7 "Çok oyunculu". Dosyalar: server/games/perceptle.js, public/games/perceptle-lobby.js (+ küçük ekler:
+  perceptle.js enter('multi'), perceptle-tests.js value(), games.js, style.css).
+- Testler: tests/swarm/perceptle-lobby.test.mjs (11), tests/e2e/perceptle-lobby.test.mjs (2). Tek oyunculu değişmedi.
+- Kullanıcı denemeli: telefonlarda eşzamanlılık (özellikle Ritim) ve 30 sn cevap süresi yeterli mi. Sonra main'e merge.

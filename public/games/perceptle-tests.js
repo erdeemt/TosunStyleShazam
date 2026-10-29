@@ -1,5 +1,5 @@
 // 👁️ Algıla — beş testin ekranları (canvas çizimi + girdi). Akış ve sunucu iletişimi perceptle.js'te.
-// Her test: create(opts) → { node, stop() }; opts = { stim, friday, showMs, leadMs, timeScale, submit(answer) }.
+// Her test: create(opts) → { node, stop(), value?() }  (value: şu anki cevap ya da null; lobide süre dolunca otomatik gönderim için); opts = { stim, friday, showMs, leadMs, timeScale, submit(answer) }.
 // stim null olabilir (sayfa test sürerken yenilendi: zamanlı gösterim tekrar edilmez). Kurallar: PLAN.md §4.7.
 import { el } from '../ui.js';
 import { timeBar } from './recall-client.js';
@@ -136,7 +136,8 @@ function countTest({ stim, friday, showMs, timeScale, submit }) {
     st.node, bar,
     el('div', { class: 'pc-answer' }, field),
     lock);
-  return { node, stop() { clearTimeout(timer); cancelAnimationFrame(raf); st.destroy(); } };
+  const value = () => { const v = field.value.replace(/[^0-9]/g, ''); return v && !field.disabled ? Number(v) : null; };
+  return { node, value, stop() { clearTimeout(timer); cancelAnimationFrame(raf); st.destroy(); } };
 }
 
 // ---------- 2. Yörünge ----------
@@ -243,7 +244,8 @@ function trackTest({ stim, friday, showMs, timeScale, submit }) {
     timer = setTimeout(land, showMs);
   } else land();
   const node = el('section', { class: 'card pc-card' }, st.node, lock);
-  return { node, stop() { clearTimeout(timer); cancelAnimationFrame(raf); st.destroy(); } };
+  const value = () => (guess == null ? null : Math.round(guess * 10) / 10);
+  return { node, value, stop() { clearTimeout(timer); cancelAnimationFrame(raf); st.destroy(); } };
 }
 
 // ---------- 3. Açı ----------
@@ -358,7 +360,7 @@ function angleTest({ stim, friday, submit }) {
     st.node,
     el('p', { class: 'pc-note center' }, friday ? 'Tam turlar sayılır — döndürmeye devam et, sonra Kilitle.' : 'Sürükle; bıraktığında kilitlenir.'),
     lock);
-  return { node, stop() { st.destroy(); } };
+  return { node, value: () => (touched ? Math.round(value * 10) / 10 : null), stop() { st.destroy(); } };
 }
 
 // ---------- 4. Ritim ----------
@@ -494,6 +496,7 @@ function splitTest({ stim, friday, submit }) {
   const [lo, hi] = SPLIT_RANGE[friday ? 'friday' : 'normal'];
   let value;
   do value = lo + Math.random() * (hi - lo); while (Math.abs(value - target) < (friday ? 0.25 : 0.15));
+  let touched = false;
   const st = stage('pc-line', 2.2);
   st.setDraw((ctx, w, h) => drawSplit(ctx, w, h, friday, [{ v: value, color: PINK }]));
   st.node.setAttribute('tabindex', '0');
@@ -503,6 +506,7 @@ function splitTest({ stim, friday, submit }) {
     const p = local(st.node, e);
     const { a, len } = splitGeom(p.w, friday);
     value = Math.min(hi, Math.max(lo, (p.x - a) / len));
+    touched = true;
     lock.disabled = false;
     st.paint();
   };
@@ -511,6 +515,7 @@ function splitTest({ stim, friday, submit }) {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
     e.preventDefault();
     value = Math.min(hi, Math.max(lo, value + (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 0.02 : 0.002)));
+    touched = true;
     lock.disabled = false;
     st.paint();
   });
@@ -520,7 +525,7 @@ function splitTest({ stim, friday, submit }) {
     st.node,
     el('p', { class: 'pc-note center' }, friday ? 'Nokta çizginin dışında olabilir — uzantıya da koyabilirsin.' : 'İşaretçiyi kaydır, sonra Kilitle.'),
     lock);
-  return { node, stop() { st.destroy(); } };
+  return { node, value: () => (touched ? Math.round(value * 10000) / 10000 : null), stop() { st.destroy(); } };
 }
 
 export const TEST_UI = { count: countTest, track: trackTest, angle: angleTest, tempo: tempoTest, split: splitTest };

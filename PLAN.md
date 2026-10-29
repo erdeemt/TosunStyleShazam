@@ -345,7 +345,7 @@ herkes gönderince hemen biter) → `reveal` (hedef + herkesin cevabı ve puanı
 
 ### 4.7 👁️ Algıla (günlük algı testi, perceptle.com tarzı) — 2026-10-26
 
-Sadece tek oyunculu (lobi yok). Sunucu `server/perceptle.js`, saf matematik `public/perceptle-math.js` (sunucu ve istemci ortak),
+Tek oyunculu (aşağıda) + lobili çok oyunculu (bölüm sonunda, 2026-10-29). Tek oyunculu sunucu `server/perceptle.js`, saf matematik `public/perceptle-math.js` (sunucu ve istemci ortak),
 istemci `public/games/perceptle.js` (akış) + `public/games/perceptle-tests.js` (beş testin canvas ekranları), tık sesi `tone-audio.js`.
 
 **Puan**: her test `round(100 · e^(−½·(hata/tolerans)²))` (0×tol → 100, 0.5× → 88, 1× → 61, 2× → 14). Sonuç = 5 testin ortalaması
@@ -392,6 +392,31 @@ Uçlar `POST /api/perceptle/<uç>`, gövdede `playerId, token`:
 **Kabul**: uyaran sadece `test` yanıtında, bir kez; sıra atlanamaz; erken cevap reddedilir; puanlar sunucuda (`tests/unit/perceptle.test.mjs`
 formülleri sabitler); 360 px'te yatay kaydırma yok, dokunma hedefleri ≥ 44 px, sürükleme yüzeyleri `touch-action: none`, canvas DPR'ye göre.
 Bilinçli sınırlama: uyaran (nokta listesi, atış parametreleri) istemciye gitmek zorunda — geliştirici araçlarıyla bakan hile yapabilir.
+
+**Çok oyunculu (lobi, 2026-10-29)** — sunucu `server/games/perceptle.js`, istemci `public/games/perceptle-lobby.js`
+(test ekranları yine `perceptle-tests.js`; `perceptle.js` `enter('multi')` ile lobiye geçer). 1–12 kişi (tek kişi de başlatabilir).
+Ayarlar (host): `rules: 'normal'|'friday'` (varsayılan: oda İstanbul'da Cuma günü kurulursa 🃏 Cuma, yoksa Normal; host değiştirir), `tests`: virgüllü test listesi (varsayılan hepsi; en az 1, sıra hep
+Say, Yörünge, Açı, Ritim, Böl; bilinmeyen/boş → hepsi). Uyaranlar oyun başında **kripto RNG** ile (oda tohumu değil), herkese aynı.
+Her test fazları (isimli zamanlayıcılar, `TIME_SCALE` ile ölçekli):
+`intro` (ad + kural, 4 sn geri sayım; host `go` ile atlar) → `play` (uyaran **ilk kez burada**; `startAt = şimdi + 0.7 sn`
+herkes için aynı sunucu anı, istemci `serverOffset` ile yerel saate çevirip animasyonu/vuruşları o an başlatır;
+`recallAt = startAt + gösterim`, `endsAt = recallAt + 30 sn`, sunucu `endsAt + 2 sn`'ye kadar kabul eder; herkes cevaplayınca
+hemen biter) → `reveal` (gerçek değer, herkesin cevabı ve puanı, eşit puan eşit sıra; host `next` ya da 12 sn) → … →
+`over` (ortalama + S–F notu, test başına puan tablosu, beraberlikte "Berabere").
+- Eylemler: `{ type: 'answer', index, answer }`, `{ type: 'go', index }`, `{ type: 'next', index }` (son ikisi sadece host).
+  `index` güncel test değilse ya da faz uymuyorsa **sessizce yok sayılır**. `recallAt − 150 ms` öncesi cevap reddedilir
+  ("Önce gösterim bitmeli"), çift cevap ve bozuk değer hata verir (temizlik tek oyunculudaki `cleanAnswer`), ritim ≤ 40 sayı,
+  ilk duyulur vuruşa göre ölçekli ms; puan `evaluate` ile, Cuma toleransları oda ayarından.
+- Gizli bilgi: uyaran sadece `play`'de ve sadece oyunculara (izleyiciye değil); zamanlı uyaranlar (noktalar, top, tempo)
+  `recallAt` sonrası görünümden çıkar (yeniden bağlanan tekrar görmez; ritimde boş gönderilir). `play`'de başkaları için sadece
+  `answered` (✓); cevaplar ve gerçek değer `history`'de, test bitince.
+- Oyun ortası katılan izleyicidir (intro/açıklama/final görür, cevap veremez). Ayrılan oyuncu kalan testlerden 0 alır ve
+  sıralamadan düşer; kalanların hepsi cevapladıysa test hemen biter; kimse kalmazsa oyun biter.
+- İstemci: girdi düğümü (sürükleme/yazı) aynı görünüm anahtarında korunur (`patchGame` + aynı-öğe önbelleği); süre dolunca
+  dokunulmuş son değer otomatik gönderilir; ses kapalıysa Ritim introsunda "🔊 Sesi aç", ritim başladığında hâlâ kapalıysa
+  pedde "🔇 Ses kapalı — dokun". Gönderilen cevap 1.5 sn içinde (ya da yeniden bağlanınca) onaylanmazsa bir kez kendiliğinden
+  yeniden gönderilir, o da tutmazsa Kilitle tekrar açılır. Host değişince (intro/açıklama) yeni hostun düğmeleri hemen görünür.
+- Testler: `tests/swarm/perceptle-lobby.test.mjs`, `tests/e2e/perceptle-lobby.test.mjs` (ekranlar `test-results/perceptle-lobby/`).
 
 ### 4.8 Sonraki aşamalar (P2 kalanı – P4)
 
