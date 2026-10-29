@@ -855,3 +855,27 @@ body.hx-live { overflow: hidden; }
 }
 /* Yatay telefonda ŞUT sağ boşlukta dursun, kaleyi örtmesin: saha sola kayar */
 @media (orientation: landscape) { .hx.touch.player .hx-canvas-wrap { padding: 0 132px 0 6px; } }
+/* ---------- 👁️ Algıla lobi ---------- */
+.pl-count { font-size: 56px; font-weight: 900; color: var(--accent2); line-height: 1; margin: 4px 0 12px; font-variant-numeric: tabular-nums; }
+.pl-tests { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; margin: 8px 0 4px; }
+.pl-test {
+  min-height: 44px; padding: 8px; border-radius: 12px; border: 2px solid var(--line); background: var(--bg);
+  color: var(--muted); font: inherit; font-weight: 700; cursor: pointer;
+}
+.pl-test.active { border-color: var(--accent2); background: #ffb5471a; color: var(--text); }
+.pl-sound { width: 100%; margin-bottom: 8px; }
+.pl-truth { margin: 0 0 8px; }
+.pl-rank .pc-row-score { font-size: 20px; min-width: 0; }
+.pl-final li { display: grid; grid-template-columns: auto 1fr auto auto; gap: 10px; }
+.pl-grade { font-weight: 900; font-size: 20px; min-width: 28px; text-align: center; color: var(--accent2); }
+.pl-grade.g-S { color: #fff6c2; }
+.pl-grade.g-D, .pl-grade.g-F { color: var(--muted); }
+.pl-table { width: 100%; border-collapse: collapse; font-size: 14px; table-layout: fixed; }
+.pl-table th, .pl-table td { padding: 6px 2px; text-align: center; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.pl-table th:first-child, .pl-table td:first-child { text-align: left; width: 34%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-table td.pc-row-score { font-size: 15px; min-width: 0; }
+.pl-table tr.me td:first-child { color: var(--accent2); }
+.pl-muted {
+  min-height: 44px; padding: 8px 14px; border-radius: 999px; border: 2px dashed var(--bad); background: var(--bg);
+  color: var(--text); font: inherit; font-weight: 800; cursor: pointer;
+}

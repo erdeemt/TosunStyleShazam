@@ -6,6 +6,7 @@ import nuance from './nuance.js';
 import tone from './tone.js';
 import shazam from './shazam.js';
 import haxball from './haxball.js';
+import perceptle from './perceptle.js';
 
 export const GAMES = {
   [spyfall.id]: spyfall,
@@ -14,6 +15,7 @@ export const GAMES = {
   [tone.id]: tone,
   [shazam.id]: shazam,
   [haxball.id]: haxball,
+  [perceptle.id]: perceptle,
 };
 
 // Lobi altyapısını gerçek oyunlardan bağımsız test etmek için; sadece TEST_GAMES=1 iken açık.

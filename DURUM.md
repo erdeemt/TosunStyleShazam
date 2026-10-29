@@ -56,7 +56,7 @@ Açık küçük notlar:
   Kurallar ve sabitler PLAN.md §4.7. Dosyalar: server/perceptle.js, public/perceptle-math.js, public/games/perceptle(-tests).js.
 - Testler: tests/unit/perceptle.test.mjs, tests/swarm/perceptle-api.test.mjs, tests/security/sec-perceptle-forgery.test.mjs,
   tests/e2e/perceptle.test.mjs (ekran görüntüleri test-results/perceptle/).
-- Kullanıcı denemeli: özellikle Ritim (telefon ses gecikmesi; ısınma kalibrasyonu) ve Cuma açı sarımı. Sonra main'e merge.
+- Kullanıcı denemeli: özellikle Ritim (telefon ses gecikmesi; ısınma kalibrasyonu) ve Cuma açı sarımı.
 
 ## Sıradaki adımlar
 
@@ -76,7 +76,7 @@ Açık küçük notlar:
 - Bilinçli bırakılan: günlük uyaranlar herkese aynı (yan hesapla önizleme mümkün, Wordle gibi).
 - npm test 260/260, npm run e2e 46/46.
 
-## ⚽ Tosun Top — game/haxball dalında (main'e BİRLEŞTİRİLMEDİ, 2026-10-29)
+## ⚽ Tosun Top — main'e merge + push edildi (2026-10-29)
 
 - HaxBall tarzı gerçek zamanlı futbol, sadece lobili (2–8 kişi, 1'e 1 olur). Kurallar, fizik sabitleri ve ağ tasarımı
   PLAN.md §4.8; lobi çekirdeğine eklenen genel kancalar §3.7 (`realtime` döngüsü, hızlı `input`/`ping` yolu, `frame` mesajı,
@@ -91,4 +91,11 @@ Açık küçük notlar:
 - İstemci: uyarlanabilir ara değer (50–150 ms) + kendi disk tahmini (topa yakınken ara değerli konuma geçer). RTT 150'de
   tuş→ekran 318 → ~50 ms. Dikeyde saha döner (~2 kat büyük), ŞUT sağ boşlukta, "Bağlantı koptu" bandı.
 - Ajan testleri: tests/security/sec-haxball-dos, tests/swarm/swarm-haxball-{core,rules,abuse,load}, tests/e2e/qa-haxball-{play,net}.
-- Kullanıcı tünel üzerinden telefonla denemeli (özellikle tahmin hissi; `localStorage['tss:hx-predict']='0'` ile kapatılabilir). Sonra main'e merge.
+- Kullanıcı tünel üzerinden telefonla denemeli (özellikle tahmin hissi; `localStorage['tss:hx-predict']='0'` ile kapatılabilir).
+## 👁️ Algıla çok oyunculu — main'e merge + push edildi (2026-10-29)
+
+- Lobili mod: 1–12 kişi, host Normal/🃏 Cuma ve test seçimi yapar; her test intro (4 sn) → play (herkese aynı anda) → açıklama (12 sn) → final.
+  Kurallar PLAN.md §4.7 "Çok oyunculu". Dosyalar: server/games/perceptle.js, public/games/perceptle-lobby.js (+ küçük ekler:
+  perceptle.js enter('multi'), perceptle-tests.js value(), games.js, style.css).
+- Testler: tests/swarm/perceptle-lobby.test.mjs (11), tests/e2e/perceptle-lobby.test.mjs (2). Tek oyunculu değişmedi.
+- Kullanıcı denemeli: telefonlarda eşzamanlılık (özellikle Ritim) ve 30 sn cevap süresi yeterli mi.

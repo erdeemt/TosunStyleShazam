@@ -1,16 +1,17 @@
-// 👁️ Algıla — günlük algı testi (perceptle.com tarzı), sadece tek oyunculu. Beş test sırayla:
+// 👁️ Algıla — günlük algı testi (perceptle.com tarzı). Tek oyunculu akış burada; çok oyunculu (lobi) perceptle-lobby.js. Beş test sırayla:
 // 🔢 Say, ☄️ Yörünge, 📐 Açı, 🥁 Ritim, ✂️ Böl. Puanı sunucu hesaplar (server/perceptle.js). Kurallar: PLAN.md §4.7.
 import { net } from '../net.js';
 import { $, el, toast } from '../ui.js';
 import { TESTS, gradeOf, squareOf } from '../perceptle-math.js';
 import { TEST_UI, revealView } from './perceptle-tests.js';
 import { unlockAudio } from './tone-audio.js';
+import { enterLobby, leaveLobby } from './perceptle-lobby.js';
 
 const MODE_KEY = 'tss:perceptle-mode';
 const RULES_KEY = 'tss:perceptle-rules';
 const base = '/api/perceptle';
 
-const META = {
+export const META = {
   count: {
     icon: '🔢', name: 'Say',
     normal: 'Noktalar 2 saniye görünecek. Kaç tane olduklarını tahmin et.',
@@ -38,7 +39,7 @@ const META = {
   },
 };
 
-const HOW_TO = [
+export const HOW_TO = [
   'Beş kısa algı testi, hep aynı sırayla: 🔢 Say, ☄️ Yörünge, 📐 Açı, 🥁 Ritim, ✂️ Böl.',
   '🔢 Say: noktalar 2 saniye görünür; kaç tane olduklarını tahmin et.',
   '☄️ Yörünge: topun yayını izle; kaybolunca yere nereye düşeceğine dokun.',
@@ -55,7 +56,7 @@ const fmt = (v, d = 0) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString('tr
 const pct = (e) => `%${fmt(e * 100)} hata`;
 const signed = (v) => `${v > 0 ? '+' : v < 0 ? '−' : '±'}${Math.abs(Math.round(v))}`;
 
-function detailText(p) {
+export function detailText(p) {
   if (p.timedOut || p.answer == null) return 'Süre doldu';
   switch (p.test) {
     case 'count': return `Gerçek ${p.truth} · Sen ${p.answer} · ${pct(p.error)}`;
@@ -69,7 +70,7 @@ function detailText(p) {
   }
 }
 
-const scoreClass = (s) => (s >= 85 ? 'good' : s >= 55 ? 'mid' : 'bad');
+export const scoreClass = (s) => (s >= 85 ? 'good' : s >= 55 ? 'mid' : 'bad');
 
 function shareText(g) {
   const head = g.mode === 'daily'
@@ -464,16 +465,26 @@ function render() {
     inRun ? null : howToBox(phase === 'ready' || phase === 'setup')));
 }
 
-export function enter() {
+export function enter(category) {
+  // Aynı oyun başka kategoriden açılırsa shell leave() çağırmaz; önce eskisini temizle.
+  leaveLobby();
   root = $('game-perceptle');
   loadSeq++;
   resetRun();
+  if (category === 'multi') {
+    const node = root;
+    root = null; // tek oyunculu çizim devre dışı
+    node.replaceChildren();
+    enterLobby(node);
+    return;
+  }
   try { mode = localStorage.getItem(MODE_KEY) === 'free' ? 'free' : 'daily'; } catch { mode = 'daily'; }
   try { rules = localStorage.getItem(RULES_KEY) === 'friday' ? 'friday' : 'normal'; } catch { rules = 'normal'; }
   load(mode);
 }
 
 export function leave() {
+  leaveLobby();
   loadSeq++;
   resetRun();
   root?.replaceChildren();
