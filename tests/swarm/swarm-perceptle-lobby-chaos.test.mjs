@@ -4,6 +4,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startServer } from '../lib/server.js';
+const MONDAY = '2026-11-02'; // Pazartesi: Cuma varsayılanı (gerçek Cuma günü) testleri etkilemesin
 import { Bot, makeRoom, sleep } from '../lib/bot.js';
 import { TESTS, finalScore, gradeOf, trackLanding, splitValue } from '../../public/perceptle-math.js';
 
@@ -11,7 +12,7 @@ const TS = 0.15; // intro 600 ms, cevap 4.5 sn, grace 300 ms, açıklama 1.8 sn
 const GRACE = 2000 * TS;
 let srv;
 const all = [];
-before(async () => { srv = await startServer({ timeScale: TS }); });
+before(async () => { srv = await startServer({ timeScale: TS, env: { FAKE_TODAY: MONDAY } }); });
 after(async () => { all.forEach((b) => b.close()); await srv.stop(); });
 
 async function room(n, settings = {}, prefix = 'K') {
@@ -271,7 +272,7 @@ const BAD = {
 
 test('bozuk cevaplar (her test türü): reddedilir, test tüketilmez, sonra geçerli cevap kabul', async () => {
   // Ayrı, yavaş sunucu: 15 bozuk cevap hız sınırına takılmadan cevap süresine sığsın (cevap 12 sn).
-  const slow = await startServer({ timeScale: 0.4 });
+  const slow = await startServer({ timeScale: 0.4, env: { FAKE_TODAY: MONDAY } });
   const { bots: [a] } = await makeRoom(slow.wsUrl, 'perceptle', 1, 'Bz');
   all.push(a);
   a.send({ t: 'settings', settings: { rules: 'friday' } });

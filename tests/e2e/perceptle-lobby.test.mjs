@@ -7,6 +7,7 @@ import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 import { startServer } from '../lib/server.js';
+const MONDAY = '2026-11-02'; // Pazartesi: Cuma varsayılanı (gerçek Cuma günü) testleri etkilemesin
 import { tempoExpected, trackLanding, splitValue } from '../../public/perceptle-math.js';
 
 const SHOTS = fileURLToPath(new URL('../../test-results/perceptle-lobby/', import.meta.url));
@@ -16,7 +17,7 @@ let quietBrowser; // sesi kendiliğinden açmayan tarayıcı (davet linkinden ge
 
 before(async () => {
   mkdirSync(SHOTS, { recursive: true });
-  srv = await startServer({ timeScale: 1 });
+  srv = await startServer({ timeScale: 1, env: { FAKE_TODAY: MONDAY } });
   browser = await chromium.launch({ channel: 'chrome', args: ['--autoplay-policy=no-user-gesture-required'] });
   quietBrowser = await chromium.launch({ channel: 'chrome' });
 });

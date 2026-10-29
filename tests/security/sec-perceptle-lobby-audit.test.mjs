@@ -4,6 +4,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startServer } from '../lib/server.js';
+const MONDAY = '2026-11-02'; // Pazartesi: Cuma varsayılanı (gerçek Cuma günü) testleri etkilemesin
 import { Bot, makeRoom, sleep } from '../lib/bot.js';
 import { TESTS, TEMPO, evaluate, makeStimulus, trackLanding } from '../../public/perceptle-math.js';
 import { cryptoRng } from '../../server/rng.js';
@@ -11,7 +12,7 @@ import { cryptoRng } from '../../server/rng.js';
 const TS = 0.15;
 let srv;
 const all = [];
-before(async () => { srv = await startServer({ timeScale: TS }); });
+before(async () => { srv = await startServer({ timeScale: TS, env: { FAKE_TODAY: MONDAY } }); });
 after(async () => { all.forEach((b) => b.close()); await srv.stop(); });
 
 const untilServer = async (t) => { const w = t - Date.now(); if (w > 0) await sleep(w); };
