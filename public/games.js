@@ -45,7 +45,7 @@ export const GAMES = [
     name: 'Algıla',
     icon: '👁️',
     desc: 'Beş kısa algı testi: say, kestir, ritim tut',
-    categories: ['single'],
+    categories: ['single', 'multi'],
     load: () => import('./games/perceptle.js'),
   },
   {
