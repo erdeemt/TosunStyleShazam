@@ -76,6 +76,15 @@ async function shownHex(page) {
   });
 }
 const near = (a, b, tol = 2) => [1, 3, 5].every((i) => Math.abs(parseInt(a.slice(i, i + 2), 16) - parseInt(b.slice(i, i + 2), 16)) <= tol);
+// Sayfa açılınca günlük /start da gelir: sınırsız oyunun kimliği (yanıt gövdesi olaydan biraz sonra gelir)
+async function freeGameId(p, path) {
+  for (let k = 0; k < 200; k++) {
+    const hit = p.net.filter((x) => x.path === path).map((x) => JSON.parse(x.text)).find((j) => j.mode === 'free');
+    if (hit) return hit.gameId;
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  throw new Error(`${path}: sınırsız oyun yok`);
+}
 const until = (p, at) => p.net.filter((x) => x.at < at).map((x) => x.text).join('\n').toLowerCase();
 
 test('Nüans tek oyunculu: hedef görsel olarak gelir, hex ağda yok, sonuçta kesin hex', async () => {
@@ -85,7 +94,7 @@ test('Nüans tek oyunculu: hedef görsel olarak gelir, hex ağda yok, sonuçta k
   await page.click('.rc-diff:has-text("Uzman")');
   await page.click('.rc-go');
   await page.waitForSelector('.nu-target.nu-img');
-  const gameId = JSON.parse(p.net.find((x) => x.path === '/api/recall/nuance/start').text).gameId;
+  const gameId = await freeGameId(p, '/api/recall/nuance/start');
   const target = (await secret(srv, { recall: 'nuance', gameId })).targets[0];
   const shown = await shownHex(page);
   assert.ok(near(shown, target), `görsel ${shown} ≠ hedef ${target}`);
@@ -133,7 +142,7 @@ test('Ton Avı Zor tek oyunculu: WAV çalar (osilatör değil), Hz ağda yok; lo
   await page.click('.rc-diff:has-text("Zor")');
   await page.click('.rc-go');
   await page.waitForSelector('.tn-orb');
-  const gameId = JSON.parse(p.net.find((x) => x.path === '/api/recall/tone/start').text).gameId;
+  const gameId = await freeGameId(p, '/api/recall/tone/start');
   const target = (await secret(srv, { recall: 'tone', gameId })).targets[0];
   await page.waitForFunction(() => window.__wavs.length > 0, null, { timeout: 4000 });
   const heard = await page.evaluate(() => window.__wavs[0]);
@@ -183,8 +192,7 @@ test('Algıla tek oyunculu: Say (nokta PNG) ve Yörünge (örnekler) oynanır, k
   const lit = await page.evaluate(() => { const c = document.querySelector('.pc-stage canvas'); const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let k = 3; k < d.length; k += 4) if (d[k] > 200) n++; return n; });
   assert.ok(lit > 500, `noktalar çizilmedi (${lit})`);
   await page.screenshot({ path: `${SHOTS}perceptle-count-dots.png`, fullPage: true });
-  const start = JSON.parse(p.net.find((x) => x.path === '/api/perceptle/start').text);
-  const raw = (await secret(srv, { gameId: start.gameId })).stimuli;
+  const raw = (await secret(srv, { gameId: await freeGameId(p, '/api/perceptle/start') })).stimuli;
   const testRes = p.net.find((x) => x.path === '/api/perceptle/test').text;
   assert.ok(!testRes.includes('"dots"') && !testRes.includes(JSON.stringify(raw[0].dots[0])), 'nokta koordinatı ağda');
   await page.waitForSelector('.pc-num:not([disabled])', { timeout: 5000 });
