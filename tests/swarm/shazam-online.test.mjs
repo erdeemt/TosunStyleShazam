@@ -3,6 +3,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startServer } from '../lib/server.js';
 import { makeRoom, sleep } from '../lib/bot.js';
+import { trackOfView } from '../lib/shazam-keys.js';
 
 let srv;
 const all = [];
@@ -12,7 +13,7 @@ after(async () => { all.forEach((b) => b.close()); await srv.stop(); });
 const TRACKS = [
   { title: 'Şımarık', artist: 'Tarkan', audio: 'https://cdnt-preview.dzcdn.net/api/1/1/a/b/c/0/aaa.mp3?hdnea=x', cover: 'https://e-cdns-images.dzcdn.net/images/cover/1.jpg' },
   { title: 'Gidiyorum', artist: 'Sezen Aksu', audio: 'https://p.scdn.co/mp3-preview/bbb', spotifyId: 'abcdefghij12345678' },
-  { title: 'Never Gonna Give You Up', artist: 'Rick Astley', ytId: 'dQw4w9WgXcQ', alt: ['Never Gonna Give You Up', 'Rick Astley - Never Gonna Give You Up'] },
+  { title: 'Never Gonna Give You Up', artist: 'Rick Astley', audio: 'https://cdns-preview-a.dzcdn.net/stream/c-rick.mp3', alt: ['Never Gonna Give You Up', 'Rick Astley - Never Gonna Give You Up'] },
   { title: 'Bohemian Rhapsody', artist: 'Queen', audio: 'https://p.scdn.co/mp3-preview/ccc' },
   { title: 'Harder, Better, Faster, Stronger', artist: 'Daft Punk', audio: 'https://cdnt-preview.dzcdn.net/api/1/1/d/e/f/0/ddd.mp3' },
   // Havuzda her zaman ≥ 3 çalınmayan şarkı kalır; 5 tur için en az 8 şarkı gerekir.
@@ -42,7 +43,7 @@ async function play(bot, action) {
   return bot.waitView((v) => !v.me || v.me.guesses.length > before || (v.me.done && !wasDone) || v.phase !== 'play');
 }
 
-const answerOf = (view) => TRACKS.find((t) => (t.ytId && t.ytId === view.media.ytId) || (t.audio && t.audio === view.media.audio));
+const answerOf = (view) => trackOfView(view, TRACKS);
 
 test('prep: sadece host, geçersiz şarkılar elenir, kötü adresler süzülür, tekrarlar tek sayılır', async () => {
   const { bots, host } = await makeRoom(srv.wsUrl, 'shazam', 3, 'Prep');
@@ -60,9 +61,10 @@ test('prep: sadece host, geçersiz şarkılar elenir, kötü adresler süzülür
     { title: 'Sessiz', artist: 'Yok' }, // çalınacak bir şey yok
     { title: '', ytId: 'dQw4w9WgXcQ' },
     { title: 'Kötü yt', ytId: '../../etc' },
-    { title: 'İyi', artist: 'A', ytId: 'abcdefghijk', cover: 'https://evil.example/x.png' },
-    { title: 'İyi', artist: 'A', ytId: 'abcdefghijk' }, // tekrar
-    { title: { toString: 1 }, ytId: 'abcdefghijk' },
+    { title: 'Sadece YouTube', artist: 'B', ytId: 'abcdefghijk' }, // online modda YouTube kimliği kabul edilmez (ağ sekmesinden görünür)
+    { title: 'İyi', artist: 'A', audio: 'https://p.scdn.co/mp3-preview/iyi', cover: 'https://evil.example/x.png' },
+    { title: 'İyi', artist: 'A', audio: 'https://p.scdn.co/mp3-preview/iyi2' }, // tekrar
+    { title: { toString: 1 }, audio: 'https://p.scdn.co/mp3-preview/obj' },
   ] } });
   const room = await host.waitRoom((r) => r.prep?.sources.includes('Kötü'));
   assert.equal(room.prep.trackCount, 1, 'sadece geçerli tek şarkı kalmalı');

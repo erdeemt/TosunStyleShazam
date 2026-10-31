@@ -4,6 +4,7 @@
 // - ShazamReferee: her mesajdan sonra değişmezleri (invariant) denetler, ihlalleri toplar.
 // - shazamMonkey: rastgele ama çoğunlukla kurallara uygun oynayan bot döngüsü (bazen doğru cevap).
 import { createRng, sleep } from './swarm-lib.mjs';
+import { trackOfView } from '../lib/shazam-keys.js';
 
 export const STAGES = [0.5, 1.5, 5, 10, 20];
 const STAGE_COUNT = STAGES.length;
@@ -20,7 +21,7 @@ const ARTISTS = ['Grup Kuzgun', 'Selin Ova', 'Deniz Taşkın', 'Murat Ekin', 'Ay
 const hex = (rng, n) => Array.from({ length: n }, () => '0123456789abcdef'[rng.int(16)]).join('');
 const alnum = (rng, n) => Array.from({ length: n }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz0123456789'[rng.int(58)]).join('');
 
-// n adet geçerli şarkı: 3 tür (Deezer önizleme, Spotify önizleme, YouTube), her birinin adı/sanatçısı/kapağı/Spotify kimliği benzersiz.
+// n adet geçerli şarkı: 3 tür (iki Deezer CDN'i, Spotify önizleme; online mod YouTube kimliği kabul etmez), her birinin adı/sanatçısı/kapağı/Spotify kimliği benzersiz.
 export function makeTracks(n, seed = 1, { tag = '' } = {}) {
   const rng = createRng(seed * 7919 + n);
   const out = [];
@@ -43,8 +44,8 @@ export function makeTracks(n, seed = 1, { tag = '' } = {}) {
       t.cover = `https://i.scdn.co/image/ab67616d0000b273${hex(rng, 24)}`;
       t.spotifyId = alnum(rng, 22);
     } else {
-      t.ytId = alnum(rng, 11);
-      t.cover = `https://i.ytimg.com/vi/${t.ytId}/hqdefault.jpg`;
+      t.audio = `https://cdns-preview-${hex(rng, 1)}.dzcdn.net/stream/c-${hex(rng, 32)}-5.mp3`;
+      t.cover = `https://i.ytimg.com/vi/${alnum(rng, 11)}/hqdefault.jpg`;
     }
     out.push(t);
   }
@@ -75,8 +76,8 @@ export async function sendPrep(host, tracks, { chunk = 25, gap = 0, source = 'Te
   }
 }
 
-export const mediaKey = (m) => (m?.ytId ? `yt:${m.ytId}` : `au:${m?.audio}`);
-const trackMediaKey = (t) => (t.ytId ? `yt:${t.ytId}` : `au:${t.audio}`);
+// Tur anahtarı (test sunucusunda başlıktan türetilir, bkz. tests/lib/shazam-keys.js). Klip adresi oyuncuya özel olduğundan karşılaştırmaya girmez.
+export const mediaKey = (m) => m?.key;
 
 // Doğru cevap sayılması gereken (eşleştiricinin kesin kabul etmesi gereken) tahmin biçimleri.
 const FOLD = { ç: 'c', ğ: 'g', ı: 'i', ö: 'o', ş: 's', ü: 'u', â: 'a', Ç: 'C', Ğ: 'G', İ: 'I', Ö: 'O', Ş: 'S', Ü: 'U' };
@@ -89,10 +90,10 @@ export function rightVariants(track) {
 const VIEW_KEYS = ['gameKey', 'round', 'totalRounds', 'phase', 'endsAt', 'stages', 'media', 'me', 'players', 'reveal', 'over'].sort().join();
 const VIEW_KEYS_POOL = ['gameKey', 'round', 'totalRounds', 'phase', 'endsAt', 'stages', 'media', 'pool', 'me', 'players', 'reveal', 'over'].sort().join();
 const ME_KEYS = ['stage', 'guesses', 'done', 'won', 'points'].sort().join();
-const MEDIA_KEYS = ['key', 'ytId', 'audio', 'startFraction'].sort().join();
+const MEDIA_KEYS = ['key', 'clip'].sort().join();
 const PLAYER_PLAY_KEYS = ['id', 'name', 'score', 'stage', 'done', 'won'].sort().join();
 const PLAYER_REVEAL_KEYS = ['id', 'name', 'score', 'stage', 'done', 'won', 'roundPoints', 'tries'].sort().join();
-const REVEAL_KEYS = ['title', 'artist', 'cover', 'spotifyId', 'ytId'].sort().join();
+const REVEAL_KEYS = ['title', 'artist', 'cover', 'spotifyId'].sort().join();
 const keysOf = (o) => Object.keys(o).sort().join();
 const isInt = (x, lo, hi) => Number.isInteger(x) && x >= lo && x <= hi;
 
@@ -112,7 +113,6 @@ export class ShazamReferee {
   constructor({ label = 'room', tracks, noLeaves = false, clockTol = 400 } = {}) {
     this.label = label;
     this.tracks = tracks;
-    this.byMedia = new Map(tracks.map((t) => [trackMediaKey(t), t]));
     this.noLeaves = noLeaves; // kimse oyundan kalıcı ayrılmıyorsa: kazanılan her adımda TAM BİR bonus olmalı
     this.clockTol = clockTol;
     this.violations = [];
@@ -137,7 +137,7 @@ export class ShazamReferee {
 
   attachAll(bots) { bots.forEach((b) => this.attach(b)); return this; }
 
-  answerFor(view) { return this.byMedia.get(mediaKey(view.media)); }
+  answerFor(view) { return trackOfView(view, this.tracks); }
 
   game(key) {
     if (!this.games.has(key)) this.games.set(key, { rounds: new Map(), totalRounds: null, over: false, mediaSeen: new Map() });
@@ -217,9 +217,12 @@ export class ShazamReferee {
     const seenRound = g.mediaSeen.get(mk);
     if (seenRound != null && seenRound !== v.round) this.fail(bot, `aynı şarkı iki turda çaldı (${seenRound}, ${v.round})`);
     g.mediaSeen.set(mk, v.round);
-    const rec = g.rounds.get(v.round) ?? { media: mk, start: v.media.startFraction, key: v.media.key, points: null };
+    const rec = g.rounds.get(v.round) ?? { media: mk, key: v.media.key, points: null };
     g.rounds.set(v.round, rec);
-    if (rec.media !== mk || rec.start !== v.media.startFraction || rec.key !== v.media.key) this.fail(bot, 'aynı turda oyunculara farklı medya/başlangıç', { round: v.round });
+    if (rec.media !== mk || rec.key !== v.media.key) this.fail(bot, 'aynı turda oyunculara farklı medya', { round: v.round });
+    // Klip: oyunda (bitirmemiş oyuncuya) ve açılışta opak adres; bitirmiş/izleyiciye oyun sırasında yok. Şarkı kimliği asla.
+    const wantClip = v.phase !== 'play' || (v.me && !v.me.done);
+    if (wantClip ? !/^\/api\/clip\/[\w-]{22}$/.test(v.media.clip ?? '') : v.media.clip !== null) this.fail(bot, 'klip adresi beklenmedik', v.media);
 
     // 2) Oyuncular
     const ids = v.players.map((p) => p.id);
@@ -282,7 +285,7 @@ export class ShazamReferee {
     } else if (track) {
       if (keysOf(v.reveal ?? {}) !== REVEAL_KEYS) this.fail(bot, 'reveal alanları beklenmedik', v.reveal);
       else if (v.reveal.title !== track.title || v.reveal.artist !== track.artist || v.reveal.cover !== (track.cover ?? null)
-        || v.reveal.spotifyId !== (track.spotifyId ?? null) || v.reveal.ytId !== (track.ytId ?? null)) this.fail(bot, 'açıklanan şarkı çalınanla uyuşmuyor', { reveal: v.reveal, track });
+        || v.reveal.spotifyId !== (track.spotifyId ?? null)) this.fail(bot, 'açıklanan şarkı çalınanla uyuşmuyor', { reveal: v.reveal, track });
     }
 
     // 5) Faz/tur geçişi + "finished player can't act" (bitirince me değişmez)

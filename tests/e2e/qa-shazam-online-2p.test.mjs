@@ -71,7 +71,10 @@ test('2 telefon: çalma, aşamalar, puanlar, süre dolması, final, tekrar oyun'
   await Q.guess(g, 'kesinlikle yanlış');
   s = await Q.st(g.page);
   soft(s.view.me.stage === 1, `yanlış sonrası stage ${s.view.me.stage}`);
-  soft(/1\.5 sn dinle/.test(await g.page.locator('#shazam-online .play-label').textContent()), 'yanlış sonrası etiket 1.5 değil');
+  // Yeni adımın klibi sunucudan yeni (opak) adresle yüklenir: kısa bir "yükleniyor" olabilir
+  await g.page.waitForFunction(() => /1\.5 sn dinle/.test(document.querySelector('#shazam-online .play-label')?.textContent ?? ''), undefined, { timeout: 4000 })
+    .catch(() => soft(false, 'yanlış sonrası etiket 1.5 değil'));
+  soft((g.clipReqs ?? []).length > 0 && g.audioReqs.filter((u) => /dzcdn|scdn/.test(u) && !/images|image/.test(u)).length === 0, `ses vekilden gelmeli (klip ${g.clipReqs?.length ?? 0}, CDN ses ${g.audioReqs.length})`);
   soft(/kesinlikle yanlış/.test(await g.page.locator('#shazam-online .guesses').textContent()), 'yanlış tahmin listede yok');
   // Host ekranında misafirin tahmin metni görünmemeli, ilerlemesi görünmeli
   await host.page.waitForTimeout(200);
