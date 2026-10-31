@@ -9,6 +9,8 @@ import * as recall from './server/recall.js';
 import * as perceptle from './server/perceptle.js';
 import { GameError } from './server/errors.js';
 import { clientIp, httpLimiter, upstreamLimiter } from './server/limits.js';
+import { handleClip, sessionCookie } from './server/clips.js';
+import { isCorrect } from './server/matcher.js';
 
 const PORT = process.env.PORT != null && process.env.PORT !== '' ? Number(process.env.PORT) : 3000;
 const PUBLIC_DIR = join(fileURLToPath(new URL('.', import.meta.url)), 'public');
@@ -274,11 +276,30 @@ function requireIdentity(body) {
   return identity;
 }
 
-const UPSTREAM_PATHS = new Set(['/api/resolve', '/api/yt-meta', '/api/deezer-search', '/api/spotify-cover']);
+const UPSTREAM_PATHS = new Set(['/api/resolve', '/api/yt-meta', '/api/deezer-search', '/api/deezer-match', '/api/spotify-cover']);
+
+// Online Shazam: YouTube (veya önizlemesiz Spotify) şarkısını Deezer önizlemesine çevir. YouTube oynatıcısı video
+// kimliğini tarayıcıya açık ettiği için online modda sadece ses vekilinden çalınabilen önizlemeler kullanılır.
+// Eşleşme sıkı: Deezer'ın bulduğu başlık, bizim başlığımızla eşleştiriciye göre "doğru tahmin" olmalı (ya da tersi).
+const matchCache = new Map(); // "sanatçı\tbaşlık" -> track | null
+async function deezerMatch(title, artist) {
+  const k = `${artist}\t${title}`;
+  if (matchCache.has(k)) return matchCache.get(k);
+  const dz = await deezerSearch(`${artist} ${title}`.trim()).catch(() => undefined);
+  if (dz === undefined) return null; // ağ hatası: önbelleğe alma
+  const ok = dz?.audio && (isCorrect(title, dz) || isCorrect(dz.title, { title, alt: [] }));
+  const out = ok ? { title: dz.title, artist: dz.artist, audio: dz.audio, cover: dz.cover } : null;
+  if (matchCache.size >= 5000) matchCache.delete(matchCache.keys().next().value);
+  matchCache.set(k, out);
+  return out;
+}
 
 async function handleApi(url, res, req) {
   const q = url.searchParams;
   const ip = clientIp(req);
+  // Ses vekili kendi sınırlarıyla (Safari aynı klip için birkaç Range isteği atar; aynı evden 12 telefon).
+  const clipRoute = url.pathname.match(/^\/api\/clip\/([^/]{1,64})$/);
+  if (clipRoute) return handleClip(req, res, clipRoute[1], ip);
   if (!httpLimiter.hit(ip)) return sendJson(res, 429, { error: 'Çok fazla istek, biraz yavaşla.' });
   if (UPSTREAM_PATHS.has(url.pathname) && !upstreamLimiter.hit(ip)) {
     return sendJson(res, 429, { error: 'Çok fazla link isteği, bir dakika sonra tekrar dene.' });
@@ -341,6 +362,22 @@ async function handleApi(url, res, req) {
     }
     case '/api/deezer-search':
       return sendJson(res, 200, { track: await deezerSearch(q.get('q') ?? '') });
+    case '/api/deezer-match': {
+      // ?t=başlık&a=sanatçı (tekrarlı, en fazla 20 çift) → { tracks: [track | null] } aynı sırayla
+      const titles = q.getAll('t').slice(0, 20).map((s) => s.slice(0, 120));
+      const artists = q.getAll('a').slice(0, 20).map((s) => s.slice(0, 80));
+      const pairs = titles.map((t, i) => [t, artists[i] ?? '']);
+      const tracks = await mapLimit(pairs, 4, ([t, a]) => (t.trim() ? deezerMatch(t, a) : null));
+      return sendJson(res, 200, { tracks: tracks.map((t) => t ?? null) });
+    }
+    // Ses vekili oturumu: kimlik doğrulanırsa imzalı HttpOnly çerez (sadece /api/clip yoluna gider).
+    case '/api/clip-session': {
+      const body = await readJson(req);
+      const identity = requireIdentity(body);
+      const secure = String(req.headers['x-forwarded-proto'] ?? '').split(',')[0].trim() === 'https' || Boolean(req.headers['cf-visitor']?.includes('https'));
+      res.setHeader('Set-Cookie', sessionCookie(identity.id, secure));
+      return sendJson(res, 200, { ok: true });
+    }
     case '/api/spotify-cover': {
       const id = q.get('id') ?? '';
       if (!/^[A-Za-z0-9]{10,30}$/.test(id)) throw new GameError('Geçersiz şarkı.');

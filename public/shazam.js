@@ -1036,7 +1036,9 @@ let offRoomWatch = null;
 // Shazam odasındayken mod kartları yer kaplamasın (odadan çıkınca geri gelir).
 const syncModePick = () => $('mode-pick').classList.toggle('hidden', Boolean(online && net.room?.game === 'shazam'));
 const ol = {
-  key: null, // hazırlanan şarkının tur anahtarı
+  key: null, // bu turun anahtarı
+  src: null, // yüklenen klip adresi (/api/clip/<opak>)
+  unplayable: [], // online modda çalınamayan şarkılar (host'a not)
   ready: false,
   failed: false,
   start: 0,
@@ -1086,12 +1088,34 @@ function unmountOnline() {
   offRoomWatch = null;
   syncModePick();
   ol.key = null;
+  ol.src = null;
   media.stop();
 }
 
-const compactTrack = (t) => ({
-  title: t.title, artist: t.artist, alt: t.alt, ytId: t.ytId, audio: t.audio, cover: t.cover, spotifyId: t.spotifyId,
-});
+// Online modda sadece önizleme sesi (sunucu vekilinden kesilerek çalınır): YouTube kimliği gönderilmez.
+const compactTrack = (t) => {
+  const o = t.online ?? t; // Deezer'a çevrilmiş YouTube / önizlemesiz Spotify şarkısı
+  return { title: o.title, artist: o.artist, alt: o.alt ?? t.alt, audio: o.audio, cover: o.cover ?? t.cover, spotifyId: t.spotifyId };
+};
+
+// YouTube (ve önizlemesi olmayan Spotify) şarkılarını Deezer önizlemesine çevir. Sonuç şarkıya yazılır (t.online),
+// bulunamayan false olur ve online modda atlanır.
+async function resolveForOnline(tracks) {
+  const todo = tracks.filter((t) => !t.audio && t.online === undefined && t.title);
+  for (let i = 0; i < todo.length; i += 20) {
+    const batch = todo.slice(i, i + 20);
+    const qs = new URLSearchParams();
+    for (const t of batch) { qs.append('t', t.title); qs.append('a', t.artist ?? ''); }
+    try {
+      const { tracks: found } = await api(`/api/deezer-match?${qs}`);
+      batch.forEach((t, k) => { t.online = found?.[k]?.audio ? { ...found[k], alt: [t.title, ...(t.alt ?? [])].slice(0, 2) } : false; });
+    } catch {
+      break; // hız sınırı / ağ: kalanlar bu sefer gönderilmez, sonraki "Odaya gönder"de tekrar denenir
+    }
+  }
+}
+
+const playableOnline = (t) => Boolean(t.audio || t.online);
 
 // Yüklü kaynakları odaya gönder: önce sıfırla, sonra kaynak kaynak ≤ 25 şarkılık parçalar (mesaj sınırı 8 KB).
 async function syncPrep(sendPrep) {
@@ -1099,10 +1123,12 @@ async function syncPrep(sendPrep) {
   ol.syncing = true;
   online?.rerender();
   try {
+    await resolveForOnline(allTracks());
+    ol.unplayable = allTracks().filter((t) => !playableOnline(t)).map((t) => (t.artist ? `${t.title} — ${t.artist}` : t.title));
     sendPrep({ op: 'reset' });
     const seen = new Set();
     for (const s of state.sources) {
-      const tracks = (s.tracks ?? []).filter((t) => (t.ytId || t.audio) && !seen.has(trackKey(t)));
+      const tracks = (s.tracks ?? []).filter((t) => playableOnline(t) && !seen.has(trackKey(t)));
       tracks.forEach((t) => seen.add(trackKey(t)));
       // Parçalar şarkı sayısına değil bayt boyutuna göre: sunucu 8 KB üstü mesajda bağlantıyı keser
       // (gerçek Deezer önizleme adresleri ~280 karakter → 25 şarkı ~10 KB ediyordu).
@@ -1181,7 +1207,12 @@ function onlineSettings(settings, { editable, change, room, sendPrep }) {
           uiEl('span', { class: 'src-count' }, s.loading ? 'yükleniyor…' : s.error ? `⚠️ ${s.error}` : `${s.tracks.length} şarkı`),
           uiEl('button', { title: 'Kaldır', onclick: () => { state.sources.splice(i, 1); saveSources(); online?.rerender(); } }, '×'))))
         : null,
-      uiEl('p', { class: 'hint' }, 'Tek oyunculu modda eklediğin listeler burada da hazır. Önizlemesi olmayan Spotify şarkıları atlanır.'));
+      ol.unplayable?.length
+        ? uiEl('details', { class: 'hint warn-text' },
+          uiEl('summary', {}, `⚠️ ${ol.unplayable.length} şarkı: Bu şarkı online modda çalınamıyor (önizleme bulunamadı)`),
+          uiEl('ul', {}, ol.unplayable.slice(0, 50).map((n) => uiEl('li', {}, n))))
+        : null,
+      uiEl('p', { class: 'hint' }, 'Tek oyunculu modda eklediğin listeler burada da hazır. Online modda YouTube şarkıları Deezer önizlemesiyle çalınır (şarkı adı ağ trafiğinden görünmesin diye); önizlemesi bulunamayanlar atlanır.'));
   }
 
   return uiEl('div', { class: 'stack' },
@@ -1193,37 +1224,50 @@ function onlineSettings(settings, { editable, change, room, sendPrep }) {
       select('start', [['random', 'Rastgele yer'], ['begin', 'Şarkının başı']], 'Başlangıç noktası')));
 }
 
-// Bu turun şarkısını sessizce yükle; herkes aynı başlangıç noktasını hesaplasın (startFraction sunucudan).
+// Ses vekili oturumu: kimlik + token karşılığında imzalı HttpOnly çerez (klip adresleri sadece bu oyuncuya çalışır).
+// Kimlik değişince veya 1 saatte bir yenilenir; klip 403 verirse bir kez daha alınır.
+let clipSession = null; // { playerId, at, promise }
+function ensureClipSession(force = false) {
+  const { playerId, token } = net.identity ?? {};
+  if (!force && clipSession && clipSession.playerId === playerId && Date.now() - clipSession.at < 3600_000) return clipSession.promise;
+  const promise = fetch('/api/clip-session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ playerId, token }),
+  }).then((r) => { if (!r.ok) throw new Error('oturum'); }).catch((err) => { clipSession = null; throw err; });
+  clipSession = { playerId, at: Date.now(), promise };
+  return promise;
+}
+
+// Bu adımın klibini sessizce yükle. Sunucu sadece [başlangıç, başlangıç + adım süresi] aralığını gönderir (kesilmiş MP3),
+// adım ilerleyince yeni bir adres gelir; açılışta başlangıçtan sona kadar olan adres. Klip her zaman 0. saniyeden çalınır.
 function prepareOnlineMedia(view) {
   const m = view.media;
-  if (ol.key === m.key) return;
-  ol.key = m.key;
+  if (ol.key !== m.key) { // yeni tur
+    ol.key = m.key;
+    ol.draft = '';
+  }
+  const src = m.clip ?? null;
+  if (ol.src === src) return;
+  ol.src = src;
   ol.ready = false;
   ol.failed = false;
   ol.playing = false;
-  ol.draft = '';
-  media.prepare({ ytId: m.ytId, audio: m.audio, title: '', artist: '' })
-    .then((duration) => {
-      if (ol.key !== m.key) return;
-      const f = m.startFraction;
-      let start = 0;
-      if (f != null && Number.isFinite(duration)) {
-        if (media.kind === 'audio') start = f * Math.max(0, duration - view.stages.at(-1) - 0.5);
-        else {
-          const lo = duration * 0.15;
-          const hi = Math.max(lo, duration * 0.65 - view.stages.at(-1));
-          start = lo + f * (hi - lo);
-        }
-      }
-      ol.start = start;
+  if (!src) return;
+  const load = () => ensureClipSession().then(() => media.prepare({ audio: src, title: '', artist: '' }));
+  load()
+    .catch(() => (ol.src === src ? ensureClipSession(true).then(() => media.prepare({ audio: src, title: '', artist: '' })) : null))
+    .then(() => {
+      if (ol.src !== src) return;
+      ol.start = 0;
       ol.ready = true;
       online?.rerender();
-      // Butona basmadan: hazır olunca 3-2-1 geri sayım ve otomatik çalma
+      // Butona basmadan: turun ilk klibi hazır olunca 3-2-1 geri sayım ve otomatik çalma
       const v = net.view;
-      if (v?.phase === 'play' && v.me && !v.me.done && v.media?.key === m.key) playOnlineClip(v);
+      if (v?.phase === 'play' && v.me && !v.me.done && v.media?.clip === src && ol.countedKey !== ol.key) playOnlineClip(v);
     })
     .catch(() => {
-      if (ol.key !== m.key) return;
+      if (ol.src !== src) return;
       ol.failed = true;
       online?.rerender();
     });
@@ -1250,9 +1294,10 @@ async function playOnlineClip(view) {
   online?.rerender();
   const dur = view.stages[view.me.stage];
   try {
-    await media.playClip(ol.start, dur, (t) => {
+    // Klip, kod çözücü ısınması için başlangıçtan ~2 çerçeve (≈50 ms) önce başlar: süreye bu pay eklenir.
+    await media.playClip(ol.start, dur + 0.08, (t) => {
       const bar = document.getElementById('ol-bar-fill');
-      if (bar) bar.style.width = `${(t / view.stages.at(-1)) * 100}%`;
+      if (bar) bar.style.width = `${(Math.min(t, dur) / view.stages.at(-1)) * 100}%`;
     });
   } catch (err) {
     // Tarayıcı dokunmadan sese izin vermedi (Safari): bir kez ▶'ye basınca açılır
@@ -1453,7 +1498,7 @@ function revealPanel(view, ctx) {
     media.playFrom(ol.start);
   }
   // Kapak: Spotify playlist şarkılarında yok → sonradan çek; YouTube'da küçük resim
-  let cover = r.cover ?? (r.ytId ? `https://i.ytimg.com/vi/${r.ytId}/hqdefault.jpg` : null);
+  let cover = r.cover ?? null;
   if (!cover && r.spotifyId) {
     if (ol.coverFor !== r.spotifyId) {
       ol.coverFor = r.spotifyId;
