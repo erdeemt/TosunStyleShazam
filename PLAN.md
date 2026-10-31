@@ -285,8 +285,29 @@ Hızlı akan oyunlar (Tosun Top) için lobiye eklenen, oyundan bağımsız ve op
 - **Puan:** bildiği adıma göre 5, 4, 3, 2, 1; o adımda **ilk bilen +1**. Bilemeyen 0.
 - Oyun sırasında diğer oyuncuların sadece ilerlemesi görünür (kaçıncı adımda, bitirdi mi, bildi mi) — tahmin metinleri görünmez.
 - **Gizlilik:** şarkı adı, sanatçı, kapak ve Spotify kimliği tur açıklanana kadar hiçbir istemciye gitmez; tahmin sunucuda
-  kontrol edilir (`server/matcher.js`, tek oyunculu kontrolle aynı). Sınırlama: ses telefonda çaldığı için YouTube video kimliği
-  istemciye gider — geliştirici araçlarıyla bakan biri YouTube şarkısını bulabilir (arkadaş ortamı için kabul edildi).
+  kontrol edilir (`server/matcher.js`, tek oyunculu kontrolle aynı). ~~Sınırlama: YouTube video kimliği istemciye gider~~ →
+  ses vekiliyle kapatıldı (aşağıda, 2026-10-31).
+- **Ses vekili (2026-10-31, `server/clips.js` + `server/mp3.js`):** istemciye şarkı kimliği / CDN adresi hiç gitmez.
+  `view.media = { key, clip }`: `clip` = `/api/clip/<128 bit base64url>` — oyuncuya ve adıma özel; tur açılınca iptal (404),
+  sonraki turda açılış klibi iptal, ayrılan oyuncununkiler iptal, ayrıca 15 dk mutlak süre. Bitirmiş oyuncu / izleyiciye oyunda `null`.
+  Sunucu önizlemeyi sadece izinli CDN'den (p.scdn.co, cdnt-preview / cdns-preview-X .dzcdn.net; https, portsuz, yönlendirmeler elle
+  ve her adımda alan adı denetlenerek, 10 sn zaman aşımı, ≤ 1.5 MB, aynı anda ≤ 6 indirme) indirir; bellek önbelleği LRU (48 MB / 64
+  parça; oda başına tur başında sadece şu anki + sıradaki şarkı önceden indirilir). MP3 çerçeve sınırında kesilir (MPEG-1/2/2.5
+  Layer III, ID3v2/ID3v1 ve Xing/Info/VBRI atlanır): oyunda `[başlangıç − 2 çerçeve, başlangıç + adım + 1 çerçeve]`, açılışta
+  başlangıçtan sona. Uzun adımın adresi ancak oyuncu o adıma gelince üretilir (sonraki adım önceden yüklenemez — bilerek).
+  Başlangıç noktası sunucuda: `f × max(0, süre − 20 − 0.5)`; istemci klibi 0. saniyeden çalar (+80 ms pay).
+  **Bağlama:** `POST /api/clip-session {playerId, token}` → imzalı (HMAC, süreç başına rastgele anahtar) `tss_clip` çerezi:
+  HttpOnly, SameSite=Strict, Path=/api/clip, 12 saat (https vekil arkasında Secure). Klip isteğindeki çerez belirtecin sahibini
+  göstermiyorsa 403 (başkasıyla paylaşılan adres işe yaramaz). Yanıt: `audio/mpeg`, `no-store`, `Accept-Ranges: bytes`;
+  tek aralık Range → 206 (Safari `<audio>` önce `bytes=0-1` ister), çoklu aralık → 200 tamamı, geçersiz → 416; Range sadece
+  kesilmiş klibin içinde. Sınırlar: IP başına 900/dk (`LIMIT_CLIP_PER_MIN`), oyuncu başına 120/dk (`LIMIT_CLIP_PER_PLAYER_PER_MIN`);
+  /api/* genel sayacına girmez. İndirilemezse 502 → istemci "Şarkı yüklenemedi" (tahmin/geç yine çalışır).
+  **YouTube online modda:** prep'te `ytId` kabul edilmez. Host'un istemcisi "Odaya gönder"de YouTube (ve önizlemesiz Spotify)
+  şarkılarını `GET /api/deezer-match?t=…&a=…` (≤ 20 çift, tek dış istek sayılır) ile Deezer önizlemesine çevirir; eşleşme
+  eşleştiriciyle sıkı denetlenir, bulunamayanlar host'a "Bu şarkı online modda çalınamıyor (önizleme bulunamadı)" notuyla listelenir.
+  Tek cihaz modları (Serbest/Puanlı/Yarışma) değişmedi. **Hâlâ görünen:** öneri havuzu (kasıtlı aday listesi), klibin kendisi
+  (sesi dinleyip tanımak oyunun kendisi). Test sunucusunda (TEST_MODE=1) dış ağa çıkılmaz (sentetik sessiz MP3; yolunda "yok"
+  geçen adres 404) ve tur anahtarı oyun anahtarı + başlıktan türetilir (testler cevabı bilsin; `SHAZAM_OPAQUE_KEYS=1` ile rastgele).
 
 ### 4.5 🎨 Nüans (renk hafızası) — kullanıcı ile netleşti (2026-10-24)
 

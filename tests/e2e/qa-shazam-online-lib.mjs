@@ -5,6 +5,7 @@ import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 import { startServer } from '../lib/server.js';
+import { trackOfView } from '../lib/shazam-keys.js';
 
 export const SHOTS = fileURLToPath(new URL('../../test-results/qa-shazam-online/', import.meta.url));
 export const MOBILE = { viewport: { width: 360, height: 800 }, hasTouch: true, isMobile: true, deviceScaleFactor: 1, bypassCSP: true };
@@ -85,7 +86,9 @@ export function attach(p, page) {
     ws.on('framereceived', (f) => p.frames.push(String(f.payload)));
     ws.on('framesent', (f) => p.sent.push(String(f.payload)));
   });
+  // Online modda ses sadece sunucu vekilinden (/api/clip/<opak>); tarayıcı CDN'e ses isteği atmamalı
   page.on('request', (r) => { if (/dzcdn|scdn|ytimg|googlevideo/.test(r.url())) p.audioReqs.push(r.url()); });
+  page.on('request', (r) => { if (r.url().includes('/api/clip/')) (p.clipReqs ??= []).push(r.url()); });
 }
 
 export function realErrors(p) {
@@ -150,9 +153,9 @@ export async function start(host, ps) {
   for (const p of ps) await waitNet(p.page, "room && room.phase === 'playing' && view && view.phase === 'play'");
 }
 
-// Bu turun şarkısı (sahte ses adresinden)
+// Bu turun şarkısı: istemciye şarkı kimliği gitmez; test sunucusunda tur anahtarı başlıktan türetilir (tests/lib/shazam-keys.js)
 export function trackOf(view, tracks) {
-  return tracks.find((t) => t.audio === view.media.audio);
+  return trackOfView(view, tracks);
 }
 
 // Sunucu bu oyuncunun eylemini işleyene kadar bekle

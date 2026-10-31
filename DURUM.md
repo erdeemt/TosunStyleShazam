@@ -99,3 +99,12 @@ Açık küçük notlar:
   perceptle.js enter('multi'), perceptle-tests.js value(), games.js, style.css).
 - Testler: tests/swarm/perceptle-lobby.test.mjs (11), tests/e2e/perceptle-lobby.test.mjs (2). Tek oyunculu değişmedi.
 - Kullanıcı denemeli: telefonlarda eşzamanlılık (özellikle Ritim) ve 30 sn cevap süresi yeterli mi.
+
+## 🎵 Shazam online ses vekili — sec/shazam dalında (main'e BİRLEŞTİRİLMEDİ, 2026-10-31)
+
+- Ağ sekmesinden cevap sızıntısı kapatıldı: istemci sadece `/api/clip/<opak>` görür (YouTube kimliği / CDN adresi yok),
+  klip o adımın süresi kadar (sunucuda MP3 çerçeve kesici, bağımlılıksız). Ayrıntı: PLAN.md §4.4 "Ses vekili".
+- YouTube şarkıları online modda Deezer önizlemesine çevrilir; bulunamayan host'a notla listelenir.
+- Testler: `tests/unit/mp3.test.mjs`, `tests/swarm/swarm-shazam-clip.test.mjs`, `tests/e2e/shazam-secure.test.mjs`.
+- Açık: gerçek Safari/iOS cihazda Range + çerezli `<audio>` denenmedi (206 yolu testte var); sonraki adımın klibi bilerek
+  önceden yüklenmiyor (adım kapısını delerdi) — yavaş ağda adım geçişinde kısa "yükleniyor" görülebilir.
