@@ -1,9 +1,10 @@
 // 🎵 Tosun Shazam — online (lobili) mod. Kurallar: PLAN.md §4.4.
 // Herkese aynı şarkı; herkes kendi telefonunda kendi hızında 0.5 → 1.5 → 5 → 10 → 20 sn ilerler ve tahmin eder.
 // Şarkı adı/sanatçı/kapak tur açıklanana kadar istemciye gitmez; tahmin sunucuda kontrol edilir.
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { GameError, cleanText, num, str } from '../errors.js';
 import { isCorrect, trackKey } from '../matcher.js';
+import { AUDIO_HOSTS, issueClip, prefetch, revokeGroup, revokePlayer } from '../clips.js';
 
 export const STAGES = [0.5, 1.5, 5, 10, 20];
 const MAX_TRACKS = 300;
@@ -14,7 +15,7 @@ const DECOYS = 3; // havuzda her zaman çalınmayacak en az 3 şarkı kalsın (e
 const REVEAL_AUTO_MS = 30_000; // host açılışta beklerse sıradaki şarkıya kendiliğinden geç
 
 // Sadece bilinen müzik CDN'leri (host başka sunuculara istek attıramasın / oyuncuların IP'sini toplayamasın).
-const AUDIO_HOSTS = [/^p\.scdn\.co$/, /^cdnt-preview\.dzcdn\.net$/, /^cdns-preview-[a-z0-9]\.dzcdn\.net$/];
+// AUDIO_HOSTS server/clips.js'te (ses vekili sadece bunlardan indirir).
 const COVER_HOSTS = [/^i\.scdn\.co$/, /^image-cdn-[a-z0-9-]+\.spotifycdn\.com$/, /^i\.ytimg\.com$/, /^e-cdns-images\.dzcdn\.net$/, /^cdn-images\.dzcdn\.net$/];
 
 function safeUrl(raw, hosts) {
@@ -36,15 +37,15 @@ function cleanTrack(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const title = text(raw.title);
   if (!title) return null;
-  const ytId = /^[\w-]{6,20}$/.test(str(raw.ytId)) ? str(raw.ytId) : null;
-  const audio = ytId ? null : safeUrl(raw.audio, AUDIO_HOSTS);
-  if (!ytId && !audio) return null; // çalınacak bir şey yok (önizlemesi olmayan Spotify şarkısı)
+  // Online modda sadece önizleme sesi: ses sunucu vekilinden kesilerek gider. YouTube oynatıcısı video kimliğini
+  // tarayıcıya açık ettiği için YouTube şarkıları istemcide Deezer önizlemesine çevrilip öyle gönderilir (bulunamazsa atlanır).
+  const audio = safeUrl(raw.audio, AUDIO_HOSTS);
+  if (!audio) return null; // çalınacak önizleme yok
   const alt = Array.isArray(raw.alt) ? raw.alt.slice(0, 2).map((a) => text(a, 100)).filter(Boolean) : [];
   return {
     title,
     artist: text(raw.artist, 60),
     alt,
-    ytId,
     audio,
     cover: safeUrl(raw.cover, COVER_HOSTS),
     spotifyId: /^[A-Za-z0-9]{10,30}$/.test(str(raw.spotifyId)) ? str(raw.spotifyId) : null,
@@ -63,11 +64,42 @@ function poolEntries(tracks) {
 
 const playersIn = (state) => state.players.filter((p) => !p.left);
 
+// Bu oyuncunun şu an dinleyebileceği klip: oyunda kendi adımının süresi kadar (daha uzun adımın adresi ancak oraya
+// gelince üretilir), açılışta başlangıç noktasından önizlemenin sonuna kadar. Bitirmiş / izleyici oyuncuya oyun sırasında yok.
+function clipFor(state, playerId, revealed, mine) {
+  const r = state.round;
+  if (!revealed && (!mine || mine.done)) return null;
+  if (state.players.find((p) => p.id === playerId)?.left) return null;
+  const slot = `${playerId}:${revealed ? 'r' : mine.stage}`;
+  r.clips[slot] ??= issueClip({
+    group: revealed ? revealGroup(state, r) : playGroup(state, r),
+    playerId,
+    src: r.track.audio,
+    startFraction: r.startFraction,
+    lastStage: STAGES.at(-1),
+    dur: revealed ? Infinity : STAGES[mine.stage],
+  });
+  return r.clips[slot];
+}
+
+// Tur anahtarı: istemci ses önbelleği için, şarkıyı ele vermez (rastgele). Sadece test sunucusunda (TEST_MODE=1)
+// oyun anahtarı + başlıktan türetilir: testler hangi şarkının çaldığını bilip doğru/yanlış tahmin edebilsin
+// (SHAZAM_OPAQUE_KEYS=1 ile testte de rastgele). Üretimde her zaman rastgele.
+const TEST_KEYS = process.env.TEST_MODE === '1' && process.env.SHAZAM_OPAQUE_KEYS !== '1';
+export const testRoundKey = (gameKey, title) => createHash('sha256').update(`tss-test|${gameKey}|${title}`).digest('hex').slice(0, 12);
+
+const playGroup = (state, r) => `shz:${state.gameKey}:${r.key}:play`;
+const revealGroup = (state, r) => `shz:${state.gameKey}:${r.key}:reveal`;
+
 function startRound(state, ctx) {
   const track = state.tracks[state.roundIndex];
+  if (state.round) revokeGroup(revealGroup(state, state.round)); // önceki turun açılış klibi
+  prefetch(track.audio);
+  prefetch(state.tracks[state.roundIndex + 1]?.audio); // sıradaki de hazır olsun
   state.round = {
     number: state.roundIndex + 1,
-    key: randomBytes(6).toString('hex'), // istemci ses önbelleği için; şarkıyı ele vermez
+    key: TEST_KEYS ? testRoundKey(state.gameKey, track.title) : randomBytes(6).toString('hex'),
+    clips: {}, // `${playerId}:${adım | 'r'}` -> /api/clip/<token> (view() ilk istendiğinde üretir)
     track,
     startFraction: state.settings.start === 'begin' ? null : ctx.rng.next(),
     phase: 'play',
@@ -81,13 +113,14 @@ function finishRound(state, ctx) {
   ctx.clearTimer();
   const r = state.round;
   for (const prog of Object.values(r.progress)) if (!prog.done) prog.done = true;
+  revokeGroup(playGroup(state, r)); // oyun klipleri artık çalışmaz
   r.phase = 'reveal';
   r.endsAt = ctx.setTimer(REVEAL_AUTO_MS); // host beklerse kendiliğinden sıradaki şarkı
 }
 
 function nextRound(state, ctx) {
   state.roundIndex++;
-  if (state.roundIndex >= state.tracks.length) { state.over = true; return; }
+  if (state.roundIndex >= state.tracks.length) { state.over = true; return; } // açılış klibi oyun sonunda da dinlenebilir (süre sınırıyla düşer)
   startRound(state, ctx);
 }
 
@@ -231,7 +264,9 @@ export default {
     const p = state.players.find((x) => x.id === playerId);
     if (!p) return;
     p.left = true;
-    if (playersIn(state).length < 1) { state.over = true; return; }
+    revokePlayer(`shz:${state.gameKey}:`, playerId);
+    for (const k of Object.keys(state.round.clips)) if (k.startsWith(`${playerId}:`)) delete state.round.clips[k];
+    if (playersIn(state).length < 1) { state.over = true; revokeGroup(playGroup(state, state.round)); return; }
     if (state.round.phase === 'play') {
       delete state.round.progress[playerId];
       maybeFinish(state, ctx);
@@ -253,8 +288,8 @@ export default {
       phase: state.over ? 'over' : r.phase,
       endsAt: r.endsAt,
       stages: STAGES,
-      // Çalmak için gereken en az bilgi: şarkı adı/sanatçı/kapak/Spotify kimliği YOK.
-      media: { key: r.key, ytId: r.track.ytId, audio: r.track.audio, startFraction: r.startFraction },
+      // Çalmak için gereken en az bilgi: sadece bu oyuncuya, bu adıma ait opak klip adresi (şarkı kimliği/CDN adresi YOK).
+      media: { key: r.key, clip: clipFor(state, playerId, revealed, mine) },
       me: mine ? { stage: mine.stage, guesses: mine.guesses, done: mine.done, won: mine.won, points: mine.points } : null,
       players: playersIn(state).map((p) => {
         const prog = r.progress[p.id];
@@ -271,7 +306,7 @@ export default {
         };
       }),
       reveal: revealed
-        ? { title: r.track.title, artist: r.track.artist, cover: r.track.cover, spotifyId: r.track.spotifyId, ytId: r.track.ytId }
+        ? { title: r.track.title, artist: r.track.artist, cover: r.track.cover, spotifyId: r.track.spotifyId }
         : null,
       over: state.over,
     };

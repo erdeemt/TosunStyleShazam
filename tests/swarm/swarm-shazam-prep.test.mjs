@@ -9,6 +9,7 @@ import { startServer } from '../lib/server.js';
 import { makeRoom, Bot, sleep } from '../lib/bot.js';
 import { createRng } from '../../server/rng.js';
 import { makeTracks, sendPrep, deezerLikeTrack, playToEnd, poolOf } from './swarm-shazam-lib.mjs';
+import { trackOfView } from '../lib/shazam-keys.js';
 
 let srv;
 const all = [];
@@ -79,20 +80,20 @@ test('bozuk prep şekilleri: hiçbiri internal hata vermez, odaya geçersiz şar
     { t: 'prep', data: { op: 'add', tracks: 'Şımarık' } },
     { t: 'prep', data: { op: 'add', tracks: [null, 1, 'x', true, [], [[[]]], {}, { title: null }] } },
     { t: 'prep', data: { op: 'add', tracks: Array(3500).fill(1) } }, // dev dizi (8 KB içinde)
-    { t: 'prep', data: { op: 'add', tracks: [{ title: { toString: 1, valueOf: 1 }, ytId: 'abcdefghijk' }] } },
-    { t: 'prep', data: { op: 'add', tracks: [{ title: ['a'], ytId: 'abcdefghijk' }, { title: 'ok', ytId: { toString: 1 } }] } },
-    { t: 'prep', data: { op: 'add', tracks: [{ title: deep(60), artist: deep(60), ytId: 'abcdefghijk' }] } },
-    { t: 'prep', data: { op: 'add', tracks: [{ title: 'Derin', alt: deep(200), ytId: 'derin123456', audio: deep(10), cover: deep(10) }] } },
+    { t: 'prep', data: { op: 'add', tracks: [{ title: { toString: 1, valueOf: 1 }, audio: 'https://p.scdn.co/mp3-preview/abcdefghijk' }] } },
+    { t: 'prep', data: { op: 'add', tracks: [{ title: ['a'], audio: 'https://p.scdn.co/mp3-preview/abcdefghijk' }, { title: 'ok', ytId: { toString: 1 } }] } },
+    { t: 'prep', data: { op: 'add', tracks: [{ title: deep(60), artist: deep(60), audio: 'https://p.scdn.co/mp3-preview/abcdefghijk' }] } },
+    { t: 'prep', data: { op: 'add', tracks: [{ title: 'Derin', alt: deep(200), audio: 'https://p.scdn.co/mp3-preview/derin123456', ytId: deep(10), cover: deep(10) }] } },
     { t: 'prep', data: { op: 'add', source: { toString: 1 }, tracks: [] } },
     { t: 'prep', data: { op: 'add', source: deep(100), tracks: [] } },
     { t: 'prep', data: { op: 'add', __proto__: { tracks: makeTracks(3, 1) } } },
-    '{"t":"prep","data":{"op":"add","tracks":[{"__proto__":{"title":"proto"},"ytId":"abcdefghijk"}]}}',
-    '{"t":"prep","data":{"op":"add","tracks":[{"constructor":{"prototype":{"x":1}},"title":"Yapıcı","ytId":"yapici12345"}]}}',
+    '{"t":"prep","data":{"op":"add","tracks":[{"__proto__":{"title":"proto"},"audio":"https://p.scdn.co/mp3-preview/abcdefghijk"}]}}',
+    '{"t":"prep","data":{"op":"add","tracks":[{"constructor":{"prototype":{"x":1}},"title":"Yapıcı","audio":"https://p.scdn.co/mp3-preview/yapici12345"}]}}',
   ];
   for (const p of payloads) host.sendRaw(p);
   const r = await barrier(host);
   noInternal(bots);
-  assert.equal(r.prep.trackCount, 2, 'sadece "Derin" ve "Yapıcı" geçerli (geçerli ytId + metin başlık)');
+  assert.equal(r.prep.trackCount, 2, 'sadece "Derin" ve "Yapıcı" geçerli (geçerli önizleme adresi + metin başlık)');
   assert.ok(host.errors.every((e) => e.code === 'game'), 'tüm hatalar oyun hatası olmalı');
   assert.ok(await (async () => { const b = await new Bot(srv.wsUrl, 'Nabız').connect(); all.push(b); return true; })(), 'sunucu ayakta');
   assert.doesNotMatch(srv.log(), /Lobi hatası|view hatası/);
@@ -118,7 +119,8 @@ test('adres süzgeci: sadece https + bilinen CDN; hileli alan adları, javascrip
   assert.equal(r.prep.trackCount, good.length + 3, 'sadece bilinen CDN adresli şarkılar');
   const rounds = await playThrough(host, bots);
   for (const { media, reveal } of rounds) {
-    assert.ok(/^https:\/\/(p\.scdn\.co|cdns-preview-[a-z0-9]\.dzcdn\.net|cdnt-preview\.dzcdn\.net)\//.test(media.audio), `ses adresi: ${media.audio}`);
+    // İstemciye ses adresi gitmez; sadece opak klip adresi (sunucu süzülmüş CDN adresinden indirir)
+    assert.ok(!('audio' in media) && /^\/api\/clip\/[\w-]{22}$/.test(media.clip), `klip: ${JSON.stringify(media)}`);
     assert.ok(reveal.cover == null || /^https:\/\/(i\.ytimg\.com|image-cdn-ak\.spotifycdn\.com|e-cdns-images\.dzcdn\.net)\//.test(reveal.cover), `kapak: ${reveal.cover}`);
     assert.ok(reveal.spotifyId == null || /^[A-Za-z0-9]{10,30}$/.test(reveal.spotifyId));
   }
@@ -140,9 +142,9 @@ test('metinler: çok uzun ad/sanatçı/kaynak kısaltılır, emoji ve birleşik 
   const long = 'Çok uzun şarkı adı '.repeat(30); // ~570 karakter
   const emoji = '🎵'.repeat(250);
   host.send({ t: 'prep', data: { op: 'add', source: 'K'.repeat(500), tracks: [
-    { title: long, artist: 'Uzun Sanatçı', ytId: 'aaaaaaaaaaa', alt: [long, long, long, long, long].map((x, k) => `${k}${x}`) },
-    { title: `Emoji ${emoji}`, artist: 'E', ytId: 'bbbbbbbbbbb' },
-    { title: 'Birleşik é́́', artist: 'Zalgo z̶̷̸', ytId: 'ccccccccccc' },
+    { title: long, artist: 'Uzun Sanatçı', audio: 'https://p.scdn.co/mp3-preview/aaaaaaaaaaa', alt: [long, long, long, long, long].map((x, k) => `${k}${x}`) },
+    { title: `Emoji ${emoji}`, artist: 'E', audio: 'https://p.scdn.co/mp3-preview/bbbbbbbbbbb' },
+    { title: 'Birleşik é́́', artist: 'Zalgo z̶̷̸', audio: 'https://p.scdn.co/mp3-preview/ccccccccccc' },
   ] } });
   const r = await barrier(host);
   assert.equal(r.prep.trackCount, 3);
@@ -161,7 +163,7 @@ test('metinler: çok uzun ad/sanatçı/kaynak kısaltılır, emoji ve birleşik 
 test('kontrol/yön karakterleri (RTL override, sıfır genişlik, NUL) şarkı ve kaynak adlarından atılmalı (oyuncu adları gibi)', async () => {
   const { bots, host } = await fresh(2);
   host.send({ t: 'prep', data: { op: 'add', source: 'Liste‮txt.exe', tracks: [
-    { title: 'Ters‮çevir', artist: 'Sıfır​genişlik', ytId: 'ddddddddddd' }, { title: 'NUL\u0000karakter', artist: 'X', ytId: 'eeeeeeeeeee' }, { title: 'Temiz', artist: 'Y', ytId: 'fffffffffff' }, { title: 'Yedek', artist: 'Z', ytId: 'ggggggggggg' },
+    { title: 'Ters‮çevir', artist: 'Sıfır​genişlik', audio: 'https://p.scdn.co/mp3-preview/ddddddddddd' }, { title: 'NUL\u0000karakter', artist: 'X', audio: 'https://p.scdn.co/mp3-preview/eeeeeeeeeee' }, { title: 'Temiz', artist: 'Y', audio: 'https://p.scdn.co/mp3-preview/fffffffffff' }, { title: 'Yedek', artist: 'Z', audio: 'https://p.scdn.co/mp3-preview/ggggggggggg' },
   ] } });
   const r = await barrier(host);
   host.send({ t: 'start' });
@@ -195,22 +197,22 @@ test('300+ şarkı: 25\'lik parçalarla 330 şarkı → 300\'de durur, sonraki e
 test('tekrarlar: aynı ad + ilk sanatçı (büyük/küçük harf, Türkçe karakter, feat., parantez) bir kez sayılır', async () => {
   const { host } = await fresh(2);
   host.send({ t: 'prep', data: { op: 'add', tracks: [
-    { title: 'Şımarık', artist: 'Tarkan', ytId: 'aaaaaaaaaa1' },
-    { title: 'simarik', artist: 'TARKAN', ytId: 'aaaaaaaaaa2' },
-    { title: 'Şımarık (Remastered)', artist: 'Tarkan feat. Biri', ytId: 'aaaaaaaaaa3' },
-    { title: 'ŞIMARIK', artist: 'Tarkan, Başkası', ytId: 'aaaaaaaaaa4' },
-    { title: 'Şımarık', artist: 'Başka Sanatçı', ytId: 'aaaaaaaaaa5' }, // farklı sanatçı → farklı şarkı
+    { title: 'Şımarık', artist: 'Tarkan', audio: 'https://p.scdn.co/mp3-preview/aaaaaaaaaa1' },
+    { title: 'simarik', artist: 'TARKAN', audio: 'https://p.scdn.co/mp3-preview/aaaaaaaaaa2' },
+    { title: 'Şımarık (Remastered)', artist: 'Tarkan feat. Biri', audio: 'https://p.scdn.co/mp3-preview/aaaaaaaaaa3' },
+    { title: 'ŞIMARIK', artist: 'Tarkan, Başkası', audio: 'https://p.scdn.co/mp3-preview/aaaaaaaaaa4' },
+    { title: 'Şımarık', artist: 'Başka Sanatçı', audio: 'https://p.scdn.co/mp3-preview/aaaaaaaaaa5' }, // farklı sanatçı → farklı şarkı
   ] } });
   assert.equal((await barrier(host)).prep.trackCount, 2);
   // Parçalar arası ve tekrar gönderimde de tekrar eklenmez
-  host.send({ t: 'prep', data: { op: 'add', tracks: [{ title: 'Şımarık', artist: 'Tarkan', ytId: 'aaaaaaaaaa6' }] } });
+  host.send({ t: 'prep', data: { op: 'add', tracks: [{ title: 'Şımarık', artist: 'Tarkan', audio: 'https://p.scdn.co/mp3-preview/aaaaaaaaaa6' }] } });
   assert.equal((await barrier(host)).prep.trackCount, 2);
 });
 
 test('sanatçısı olmayan farklı şarkılar birbirinin tekrarı sayılmamalı', async () => {
   const { host } = await fresh(2);
   host.send({ t: 'prep', data: { op: 'add', tracks: [
-    { title: 'Birinci Şarkı', ytId: 'bbbbbbbbbb1' }, { title: 'İkinci Şarkı', ytId: 'bbbbbbbbbb2' }, { title: 'Üçüncü Şarkı', artist: '', ytId: 'bbbbbbbbbb3' },
+    { title: 'Birinci Şarkı', audio: 'https://p.scdn.co/mp3-preview/bbbbbbbbbb1' }, { title: 'İkinci Şarkı', audio: 'https://p.scdn.co/mp3-preview/bbbbbbbbbb2' }, { title: 'Üçüncü Şarkı', artist: '', audio: 'https://p.scdn.co/mp3-preview/bbbbbbbbbb3' },
   ] } });
   assert.equal((await barrier(host)).prep.trackCount, 3);
 });
@@ -218,10 +220,10 @@ test('sanatçısı olmayan farklı şarkılar birbirinin tekrarı sayılmamalı'
 test('Latin dışı alfabeyle (Kiril, Hangıl, Arapça, Yunanca) yazılmış şarkılar eklenebilmeli ve bilinebilmeli', async () => {
   const { bots, host } = await fresh(2);
   const tracks = [
-    { title: 'Группа крови', artist: 'Кино', ytId: 'ccccccccccc' },
-    { title: '강남스타일', artist: 'PSY', ytId: 'ddddddddddd' },
-    { title: 'Ελπίδα', artist: 'Νίκος', ytId: 'eeeeeeeeeee' },
-    { title: 'حبيبي', artist: 'عمرو دياب', ytId: 'fffffffffff' },
+    { title: 'Группа крови', artist: 'Кино', audio: 'https://p.scdn.co/mp3-preview/ccccccccccc' },
+    { title: '강남스타일', artist: 'PSY', audio: 'https://p.scdn.co/mp3-preview/ddddddddddd' },
+    { title: 'Ελπίδα', artist: 'Νίκος', audio: 'https://p.scdn.co/mp3-preview/eeeeeeeeeee' },
+    { title: 'حبيبي', artist: 'عمرو دياب', audio: 'https://p.scdn.co/mp3-preview/fffffffffff' },
   ];
   host.send({ t: 'prep', data: { op: 'add', tracks } });
   assert.equal((await barrier(host)).prep.trackCount, 4, 'dört farklı şarkı');
@@ -229,7 +231,7 @@ test('Latin dışı alfabeyle (Kiril, Hangıl, Arapça, Yunanca) yazılmış şa
   await host.waitRoom((x) => x.settings.rounds === 4);
   host.send({ t: 'start' });
   const v = await host.waitView((x) => x.phase === 'play');
-  const ans = tracks.find((t) => t.ytId === v.media.ytId);
+  const ans = trackOfView(v, tracks);
   host.action({ type: 'guess', text: ans.title });
   const after = await host.waitView((x) => x.me.guesses.length === 1);
   assert.equal(after.me.won, true, `tam başlık "${ans.title}" kabul edilmeli`);
@@ -313,7 +315,7 @@ test('hız sınırı × parçalı prep: patlama hâlinde 30/5 sn üstü düşer 
 
 test('görünüm boyutu: 300 uzun adlı şarkıda her görünüm (her eylemde her oyuncuya) havuzun tamamını taşımamalı', async () => {
   const { bots, host } = await fresh(3);
-  const tracks = Array.from({ length: 300 }, (_, i) => ({ title: `w${i} ${'Ş'.repeat(196)}`, artist: `${'Ü'.repeat(199)}`, ytId: `y${String(i).padStart(10, '0')}` }));
+  const tracks = Array.from({ length: 300 }, (_, i) => ({ title: `w${i} ${'Ş'.repeat(196)}`, artist: `${'Ü'.repeat(199)}`, audio: `https://p.scdn.co/mp3-preview/y${String(i).padStart(10, '0')}` }));
   await sendPrep(host, tracks, { chunk: 9, gap: 200, wait: false }); // istemci aralığı: 5 sn'de ≤ 25 mesaj
   await host.waitRoom((x) => x.prep.trackCount === 300, { timeout: 10_000 });
   host.send({ t: 'start' });

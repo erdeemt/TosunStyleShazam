@@ -16,12 +16,11 @@ test('kenar durumlar: çift dokunma, ses 404, yavaş ağ, misafir prep', async (
   const { ps, host } = await Q.room(env, ['Ali', 'Bozuk', 'Yavaş'], { desktopHost: true });
   const [, bad, slow] = ps;
   // Bozuk telefon: ses 404; yavaş telefon: ses 4 sn gecikmeli
-  await bad.ctx.unroute(/https:\/\/cdnt-preview\.dzcdn\.net\/.*/);
-  await bad.ctx.route(/https:\/\/cdnt-preview\.dzcdn\.net\/.*/, (r) => r.fulfill({ status: 404, body: 'yok' }));
-  await slow.ctx.unroute(/https:\/\/cdnt-preview\.dzcdn\.net\/.*/);
-  await slow.ctx.route(/https:\/\/cdnt-preview\.dzcdn\.net\/.*/, async (r) => {
+  // (ses sunucu vekilinden gelir: /api/clip/<opak>)
+  await bad.ctx.route(/\/api\/clip\//, (r) => r.fulfill({ status: 404, body: 'yok' }));
+  await slow.ctx.route(/\/api\/clip\//, async (r) => {
     await new Promise((res) => setTimeout(res, 4000));
-    await r.fulfill({ status: 200, contentType: 'audio/wav', body: Q.WAV });
+    await r.continue();
   });
 
   // Misafir prep gönderemez

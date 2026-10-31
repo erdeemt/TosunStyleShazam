@@ -75,7 +75,6 @@ test(`shazam soak: ${ROOMS} oda × ${BOTS} bot, ${SECONDS} sn`, { skip: !ON && '
           if (rng.next() < 0.3) { // prep'i yenile (yeni şarkılar hakeme de bildirilir)
             tracks = makeTracks(10 + rng.int(60), 900 + ri * 10 + stats.reprep++);
             ref.tracks.push(...tracks);
-            for (const t of tracks) ref.byMedia.set(t.ytId ? `yt:${t.ytId}` : `au:${t.audio}`, t);
             await sendPrep(host, tracks, { gap: 200 });
           }
         } catch (err) { stats.errors.push(`oyun r${ri}: ${err.message}`); await sleep(500); }

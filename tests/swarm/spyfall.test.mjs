@@ -248,3 +248,50 @@ test('soru-cevap: sıradaki oyuncu ayrılırsa ikili yeniden kurulur; suçlama s
   await a.waitView((x) => x.phase === 'accuse');
   assert.match((await a.expectError({ type: 'qaDone' })).message, /soru sırası yok/);
 });
+
+test('soru turları: ilk N soruda herkese tam bir kez sorulur, sonra yeni tur başlar', async () => {
+  for (const n of [4, 8]) {
+    const g = await setupGame(n);
+    const byId = (id) => g.bots.find((b) => b.playerId === id);
+    const targets = [];
+    for (let q = 1; q <= n + 1; q++) {
+      const v = await g.host.waitView((x) => x.qa.number === q);
+      assert.equal(v.qa.tour, q <= n ? 1 : 2, `${q}. soru turu`);
+      assert.equal(v.qa.askedCount, q <= n ? q : 1);
+      assert.equal(v.qa.playerCount, n);
+      targets.push(v.qa.targetId);
+      if (q === n + 1) break;
+      await byId(v.qa.askerId).act({ type: 'qaDone' });
+      byId(v.qa.targetId).action({ type: 'qaDone' });
+    }
+    assert.equal(new Set(targets.slice(0, n)).size, n, `${n} kişide ilk ${n} soruda herkese sorulmalı`);
+    assert.deepEqual(new Set(targets.slice(0, n)), new Set(g.bots.map((b) => b.playerId)));
+  }
+});
+
+test('mekân geçmişi: tekrar oynayınca (aynı oyuncular) önceki oyunların mekânları gelmez', async () => {
+  const g = await setupGame(3, { rounds: 10 });
+  const seen = [];
+  // 3 oyun × 10 tur: 30 turun hepsi farklı mekân olmalı (oyunlar arası da). Mesaj sınırına takılmamak için turlar arası kısa bekleme.
+  for (let game = 0; game < 3; game++) {
+    if (game > 0) {
+      g.host.send({ t: 'backToLobby' });
+      await g.host.waitRoom((r) => r.phase === 'lobby');
+      g.host.send({ t: 'start' });
+    }
+    for (let round = 1; round <= 10; round++) {
+      await Promise.all(g.bots.map((b) => b.waitView((v) => v.round === round && v.phase === 'play' && (game === 0 || v.gameKey !== g.prevKey))));
+      const spy = g.bots.find((b) => b.view.me.spy);
+      const loc = g.bots.find((b) => !b.view.me.spy).view.me.location.id;
+      seen.push(loc);
+      await spy.act({ type: 'guess', locationId: loc });
+      await g.host.waitView((v) => v.phase === 'reveal' && v.round === round);
+      g.host.action({ type: 'next' });
+      await sleep(250);
+    }
+    await g.host.waitRoom((r) => r.phase === 'over');
+    g.prevKey = g.host.view.gameKey;
+  }
+  assert.equal(seen.length, 30);
+  assert.equal(new Set(seen).size, 30, 'önceki oyunların mekânları tekrar gelmemeli');
+});

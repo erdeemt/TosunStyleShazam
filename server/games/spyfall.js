@@ -3,6 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { randomInt } from 'node:crypto';
 import { GameError, num, str } from '../errors.js';
+import { jsonStore } from '../store.js';
 
 const { locations: LOCATIONS } = JSON.parse(readFileSync(new URL('../../content/spyfall/locations.json', import.meta.url), 'utf8'));
 const LOCATION_LIST = LOCATIONS.map(({ id, name, emoji }) => ({ id, name, emoji }));
@@ -18,25 +19,62 @@ const isSpy = (state, id) => state.round.spyIds.includes(id);
 const findPlayer = (state, id) => state.players.find((p) => p.id === id && !p.left);
 
 // Soru-cevap sırası: X → Y'ye soruyor; ikisi de onaylayınca cevap veren yeni soran olur ve kendisine
-// az önce sorana geri soramaz (Spyfall kuralı). Hedef kalanlardan rastgele.
+// az önce sorana geri soramaz (Spyfall kuralı). Turlar: bir turda herkese bir kez sorulur; hedef bu turda
+// henüz sorulmamışlardan rastgele seçilir, herkese sorulunca yeni tur başlar.
 function pickTarget(state, rng, askerId, excludeId) {
+  const r = state.round;
   const others = active(state).filter((p) => p.id !== askerId);
-  const preferred = others.filter((p) => p.id !== excludeId);
-  const pool = preferred.length ? preferred : others;
-  return pool.length ? rng.pick(pool).id : null;
+  if (!others.length) return null;
+  let fresh = others.filter((p) => !r.asked.includes(p.id));
+  if (!fresh.length) {
+    // Bu turda herkese soruldu (soran hariç kalan yok): yeni tur
+    r.tour += 1;
+    r.asked = [];
+    fresh = others;
+  }
+  const preferred = fresh.filter((p) => p.id !== excludeId);
+  const pool = preferred.length ? preferred : fresh;
+  return rng.pick(pool).id;
 }
 
 function newPair(state, rng, askerId, excludeId = null) {
   const r = state.round;
-  r.qa = { number: (r.qa?.number ?? 0) + 1, askerId, targetId: pickTarget(state, rng, askerId, excludeId), done: [] };
+  const targetId = pickTarget(state, rng, askerId, excludeId);
+  if (targetId) r.asked.push(targetId);
+  r.qa = { number: (r.qa?.number ?? 0) + 1, askerId, targetId, done: [] };
+}
+
+// Mekân geçmişi: oyuncu başına görülen mekânlar kalıcı tutulur; yeni oyunda (tekrar oyna, yeni oda) mümkün
+// olduğunca odadakilerin hiçbirinin görmediği mekân seçilir. Bir oyuncu hepsini görünce onun listesi sıfırlanır.
+const seenStore = jsonStore('spyfall-seen', {}); // { playerId: [locationId] }
+const MAX_SEEN_PLAYERS = 5000;
+
+function pickLocation(state, rng, players) {
+  const unusedThisGame = LOCATIONS.filter((l) => !state.usedLocations.includes(l.id));
+  const candidates = unusedThisGame.length ? unusedThisGame : LOCATIONS;
+  const seenBy = (l) => players.filter((p) => seenStore.data[p.id]?.includes(l.id)).length;
+  const least = Math.min(...candidates.map(seenBy));
+  return rng.pick(candidates.filter((l) => seenBy(l) === least));
+}
+
+function rememberLocation(players, locationId) {
+  for (const p of players) {
+    let seen = seenStore.data[p.id] ?? [];
+    if (!seen.includes(locationId)) seen.push(locationId);
+    if (seen.length >= LOCATIONS.length) seen = [locationId]; // hepsi görüldü: baştan
+    seenStore.data[p.id] = seen;
+  }
+  const ids = Object.keys(seenStore.data);
+  if (ids.length > MAX_SEEN_PLAYERS) for (const id of ids.slice(0, ids.length - MAX_SEEN_PLAYERS)) delete seenStore.data[id];
+  seenStore.save();
 }
 
 function startRound(state, ctx) {
   const rng = ctx.rng;
   const players = active(state);
-  const unused = LOCATIONS.filter((l) => !state.usedLocations.includes(l.id));
-  const location = rng.pick(unused.length ? unused : LOCATIONS);
+  const location = pickLocation(state, rng, players);
   state.usedLocations.push(location.id);
+  rememberLocation(players, location.id);
 
   const spyCount = Math.min(state.settings.spies, players.length >= 9 ? 2 : 1);
   const shuffled = rng.shuffle(players.map((p) => p.id));
@@ -52,6 +90,8 @@ function startRound(state, ctx) {
     roles,
     firstAskerId: rng.pick(players).id,
     qa: null, // { number, askerId, targetId, done: [playerId] }
+    tour: 1, // soru turu: her turda herkese bir kez sorulur
+    asked: [], // bu turda soru sorulmuş oyuncular
     phase: 'play', // play | accuse | final | reveal
     endsAt: ctx.setTimer(state.settings.minutes * 60_000),
     remainingMs: null, // suçlama sırasında saat durur
@@ -290,7 +330,10 @@ export default {
       endsAt: r.endsAt,
       paused: r.phase === 'accuse',
       firstAskerId: r.firstAskerId,
-      qa: r.qa && { number: r.qa.number, askerId: r.qa.askerId, targetId: r.qa.targetId, done: r.qa.done },
+      qa: r.qa && {
+        number: r.qa.number, askerId: r.qa.askerId, targetId: r.qa.targetId, done: r.qa.done,
+        tour: r.tour, askedCount: active(state).filter((p) => r.asked.includes(p.id)).length, playerCount: active(state).length,
+      },
       players: state.players.filter((p) => !p.left).map((p) => ({ id: p.id, name: p.name, score: p.score })),
       locations: LOCATION_LIST,
       me: inGame
