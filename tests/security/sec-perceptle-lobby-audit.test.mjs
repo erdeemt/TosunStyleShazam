@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { startServer } from '../lib/server.js';
 const MONDAY = '2026-11-02'; // Pazartesi: Cuma varsayılanı (gerçek Cuma günü) testleri etkilemesin
 import { Bot, makeRoom, sleep } from '../lib/bot.js';
+import { secret } from '../lib/media.js';
 import { TESTS, TEMPO, evaluate, makeStimulus, trackLanding } from '../../public/perceptle-math.js';
 import { cryptoRng } from '../../server/rng.js';
 
@@ -33,6 +34,7 @@ test('mesaj taraması: uyaran, gerçek değer ve başkalarının cevabı zamanı
     await spec.connect();
     await spec.join(r.code);
     const plays = [];
+    const raws = [];
     const myAnswers = r.bots.map(() => []);
     for (let i = 0; i < TESTS.length; i++) {
       await r.host.waitView((v) => v.gameKey === gk && v.index === i && (v.phase === 'intro' || v.phase === 'play'));
@@ -40,6 +42,7 @@ test('mesaj taraması: uyaran, gerçek değer ve başkalarının cevabı zamanı
       const pm = await r.host.waitFor((m) => m.t === 'view' && m.view?.gameKey === gk && m.view.phase === 'play' && m.view.index === i, { fromStart: true });
       const pv = pm.view;
       plays.push(pv);
+      raws.push((await secret(srv, { room: r.code })).stimuli[i]); // ham uyaran (istemciye gitmez)
       // Uyaran SYNC_MS (700 ms × ölçek) erken gelir — gösterimden önce elde: tasarım gereği, burada sadece ölçülür.
       assert.ok(pv.startAt - pm.receivedAt <= 700 * TS + 50);
       await untilServer(pv.recallAt + 60);
@@ -65,7 +68,7 @@ test('mesaj taraması: uyaran, gerçek değer ve başkalarının cevabı zamanı
     const everyone = [...r.bots, spec];
     for (const b of everyone) {
       const raw = JSON.stringify(b.messages);
-      for (const bad of ['"stimuli"', '"answers"', '"closeAt"', '"token":"' + (b === r.host ? r.bots[1].token : r.host.token)]) {
+      for (const bad of ['"stimuli"', '"answers"', '"closeAt"', '"dots"', '"vx"', '"vy"', '"g":', '"token":"' + (b === r.host ? r.bots[1].token : r.host.token)]) {
         assert.ok(!raw.includes(bad), `${b.name}: ${bad} sızdı`);
       }
       for (const m of views(b, gk)) {
@@ -103,7 +106,7 @@ test('mesaj taraması: uyaran, gerçek değer ve başkalarının cevabı zamanı
           if (!pv.stimulus || !['count', 'track'].includes(TESTS[i])) continue;
           const firstReveal = b.messages.findIndex((m) => m.t === 'view' && m.view?.gameKey === gk && m.view.index === i && m.view.phase !== 'play' && m.view.phase !== 'intro');
           const before = JSON.stringify(b.messages.slice(0, firstReveal));
-          const probe = TESTS[i] === 'count' ? JSON.stringify(pv.stimulus.dots[0]) : `"vx":${pv.stimulus.vx}`;
+          const probe = TESTS[i] === 'count' ? JSON.stringify(raws[i].dots[0]) : `"vx":${raws[i].vx}`;
           assert.ok(!before.includes(probe), `izleyiciye ${TESTS[i]} uyaranı sızdı`);
         }
       }

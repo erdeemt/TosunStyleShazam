@@ -23,7 +23,7 @@ test('ezber süresi bitmeden gelen cevap reddedilir ve turu tüketmez', async ()
     await api(game, 'start', { ...me, mode: 'daily' });
     const r = await api(game, 'round', { ...me, mode: 'daily', gameId: DAY, round: 0 });
     assert.equal(r.status, 200, JSON.stringify(r.json));
-    const s = await api(game, 'submit', { ...me, mode: 'daily', gameId: DAY, round: 0, guess: r.json.target });
+    const s = await api(game, 'submit', { ...me, mode: 'daily', gameId: DAY, round: 0, guess: game === 'nuance' ? '#808080' : 440 }); // gizli hedef JSON'da yok
     assert.equal(s.status, 400, 'erken cevap kabul edildi');
     assert.match(s.json.error ?? s.json.message ?? '', /ezber/i);
     const st = await api(game, 'start', { ...me, mode: 'daily' });

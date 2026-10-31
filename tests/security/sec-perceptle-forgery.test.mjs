@@ -22,7 +22,7 @@ test('gösterim bitmeden gelen cevap reddedilir ve testi tüketmez', async () =>
   const r = await api('test', { ...me, mode: 'daily', gameId: DAY, index: 0 });
   assert.equal(r.status, 200);
   for (let k = 0; k < 5; k++) {
-    const s = await api('submit', { ...me, mode: 'daily', gameId: DAY, index: 0, answer: r.json.stimulus.dots.length });
+    const s = await api('submit', { ...me, mode: 'daily', gameId: DAY, index: 0, answer: 60 });
     assert.equal(s.status, 400, 'erken cevap kabul edildi');
   }
   const st = await api('start', { ...me, mode: 'daily' });
