@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { startServer } from '../lib/server.js';
 const MONDAY = '2026-11-02'; // Pazartesi: Cuma varsayılanı (gerçek Cuma günü) testleri etkilemesin
 import { Bot, makeRoom, sleep } from '../lib/bot.js';
+import { secret } from '../lib/media.js';
 import { TESTS, finalScore, gradeOf, trackLanding, splitValue } from '../../public/perceptle-math.js';
 
 const TS = 0.15; // intro 600 ms, cevap 4.5 sn, grace 300 ms, açıklama 1.8 sn
@@ -63,7 +64,7 @@ test('12 kişi Cuma: yarısı endsAt sınırında, yarısı grace sonrasında ay
     r.host.action({ type: 'go', index: i });
     const pv = await playView(r.host, gameKey, i);
     const test = TESTS[i];
-    const ans = goodAnswer(test, pv.stimulus);
+    const ans = goodAnswer(test, (await secret(srv, { room: r.code })).stimuli[i]); // ham uyaran istemciye gitmez
     // Hepsi aynı anda: 0–5 sınırın hemen içi, 6–11 grace bittikten sonra
     await untilServer(pv.endsAt - 3);
     r.bots.slice(0, 6).forEach((b) => b.action({ type: 'answer', index: i, answer: ans }));

@@ -23,6 +23,7 @@ const DAILY_ORDER = createRng(seedFrom(`tosun-wordle-v1:${SALT}`)).shuffle(ANSWE
 const FREE_TTL_MS = 6 * 3600_000;
 const MAX_FREE_GAMES = 5000;
 
+const identityStore = jsonStore('identities', {}); // lobby.js ile aynı kayıt (hesap yaşı: createdAt)
 const daily = jsonStore('wordle-daily', {}); // { 'YYYY-MM-DD': { playerId: { name, guesses: [{ word, marks }], done, won, finishedAt } } }
 const freeGames = new Map(); // gameId -> { playerId, answer, guesses, done, won, createdAt }
 
@@ -64,6 +65,25 @@ export function todayIstanbul(now = new Date()) {
   // Sadece testlerde: günü taklit et (gece yarısı geçişi, farklı günler).
   if (process.env.TEST_GAMES === '1' && process.env.FAKE_TODAY) return process.env.FAKE_TODAY;
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+}
+
+// Gerçek saatle (FAKE_TODAY'den bağımsız) bir anın İstanbul tarihi.
+export function istanbulDate(ms) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
+}
+
+// Yan hesap hilesi: günlük bulmacanın gününde (İstanbul) açılmış kimlik o günün sıralamasına girmez, en altta
+// "sıralama dışı" görünür. createdAt'ı olmayan eski kimlikler eski sayılır. Kimlik kaydı lobby.js'ten (identities.json).
+export function isFreshAccount(identityRecord, date) {
+  const c = identityRecord?.createdAt;
+  return Number.isFinite(c) && istanbulDate(c) === date;
+}
+
+// Sıralananlar (rank 1..) önce, sonra sıralama dışı yeniler (rank null). Her grupta ilk `limit` + sen.
+export function rankDaily(entries, cmp, limit = Infinity) {
+  const ranked = entries.filter((e) => !e.fresh).sort(cmp).map((e, i) => ({ ...e, rank: i + 1 }));
+  const fresh = entries.filter((e) => e.fresh).sort(cmp).map((e) => ({ ...e, rank: null }));
+  return [...ranked.filter((e) => e.rank <= limit || e.me), ...fresh.filter((e, i) => i < limit || e.me)];
 }
 
 function dayIndex(date) {
@@ -161,18 +181,19 @@ export function leaderboard(date, viewerId) {
   return {
     date,
     puzzleNo: dayIndex(date) + 1,
-    entries: Object.entries(day)
+    entries: rankDaily(Object.entries(day)
       .filter(([, e]) => e.done)
       .map(([id, e]) => ({
         name: e.name,
         me: id === viewerId,
+        fresh: isFreshAccount(identityStore.data[id], date), // bugün açılmış hesap: sıralama dışı
         won: e.won,
         tries: e.won ? e.guesses.length : null,
         finishedAt: e.finishedAt,
         // Bulmacayı bitirmemiş biri başkalarının renk desenlerinden ipucu almasın.
         grid: viewerDone ? e.guesses.map((g) => g.marks) : null,
-      }))
-      .sort((a, b) => (a.won === b.won ? (a.tries ?? 99) - (b.tries ?? 99) || a.finishedAt - b.finishedAt : a.won ? -1 : 1)),
+      })),
+    (a, b) => (a.won === b.won ? (a.tries ?? 99) - (b.tries ?? 99) || a.finishedAt - b.finishedAt : a.won ? -1 : 1)),
     playing: Object.values(day).filter((e) => !e.done && e.guesses.length).length,
   };
 }

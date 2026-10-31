@@ -3,11 +3,12 @@ import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { attachLobby, resolveIdentity, verifyIdentity, stats as lobbyStats } from './server/lobby.js';
+import { attachLobby, resolveIdentity, verifyIdentity, stats as lobbyStats, _testRoomSecrets } from './server/lobby.js';
 import * as wordle from './server/wordle.js';
 import * as recall from './server/recall.js';
 import * as perceptle from './server/perceptle.js';
 import { GameError } from './server/errors.js';
+import { serveMedia, mediaStats } from './server/media-tokens.js';
 import { clientIp, httpLimiter, upstreamLimiter } from './server/limits.js';
 import { handleClip, sessionCookie } from './server/clips.js';
 import { isCorrect } from './server/matcher.js';
@@ -316,6 +317,12 @@ async function handleApi(url, res, req) {
     if (endpoint === 'submit') return sendJson(res, 200, recall.submitGuess(identity, game, mode, body.gameId, body.round, body.guess));
     return sendJson(res, 200, recall.leaderboard(game, recall.todayIstanbul(), identity.id));
   }
+  // Gizli uyaran medyası (Nüans PNG, Ton Avı Zor WAV, Algıla nokta PNG): /api/media/<jeton>, gövdede kimlik.
+  const mediaRoute = url.pathname.match(/^\/api\/media\/([0-9a-f]{32})$/);
+  if (mediaRoute) {
+    const body = await readJson(req);
+    return serveMedia(res, mediaRoute[1], verifyIdentity(body.playerId, body.token), ip);
+  }
   // 👁️ Algıla: /api/perceptle/<uç>
   const perceptleRoute = url.pathname.match(/^\/api\/perceptle\/(start|test|submit|leaderboard)$/);
   if (perceptleRoute) {
@@ -329,8 +336,14 @@ async function handleApi(url, res, req) {
     return sendJson(res, 200, perceptle.leaderboard(perceptle.todayIstanbul(), identity.id));
   }
   // Sadece testlerde (TEST_GAMES=1): oda/döngü sayısı + işlemci süresi (sızıntı ve yük testleri için).
-  if (process.env.TEST_GAMES === '1' && url.pathname === '/api/_test/stats') {
-    return sendJson(res, 200, { ...lobbyStats(), cpu: process.cpuUsage(), uptimeMs: Math.round(process.uptime() * 1000), rss: process.memoryUsage().rss });
+  if (process.env.TEST_GAMES === '1' && process.env.TEST_MODE === '1' && url.pathname === '/api/_test/stats') {
+    return sendJson(res, 200, { ...lobbyStats(), media: mediaStats(), cpu: process.cpuUsage(), uptimeMs: Math.round(process.uptime() * 1000), rss: process.memoryUsage().rss });
+  }
+  // Sadece testlerde (TEST_GAMES=1): gizli hedef/uyaran (oyun artık bunları JSON'da göndermiyor; testler kusursuz cevap için).
+  if (process.env.TEST_GAMES === '1' && process.env.TEST_MODE === '1' && url.pathname === '/api/_test/secret') {
+    if (q.get('room')) return sendJson(res, 200, _testRoomSecrets(q.get('room')));
+    if (q.get('recall')) return sendJson(res, 200, recall._testSecrets(q.get('recall'), q.get('gameId')));
+    return sendJson(res, 200, perceptle._testSecrets(q.get('gameId')));
   }
   switch (url.pathname) {
     // ---------- Kimlik + günlük bulmacalar ----------
@@ -408,7 +421,8 @@ const CSP = [
   "script-src 'self' https://www.youtube.com https://s.ytimg.com",
   'frame-src https://www.youtube.com https://www.youtube-nocookie.com',
   // Kapaklar ve önizlemeler sadece müzik servislerinin CDN'lerinden (host tarafından eklenen şarkılar dahil).
-  "img-src 'self' data: https://i.scdn.co https://*.spotifycdn.com https://i.ytimg.com https://*.dzcdn.net",
+  // blob: → gizli uyaran görseli (Nüans hedefi) /api/media'dan indirilip gösterilir
+  "img-src 'self' data: blob: https://i.scdn.co https://*.spotifycdn.com https://i.ytimg.com https://*.dzcdn.net",
   "media-src 'self' data: https://p.scdn.co https://*.dzcdn.net", // data: → ses kilidini açan sessiz klip
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   'font-src https://fonts.gstatic.com',

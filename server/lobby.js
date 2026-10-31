@@ -46,10 +46,10 @@ export { GameError };
 const identityStore = jsonStore('identities', {});
 const identities = new Map(
   Object.values(identityStore.data).map((i) => [i.id, { ...i, socket: null, roomCode: null }]),
-); // playerId -> { id, token, name, socket, roomCode, lastSeen }
+); // playerId -> { id, token, name, socket, roomCode, lastSeen, createdAt? }
 
 function persistIdentity(identity) {
-  identityStore.data[identity.id] = { id: identity.id, token: identity.token, name: identity.name, lastSeen: identity.lastSeen };
+  identityStore.data[identity.id] = { id: identity.id, token: identity.token, name: identity.name, lastSeen: identity.lastSeen, ...(identity.createdAt ? { createdAt: identity.createdAt } : {}) };
   identityStore.save();
 }
 const rooms = new Map(); // code -> room
@@ -162,6 +162,7 @@ function makeCtx(room) {
     now: Date.now(),
     rng: room.rng,
     hostId: room.hostId,
+    roomCode: room.code, // medya jetonlarını odaya bağlamak için (server/media-tokens.js)
     timeScale: TIME_SCALE,
     // ms: oyun süresi (gerçek dakika cinsinden düşünülür); dönen değer bitiş anı (epoch ms, ölçeklenmiş).
     // Aynı anda birden fazla zamanlayıcı olabilir (ör. gündüz saati + aday destek süresi); isim verilmezse 'main'.
@@ -570,7 +571,8 @@ export function resolveIdentity({ playerId, token, name } = {}, ip = null) {
   if (!identity || typeof token !== 'string' || identity.token !== token) {
     if (ip && !identityLimiter.hit(ip)) throw new GameError('Bu ağdan çok fazla yeni oyuncu oluşturuldu. Biraz sonra tekrar dene.');
     if (identities.size >= LIMITS.maxIdentities) pruneIdentities();
-    identity = { id: randomUUID(), token: randomBytes(16).toString('hex'), name: null, socket: null, roomCode: null, lastSeen: Date.now() };
+    // createdAt: günlük sıralamada aynı gün açılan yan hesaplar "sıralama dışı" (eski kayıtlarda yok = eski hesap)
+    identity = { id: randomUUID(), token: randomBytes(16).toString('hex'), name: null, socket: null, roomCode: null, lastSeen: Date.now(), createdAt: Date.now() };
     identities.set(identity.id, identity);
   }
   if (str(name).trim()) identity.name = sanitizeName(name);
@@ -814,6 +816,12 @@ export function attachLobby(server) {
 }
 
 // Testler ve izleme için
+// Sadece testler (server.js bunu TEST_GAMES=1 iken /api/_test/secret ile açar): odanın gizli oyun verisi.
+export function _testRoomSecrets(code) {
+  const s = rooms.get(String(code))?.state;
+  return s ? { targets: s.targets ?? null, stimuli: s.stimuli ?? null } : null;
+}
+
 export function stats() {
   return { rooms: rooms.size, identities: identities.size, timeScale: TIME_SCALE, loops: loops.size };
 }

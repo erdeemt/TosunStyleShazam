@@ -3,7 +3,8 @@
 import { el } from '../ui.js';
 import { TONE_RANGES, centsBetween, centsHint, freqAt } from '../recall-math.js';
 import { createRecallGame, secondsTimer, timeBar } from './recall-client.js';
-import { audioReady, playTone, startLive, stopAll, unlockAudio } from './tone-audio.js';
+import { audioReady, decodeAudio, playBuffer, playTone, startLive, stopAll, unlockAudio } from './tone-audio.js';
+import { fetchMedia } from '../media.js';
 import { createWave } from './tone-wave.js';
 
 let memoKey = '';
@@ -31,13 +32,35 @@ function scene(extraClass, ...children) {
   return { wave, node: el('div', { class: `tn-stage ${extraClass}` }, wave.node, ...children) };
 }
 
+// Zor mod: hedef Hz JSON'da yok; sunucunun WAV'ı (opak, tek kullanımlık adres) indirilip çözülür. Adres başına bir kez.
+const decoded = new Map(); // url -> Promise<AudioBuffer>
+function prepareMedia(url) {
+  let p = decoded.get(url);
+  if (!p) {
+    p = fetchMedia(url).then(decodeAudio);
+    p.catch(() => decoded.delete(url));
+    decoded.set(url, p);
+    while (decoded.size > 4) decoded.delete(decoded.keys().next().value);
+  }
+  return p;
+}
+
 // Hedef ton bu ekranda bir kez çalar. Ses kilitliyse (tarayıcı dokunuş istemiş) bir düğmeyle kalan süre çalınır.
-function memorizeView(target, { endsAt, totalMs, key }) {
+// target: Hz (Kolay) ya da null + media: WAV adresi (Zor).
+function memorizeView(target, { endsAt, totalMs, key, media }) {
+  let buffer = null;
+  let wantPlay = false;
+  if (target == null && media) {
+    prepareMedia(media).then((b) => { buffer = b; if (wantPlay) play(); }).catch(() => {});
+  }
   const play = () => {
     const left = endsAt - Date.now();
     if (left < 120) return;
     memoStop?.();
-    memoStop = playTone(target, left);
+    if (target != null) { memoStop = playTone(target, left); return; }
+    if (!buffer) { wantPlay = true; return; } // indirilince çalar
+    wantPlay = false;
+    memoStop = playBuffer(buffer, Math.max(0, buffer.duration * 1000 - left));
   };
   const overlay = el('div', { class: 'tn-overlay' });
   const { node } = scene('tn-orb tn-memo', overlay);
@@ -214,6 +237,7 @@ const game = createRecallGame({
   formatTotal: (total, { short } = {}) => (short ? total.toFixed(2) : `${total.toFixed(2)}/50`),
   shareText: ({ mode, puzzleNo, total }) => `${mode === 'daily' ? `Tosun Ton Avı #${puzzleNo}` : 'Tosun Ton Avı (sınırsız)'} · ${total.toFixed(2)}/50`,
   unlock: unlockAudio,
+  prepareMedia,
   stopSound,
   inlineSubmit: true,
 });

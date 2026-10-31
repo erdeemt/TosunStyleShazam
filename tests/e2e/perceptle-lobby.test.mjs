@@ -1,6 +1,7 @@
 // Tarayıcı testi: 👁️ Algıla lobi — 3 telefon (360×800) tam oyun: Say, Yörünge (sürükleme), Açı, Ritim (Boşluk tuşu,
 // vuruş anında), Böl; uyaran herkese aynı anda, başkası cevaplayınca girdi sıfırlanmaz, açıklama ve final ekranı.
 // Ekran görüntüleri: test-results/perceptle-lobby/.
+import { secret } from '../lib/media.js';
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
@@ -31,7 +32,7 @@ async function phone(name, b = browser) {
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('websocket', (ws) => ws.on('framereceived', ({ payload }) => {
-    try { const m = JSON.parse(payload); if (m.t === 'view') views.push(m.view); } catch { /* yok say */ }
+    try { const m = JSON.parse(payload); if (m.t === 'view') views.push(m.view); if (m.t === 'room' && m.room) views.code = m.room.code; } catch { /* yok say */ }
   }));
   await page.goto(`${srv.url}/#/multi/perceptle`);
   await page.fill('input[placeholder="Takma adın"]', name);
@@ -42,7 +43,7 @@ async function phone(name, b = browser) {
 async function stimOf(p, index) {
   for (let k = 0; k < 200; k++) {
     const v = p.views.find((x) => x.phase === 'play' && x.index === index && x.stimulus);
-    if (v) return v.stimulus;
+    if (v) return (await secret(srv, { room: p.views.code })).stimuli[index]; // ham uyaran (istemciye PNG/örnek gider)
     await new Promise((r) => setTimeout(r, 25));
   }
   throw new Error(`${p.name}: ${index}. uyaran gelmedi`);

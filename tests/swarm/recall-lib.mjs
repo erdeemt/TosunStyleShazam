@@ -4,6 +4,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startServer } from '../lib/server.js';
 import { makeRoom, sleep } from '../lib/bot.js';
+import { secret } from '../lib/media.js';
 import { scoreColor, scoreTone, hexToRgb, round2 } from '../../public/recall-math.js';
 
 const SCORE = {
@@ -54,7 +55,14 @@ export function recallSuite(gameId, { guessFor, outOfRange, clampedTo, invalid }
             if (g != null) assert.ok(!contains(text, g), `${b.name}, ${bots[oi].name} adlı oyuncunun cevabını erken gördü (${g})`);
           }
         }
-        if (v.phase === 'memorize') assert.ok(v.target != null, 'ezberde hedef görünmeli');
+        if (v.phase === 'memorize') {
+          // Gizli hedef (Nüans, Ton Avı Zor): ezberde hex/Hz yok, sadece opak medya adresi.
+          const hidden = gameId === 'nuance' || v.difficulty === 'hard';
+          if (hidden) {
+            assert.equal(v.target, null, 'ezberde gizli hedef JSON içinde olmamalı');
+            assert.match(v.media, /^\/api\/media\/[0-9a-f]{32}$/);
+          } else assert.ok(v.target != null, 'ezberde hedef görünmeli');
+        }
       }
       for (const other of bots) if (other !== b) assert.ok(!b.transcript().includes(other.token), 'token sızdı');
     }
@@ -64,7 +72,8 @@ export function recallSuite(gameId, { guessFor, outOfRange, clampedTo, invalid }
   async function playRound(room, round, guesses, { skip = new Set() } = {}) {
     // Ezber görünümü çoktan gelmiş olabilir: tüm mesaj geçmişinde ara.
     const memo = await room.host.waitFor((m) => m.t === 'view' && m.view?.round === round && m.view.phase === 'memorize', { fromStart: true, timeout: 8000 });
-    const target = memo.view.target;
+    // Gizli hedefte görünümde target yok: testlere özel uçtan al (kusursuz/benzersiz cevap için).
+    const target = memo.view.target ?? (await secret(srv, { room: room.code })).targets[round - 1];
     await Promise.all(room.bots.map(async (b, i) => {
       await b.waitView((v) => v.round === round && v.phase !== 'memorize', { timeout: 8000 });
       if (skip.has(i) || b.view.phase !== 'recall') return;

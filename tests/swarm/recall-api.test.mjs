@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startServer } from '../lib/server.js';
 import { sleep } from '../lib/bot.js';
+import { secret } from '../lib/media.js';
 import { scoreColor, scoreTone, hexToRgb } from '../../public/recall-math.js';
 
 const DAY = '2026-11-07';
@@ -57,7 +58,12 @@ for (const [game, G] of Object.entries(GAMES)) {
     for (let i = 0; i < 5; i++) {
       const r = await api(game, 'round', { ...me, mode: 'daily', gameId: DAY, round: i });
       assert.equal(r.status, 200, r.text);
-      assert.deepEqual(r.json.target, targets[i]);
+      if (game === 'nuance') {
+        // Nüans: hex JSON'da yok, opak tek kullanımlık PNG adresi var
+        assert.equal(r.json.target, undefined);
+        assert.match(r.json.media, /^\/api\/media\/[0-9a-f]{32}$/);
+        assert.ok(!has(r.text, targets[i]), 'Nüans hedefi JSON içinde');
+      } else assert.deepEqual(r.json.target, targets[i]); // Ton Avı Kolay (günlük): Hz görünür kalabilir
       assert.ok(targets.slice(i + 1).every((t) => !has(r.text, t)), 'sonraki turun hedefi sızdı');
       const again = await api(game, 'round', { ...me, mode: 'daily', gameId: DAY, round: i });
       assert.match(again.json.error, /zaten başladı/);
@@ -159,8 +165,12 @@ for (const [game, G] of Object.entries(GAMES)) {
     const steal = await api(game, 'round', { ...b, mode: 'free', gameId: g.gameId, round: 0 });
     assert.match(steal.json.error, /bulunamadı/);
     const r0 = (await api(game, 'round', { ...a, mode: 'free', gameId: g.gameId, round: 0 })).json;
-    assert.ok(r0.target != null);
-    const s = (await api(game, 'submit', { ...a, mode: 'free', gameId: g.gameId, round: 0, guess: r0.target })).json;
+    // Uzman Nüans ve Zor Ton Avı: hedef JSON'da yok (medya adresi); kusursuz cevap için testlere özel uç
+    assert.equal(r0.target, undefined);
+    assert.ok(r0.media);
+    const real = (await secret(srv, { recall: game, gameId: g.gameId })).targets[0];
+    await sleep(g.memorizeMs + 20);
+    const s = (await api(game, 'submit', { ...a, mode: 'free', gameId: g.gameId, round: 0, guess: real })).json;
     assert.equal(s.played[0].score, game === 'nuance' ? 1000 : 10);
     const bogus = (await api(game, 'start', { ...a, mode: 'free', difficulty: '__proto__' })).json;
     assert.equal(bogus.difficulty, game === 'nuance' ? 'normal' : 'easy');

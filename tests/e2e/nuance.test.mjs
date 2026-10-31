@@ -1,5 +1,6 @@
 // Tarayıcı testi: 🎨 Nüans — tek oyunculu günlük oyun (hex + kaydırıcı + süre dolunca otomatik gönderim, sıralama)
 // ve 3 telefonla lobi oyunu (360×800). Ekran görüntüleri: test-results/nuance/.
+import { secret } from '../lib/media.js';
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
@@ -31,6 +32,22 @@ async function phone(hash) {
 }
 
 const rgbToHex = (css) => `#${css.match(/\d+/g).slice(0, 3).map((n) => Number(n).toString(16).padStart(2, '0')).join('')}`;
+// Hedef hex artık JSON'da/DOM'da yok: ezber diskindeki sunucu PNG'si (blob:). Görselin ortalama rengi (göz damlası değil,
+// tüm piksellerin ortalaması) ve kesin hedef (testlere özel uç) ayrı ayrı alınır.
+async function shownHex(page) {
+  await page.waitForFunction(() => document.querySelector('.nu-target-img')?.complete && document.querySelector('.nu-target-img').naturalWidth > 0);
+  return page.$eval('.nu-target-img', (img) => {
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const x = c.getContext('2d');
+    x.drawImage(img, 0, 0);
+    const d = x.getImageData(0, 0, c.width, c.height).data;
+    const s = [0, 0, 0];
+    for (let i = 0; i < d.length; i += 4) { s[0] += d[i]; s[1] += d[i + 1]; s[2] += d[i + 2]; }
+    return `#${s.map((v) => Math.round(v / (d.length / 4)).toString(16).padStart(2, '0')).join('')}`;
+  });
+}
+const near = (a, b, tol = 2) => [1, 3, 5].every((i) => Math.abs(parseInt(a.slice(i, i + 2), 16) - parseInt(b.slice(i, i + 2), 16)) <= tol);
 const noHorizontalScroll = (page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
 
 test('tek oyunculu günlük: 5 tur, hex ve kaydırıcı, otomatik gönderim, sıralama', async () => {
@@ -44,7 +61,8 @@ test('tek oyunculu günlük: 5 tur, hex ve kaydırıcı, otomatik gönderim, sı
   for (let round = 0; round < 5; round++) {
     if (round > 0) await page.click('.rc-go');
     await page.waitForSelector('.nu-target');
-    const target = rgbToHex(await page.$eval('.nu-target', (n) => getComputedStyle(n).backgroundColor));
+    const target = (await secret(srv, { recall: 'nuance', gameId: DAY })).targets[round];
+    if (round === 0) assert.ok(near(await shownHex(page), target), 'gösterilen görsel hedef renkte olmalı');
     if (round === 0) await page.screenshot({ path: `${SHOTS}single-memorize.png` });
     await page.waitForSelector('.nu-input', { timeout: 6000 });
     assert.equal(await page.locator('.nu-target').count(), 0, 'hatırlama ekranında hedef görünmemeli');
@@ -124,11 +142,13 @@ test('3 telefon lobi: aynı hedef, gizli cevaplar, açıklama yan yana, final s�
   await ali.page.click('#game-nuance button:has-text("Oyunu başlat")');
 
   for (let round = 1; round <= 3; round++) {
-    const targets = await Promise.all(phones.map(async (p) => {
+    const shown = await Promise.all(phones.map(async (p) => {
       await p.page.waitForSelector('.nu-target');
-      return rgbToHex(await p.page.$eval('.nu-target', (n) => getComputedStyle(n).backgroundColor));
+      return shownHex(p.page);
     }));
-    assert.equal(new Set(targets).size, 1, 'herkes aynı hedefi görmeli');
+    const real = (await secret(srv, { room: code })).targets[round - 1];
+    assert.ok(shown.every((h) => near(h, real)), `herkes aynı hedefi görmeli ${shown} ~ ${real}`);
+    const targets = [real];
     if (round === 1) await ayse.page.screenshot({ path: `${SHOTS}lobby-memorize.png` });
     await Promise.all(phones.map((p) => p.page.waitForSelector('.nu-input', { timeout: 6000 })));
     // Ali hex ile tam isabet, Ayşe kaydırıcıyla, Mert dokunmaz (süre dolunca otomatik)

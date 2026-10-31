@@ -1,5 +1,6 @@
 // Tarayıcı testi: 👁️ Algıla — tam günlük oyun (5 test, dokunmatik 360×800) ve sınırsız Cuma kuralları oyunu.
 // Ekran görüntüleri: test-results/perceptle/.
+import { secret } from '../lib/media.js';
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
@@ -28,7 +29,12 @@ async function phone(hash) {
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('response', async (res) => {
-    if (res.url().endsWith('/api/perceptle/test') && res.ok()) stimuli.push(await res.json().catch(() => null));
+    // İstemciye ham uyaran gitmiyor (nokta PNG'si / yörünge örnekleri): kusursuz cevap için testlere özel uçtan ham hâli
+    if (res.url().endsWith('/api/perceptle/test') && res.ok()) {
+      const j = await res.json().catch(() => null);
+      if (j) { j.public = j.stimulus; j.stimulus = (await secret(srv, { gameId: j.gameId })).stimuli[j.index]; }
+      stimuli.push(j);
+    }
   });
   // Yanıt gövdesi olaydan biraz sonra gelir: i. test uyaranını bekle
   stimuli.at = async (i) => {

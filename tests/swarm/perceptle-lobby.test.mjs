@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startServer } from '../lib/server.js';
 import { Bot, makeRoom, sleep } from '../lib/bot.js';
+import { secret, hasKey } from '../lib/media.js';
 import { TESTS, evaluate, finalScore, gradeOf, tempoExpected, trackLanding, splitValue } from '../../public/perceptle-math.js';
 
 const TS = 0.05; // intro 0.2 sn, cevap 1.5 sn, açıklama 0.6 sn
@@ -78,9 +79,14 @@ async function playAll(r, gameKey, { friday = false, skip = new Set(), go = true
     await r.host.waitView((v) => v.gameKey === gameKey && v.index === i && (v.phase === 'intro' || v.phase === 'play'));
     if (go && r.host.view.phase === 'intro') r.host.action({ type: 'go', index: i });
     const pvs = await Promise.all(r.bots.map((b) => playView(b, gameKey, i)));
-    const stim = pvs[0].stimulus;
-    assert.ok(stim, 'play başında uyaran gelmeli');
-    for (const pv of pvs) assert.deepEqual(pv.stimulus, stim, 'herkese aynı uyaran');
+    assert.ok(pvs[0].stimulus, 'play başında uyaran gelmeli');
+    // İstemciye ham uyaran gitmez: Say → oyuncu başına ayrı PNG adresi, Yörünge → örnekler; diğerleri herkese aynı.
+    if (tests[i] === 'count') {
+      assert.ok(pvs.every((pv) => /^\/api\/media\/[0-9a-f]{32}$/.test(pv.stimulus.image) && !hasKey(pv.stimulus, ['dots'])));
+      assert.equal(new Set(pvs.map((pv) => pv.stimulus.image)).size, pvs.length, 'herkese ayrı medya adresi');
+    } else for (const pv of pvs) assert.deepEqual(pv.stimulus, pvs[0].stimulus, 'herkese aynı uyaran');
+    if (tests[i] === 'track') assert.ok(!hasKey(pvs[0].stimulus, ['g', 'vx', 'vy', 'x0', 'y0', 'landing']), 'atış parametresi sızdı');
+    const stim = (await secret(srv, { room: r.code })).stimuli[i];
     assert.ok(pvs.every((pv) => pv.startAt === pvs[0].startAt), 'herkese aynı başlangıç anı');
     stimuli.push(stim);
     await untilServer(pvs[0].recallAt + 5);
@@ -116,6 +122,10 @@ function assertNoLeaks(r, gameKey, { stimuli, answers, tests }) {
       const before = JSON.stringify(b.messages.slice(0, firstPlay));
       if (tests[i] === 'count' || tests[i] === 'track') assert.ok(!before.includes(JSON.stringify(stim)), `${b.name}: ${tests[i]} uyaranı play'den önce sızdı`);
       if (tests[i] === 'count') assert.ok(!before.includes(JSON.stringify(stim.dots[0])), 'nokta erken sızdı');
+      // Gizli uyaran: nokta koordinatları ve atış parametreleri hiçbir mesajda (açıklamada da) yok.
+      const all = b.transcript();
+      if (tests[i] === 'count') assert.ok(!all.includes(JSON.stringify(stim.dots[0])) && !all.includes('"dots"'), 'nokta koordinatı sızdı');
+      if (tests[i] === 'track') assert.ok(!/"(vx|vy|g|x0|y0)":/.test(all), 'yörünge parametresi sızdı');
     }
     for (const v of views) {
       if (v.phase !== 'play') assert.equal(v.stimulus, null, `${v.phase} fazında uyaran olmamalı`);
@@ -125,7 +135,8 @@ function assertNoLeaks(r, gameKey, { stimuli, answers, tests }) {
       }
       if (v.phase === 'play') {
         for (const p of v.players) assert.deepEqual(Object.keys(p).sort(), ['answered', 'grade', 'id', 'name', 'scores', 'total']);
-        const text = JSON.stringify({ ...v, me: null });
+        // Uyaran (yörünge örnekleri) cevap değil: rastlantısal sayı eşleşmesi olmasın
+        const text = JSON.stringify({ ...v, me: null, stimulus: null, history: v.history.map((h) => ({ ...h, stimulus: null })) });
         if (tests[v.index] === 'track') {
           for (const [ok] of r.bots.entries()) {
             const a = answers[`${ok}:${v.index}`];
@@ -375,7 +386,7 @@ test('izleyici: intro ve açıklamayı görür, uyaranı almaz, cevap veremez', 
   await untilServer(pv.recallAt + 5);
   for (const b of r.bots) b.action({ type: 'answer', index: 0, answer: 60 });
   const rv = await spec.waitView((v) => v.phase === 'reveal');
-  assert.equal(rv.last.truth, pv.stimulus.dots.length);
+  assert.equal(rv.last.truth, (await secret(srv, { room: r.code })).stimuli[0].dots.length);
   assert.equal(Object.keys(rv.last.results).length, 2);
 });
 

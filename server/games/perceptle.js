@@ -5,7 +5,7 @@
 import { randomBytes } from 'node:crypto';
 import { cryptoRng } from '../rng.js';
 import { GameError, num, str } from '../errors.js';
-import { cleanAnswer, isFriday, todayIstanbul } from '../perceptle.js';
+import { cleanAnswer, isFriday, publicStimulus, revealStimulus, todayIstanbul } from '../perceptle.js';
 import { TESTS, TEMPO, evaluate, finalScore, gradeOf, makeStimulus, splitLabel, stimulusMs, truthOf } from '../../public/perceptle-math.js';
 
 const INTRO_MS = 4000; // test adı + kural, 3-2-1 (host atlayabilir)
@@ -54,6 +54,7 @@ function startPlay(state, ctx) {
   state.recallAt = state.startAt + sc(ctx, showMs);
   state.endsAt = state.recallAt + sc(ctx, ANSWER_MS);
   state.closeAt = ctx.setTimer(SYNC_MS + showMs + ANSWER_MS + GRACE_MS, 'play');
+  state.shown = new Map(); // bu testin oyuncu başına istemci uyaranı (Say: kendi PNG adresi)
 }
 
 function finishTest(state, ctx) {
@@ -73,7 +74,7 @@ function finishTest(state, ctx) {
     test,
     truth: truthOf(test, stim),
     label: test === 'split' ? splitLabel(stim) : null,
-    stimulus: DRAWN.has(test) ? stim : null,
+    stimulus: DRAWN.has(test) ? revealStimulus(test, stim) : null, // yörünge: örnekler + iniş (parametre yok)
     results,
   });
   state.phase = 'reveal';
@@ -124,6 +125,8 @@ export default {
     const rng = cryptoRng();
     const state = {
       settings,
+      roomCode: ctx.roomCode ?? null, // medya jetonu odaya bağlı
+      shown: new Map(),
       timeScale: ctx.timeScale, // istemci animasyonu (gerçek süre × ölçek) için
       gameKey: randomBytes(4).readUInt32BE(0),
       tests,
@@ -204,6 +207,20 @@ export default {
     const showStim = inPlay && playing && (!TIMED.has(test) || Date.now() < state.recallAt);
     const mine = inPlay ? state.answers[playerId] : null;
     const friday = state.settings.rules === 'friday';
+    // İstemciye ham uyaran değil publicStimulus gider (nokta PNG'si / yörünge örnekleri); oyuncu başına bir kez üretilir.
+    let stimulus = null;
+    if (showStim) {
+      stimulus = state.shown.get(playerId);
+      if (!stimulus) {
+        stimulus = publicStimulus(test, state.stimuli[state.index], friday, {
+          owner: playerId,
+          room: state.roomCode,
+          ttlMs: state.recallAt - Date.now() + 3000,
+          cacheKey: `perceptle-room:${state.roomCode}:${state.gameKey}:${state.index}`,
+        });
+        state.shown.set(playerId, stimulus);
+      }
+    }
     return {
       game: 'perceptle',
       gameKey: state.gameKey,
@@ -218,7 +235,7 @@ export default {
       recallAt: inPlay ? state.recallAt : null,
       leadMs: inPlay && test === 'tempo' ? TEMPO.leadMs : 0, // ölçeksiz; istemci timeScale ile çarpar
       timeScale: state.timeScale,
-      stimulus: showStim ? state.stimuli[state.index] : null,
+      stimulus,
       me: { playing, answered: Boolean(mine), answer: mine ? mine.answer : null },
       players: state.players.filter((p) => !p.left).map((p) => {
         const total = finalScore(p.scores);

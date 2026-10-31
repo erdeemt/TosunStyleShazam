@@ -6,10 +6,12 @@ import { createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { cryptoRng } from './rng.js';
 import { GameError, num } from './errors.js';
 import { jsonStore } from './store.js';
-import { todayIstanbul } from './wordle.js';
+import { isFreshAccount, rankDaily, todayIstanbul } from './wordle.js';
 import {
-  TESTS, TEMPO, SPLIT_RANGE, evaluate, splitLabel, finalScore, gradeOf, makeStimulus, stimulusMs, truthOf,
+  COUNT, TESTS, TEMPO, SPLIT_RANGE, evaluate, splitLabel, finalScore, gradeOf, makeStimulus, stimulusMs, truthOf, trackPublic, trackReveal,
 } from '../public/perceptle-math.js';
+import { mintMedia } from './media-tokens.js';
+import { countFrames, dotsPng } from './media-encode.js';
 
 // Süre ölçeği sadece test sunucusunda (TEST_MODE=1, tests/lib/server.js): üretimde yanlışlıkla bırakılırsa süreler değişmesin.
 const TIME_SCALE = process.env.TEST_MODE === '1' && Number(process.env.TIME_SCALE) > 0 ? Number(process.env.TIME_SCALE) : 1;
@@ -120,6 +122,26 @@ function settle(game, stimOf, now = Date.now()) {
   finishIfDone(game);
 }
 
+// İstemciye giden uyaran: Say noktaları koordinat listesi değil sunucuda çizilmiş PNG (Cuma: kare şeridi),
+// Yörünge sadece görünen kısmın örnekleri (yerçekimi/hız/iniş yok). Açı/Ritim/Böl olduğu gibi (zaten ekranda/duyuluyor).
+// media: { owner, room?, ttlMs, cacheKey? } — PNG adresi sahibine bağlı ve kısa ömürlü (server/media-tokens.js).
+export function publicStimulus(test, stim, friday, media) {
+  if (test === 'count') {
+    const layout = countFrames(friday, COUNT.showMs);
+    return {
+      image: mintMedia({ ...media, contentType: 'image/png', render: () => dotsPng(stim.dots, layout) }),
+      ...layout,
+    };
+  }
+  if (test === 'track') return trackPublic(stim);
+  return stim;
+}
+
+// Sonuç çizimi için: yörüngede tüm uçuşun örnekleri + iniş (parametreler yine gitmez).
+export const revealStimulus = (test, stim) => (test === 'track' ? trackReveal(stim) : test === 'angle' || test === 'split' ? stim : null);
+
+const MEDIA_GRACE_MS = 3000;
+
 // Sürerken yenilenen sayfada sadece süresiz uyaranlar (açı, böl: hedef zaten ekranda yazılı) tekrar gönderilir.
 const RESENDABLE = new Set(['angle', 'split']);
 
@@ -130,6 +152,7 @@ function publicGame(game, stimOf, extra) {
     test: TESTS[i],
     truth: truthOf(TESTS[i], stimOf(i)),
     label: TESTS[i] === 'split' ? splitLabel(stimOf(i)) : null, // "3/7", "%42"
+    stimulus: TESTS[i] === 'track' ? revealStimulus('track', stimOf(i)) : null, // sonuç çizimi (örnekler + iniş)
     answer: t.answer,
     score: t.score,
     error: t.error,
@@ -258,14 +281,19 @@ export function startTest(identity, mode, rawGameId, rawIndex) {
   game.tests.push(t);
   if (mode === 'daily') { game.name = identity.name ?? game.name; daily.save(); }
   const stim = stimOf(index);
+  const showMs = showMsOf(index, stim, game.friday);
   return {
     ...extra,
     index,
     test: TESTS[index],
     friday: game.friday,
-    stimulus: stim,
+    stimulus: publicStimulus(TESTS[index], stim, game.friday, {
+      owner: identity.id,
+      ttlMs: showMs + MEDIA_GRACE_MS,
+      cacheKey: mode === 'daily' ? `perceptle:${extra.gameId}:${index}` : null, // günlük: herkese aynı görsel
+    }),
     timeScale: TIME_SCALE, // istemci animasyonu (gerçek süre × ölçek) ve ritim aralığı için
-    showMs: showMsOf(index, stim, game.friday),
+    showMs,
     leadMs: TESTS[index] === 'tempo' ? scaled(TEMPO.leadMs) : 0,
     startedAt: now,
     endsAt: deadlineOf(t, index, stim, game.friday),
@@ -310,22 +338,27 @@ export function leaderboard(date, viewerId) {
     puzzleNo: dayIndex(date) + 1,
     friday: isFriday(date),
     viewerDone,
-    entries: Object.entries(day)
+    entries: rankDaily(Object.entries(day)
       .filter(([, e]) => e.done)
       .map(([id, e]) => ({
         name: identityStore.data[id]?.name ?? e.name,
         me: id === viewerId,
+        fresh: isFreshAccount(identityStore.data[id], date), // bugün açılmış hesap: sıralama dışı
         total: e.total,
         grade: gradeOf(e.total),
         finishedAt: e.finishedAt,
         scores: viewerDone ? e.tests.map((t) => t.score) : null,
-      }))
-      .sort((a, b) => b.total - a.total || a.finishedAt - b.finishedAt)
-      .map((e, i) => ({ ...e, rank: i + 1 }))
-      .filter((e) => e.rank <= BOARD_LIMIT || e.me),
+      })), (a, b) => b.total - a.total || a.finishedAt - b.finishedAt, BOARD_LIMIT),
     finishers: Object.values(day).filter((e) => e.done).length,
     playing: Object.values(day).filter((e) => !e.done && e.tests.length).length,
   };
 }
 
 export { todayIstanbul };
+
+// Sadece testler (server.js bunu TEST_GAMES=1 iken /api/_test/secret ile açar): ham uyaranlar.
+export function _testSecrets(rawGameId) {
+  const free = freeGames.get(String(rawGameId));
+  if (free) return { stimuli: free.stimuli };
+  return { stimuli: TESTS.map((_, i) => dailyStimulus(String(rawGameId), i)) };
+}

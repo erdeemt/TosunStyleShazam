@@ -29,6 +29,16 @@ async function phone(hash) {
       window.__tones.push(this.frequency.value);
       return start.apply(this, args);
     };
+    // Zor mod: hedef sunucunun WAV'ı (AudioBufferSourceNode); sıfır geçişlerinden frekansı kaydet
+    window.__wavs = [];
+    const bstart = AudioBufferSourceNode.prototype.start;
+    AudioBufferSourceNode.prototype.start = function (...args) {
+      const d = this.buffer.getChannelData(0);
+      let c = 0;
+      for (let i = 1; i < d.length; i++) if (d[i - 1] < 0 && d[i] >= 0) c++;
+      window.__wavs.push(c / this.buffer.duration);
+      return bstart.apply(this, args);
+    };
   });
   const page = await ctx.newPage();
   const errors = [];
@@ -138,8 +148,11 @@ test('2 telefon lobi, Zor mod: Hz gizli, aynı ton, açıklamada iki cevap', asy
     await Promise.all(phones.map((p) => p.page.waitForSelector('.tn-orb')));
     if (round === 1) await ece.page.screenshot({ path: `${SHOTS}lobby-memorize.png` });
     await Promise.all(phones.map((p) => p.page.waitForSelector('.tn-pad', { timeout: 6000 })));
-    const heard = await Promise.all(phones.map((p) => p.page.evaluate(() => window.__tones.at(-1))));
-    assert.ok(Math.abs(heard[0] - heard[1]) < 0.01, 'iki telefonda aynı ton çalmalı');
+    // Zor: Hz JSON'da yok, ton sunucunun WAV'ı olarak çalar (osilatör değil)
+    const heard = await Promise.all(phones.map((p) => p.page.evaluate(() => window.__wavs.at(-1))));
+    assert.equal(await deniz.page.evaluate(() => window.__wavs.length), round, 'her turda bir WAV çalmalı');
+    assert.ok(heard.every((h) => h >= 55 && h <= 1450), `WAV frekansı ${heard}`);
+    assert.ok(Math.abs(heard[0] / heard[1] - 1) < 0.02, `iki telefonda aynı ton çalmalı ${heard}`);
     assert.equal(await deniz.page.locator('.tn-hz').count(), 0, 'Zor modda Hz gizli');
     await drag(deniz.page, 0.2, 0.6);
     await deniz.page.click('.rc-submit');

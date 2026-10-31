@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startServer } from '../lib/server.js';
 import { sleep } from '../lib/bot.js';
+import { secret, hasKey } from '../lib/media.js';
 import { TESTS, gradeOf, finalScore, tempoExpected, trackLanding, splitValue } from '../../public/perceptle-math.js';
 
 const DAY = '2026-11-02'; // Pazartesi
@@ -54,13 +55,27 @@ async function play(me, index, answerFn, { server = srv, mode = 'daily', gameId 
   const r = await api('test', { ...me, mode, gameId, index }, server);
   assert.equal(r.status, 200, r.text);
   await sleep(r.json.showMs + 30);
-  const answer = answerFn(r.json.stimulus, r.json);
+  // Uyaranın ham hâli artık istemciye gitmiyor (nokta PNG'si / yörünge örnekleri); kusursuz cevap için testlere özel uçtan.
+  const stim = (await secret(server, { gameId })).stimuli[index];
+  const answer = answerFn(stim, r.json);
   const s = await api('submit', { ...me, mode, gameId, index, answer }, server);
   assert.equal(s.status, 200, s.text);
   return { r: r.json, s: s.json };
 }
 
-const stimKeys = /"(dots|bpm|target|x0|vx|vy|num|den|pct)"/;
+const stimKeys = /"(dots|bpm|target|x0|vx|vy|num|den|pct|image|samples)"/;
+
+// İstemciye giden uyaran: Say → PNG adresi (nokta listesi yok), Yörünge → örnekler (g/hız/iniş yok), diğerleri aynı.
+function assertPublicStim(test, pub, raw) {
+  if (test === 'count') {
+    assert.match(pub.image, /^\/api\/media\/[0-9a-f]{32}$/);
+    assert.ok(!hasKey(pub, ['dots']), 'nokta koordinatları sızdı');
+  } else if (test === 'track') {
+    assert.ok(Array.isArray(pub.samples) && pub.samples.length >= 30);
+    assert.ok(!hasKey(pub, ['g', 'vx', 'vy', 'x0', 'y0', 'landing']), 'atış parametresi sızdı');
+    assert.equal(pub.visible, raw.visible);
+  } else assert.deepEqual(pub, raw);
+}
 
 test('günlük: uyaran sadece test başında, sırayla, tekrar başlatılamaz, kusursuz cevap 100, tek hak', async () => {
   const me = await identity('Keskin');
@@ -78,10 +93,8 @@ test('günlük: uyaran sadece test başında, sırayla, tekrar başlatılamaz, k
   for (let i = 0; i < 5; i++) {
     const r = await api('test', { ...me, mode: 'daily', gameId: DAY, index: i });
     assert.equal(r.status, 200, r.text);
-    assert.deepEqual(r.json.stimulus, dailyStimulus(DAY, i));
+    assertPublicStim(TESTS[i], r.json.stimulus, dailyStimulus(DAY, i));
     assert.equal(r.json.test, TESTS[i]);
-    // sonraki testlerin uyaranı bu yanıtta yok (sadece kendi uyaranı)
-    assert.deepEqual(Object.keys(r.json.stimulus).sort(), Object.keys(dailyStimulus(DAY, i)).sort());
     const again = await api('test', { ...me, mode: 'daily', gameId: DAY, index: i });
     assert.match(again.json.error, /zaten başladı/);
     assert.ok(!stimKeys.test(again.text));
@@ -93,7 +106,7 @@ test('günlük: uyaran sadece test başında, sırayla, tekrar başlatılamaz, k
     if (['angle', 'split'].includes(TESTS[i])) assert.deepEqual(mid.json.pending.stimulus, dailyStimulus(DAY, i));
     else assert.equal(mid.json.pending.stimulus, null, 'yenilemede zamanlı uyaran tekrar geldi');
     await sleep(r.json.showMs + 30);
-    const answer = perfect(TESTS[i], r.json.stimulus, false);
+    const answer = perfect(TESTS[i], dailyStimulus(DAY, i), false);
     const s = await api('submit', { ...me, mode: 'daily', gameId: DAY, index: i, answer });
     assert.equal(s.status, 200, s.text);
     assert.equal(s.json.played[i].score, 100, `${TESTS[i]} kusursuz cevap 100 almalı (${s.text})`);
@@ -121,7 +134,7 @@ test('erken cevap reddedilir ve testi tüketmez; ritim de son vuruştan önce ka
     const me = await identity('Aceleci', slow);
     const r = await api('test', { ...me, mode: 'daily', gameId: DAY, index: 0 }, slow);
     assert.equal(r.json.showMs, 2000);
-    const early = await api('submit', { ...me, mode: 'daily', gameId: DAY, index: 0, answer: r.json.stimulus.dots.length }, slow);
+    const early = await api('submit', { ...me, mode: 'daily', gameId: DAY, index: 0, answer: dailyStimulus(DAY, 0).dots.length }, slow);
     assert.equal(early.status, 400, 'gösterim bitmeden cevap kabul edildi');
     assert.match(early.json.error, /gösterim/);
     const st = (await api('start', { ...me, mode: 'daily' }, slow)).json;
@@ -133,7 +146,7 @@ test('erken cevap reddedilir ve testi tüketmez; ritim de son vuruştan önce ka
     await play(me, 1, () => 500, o);
     await play(me, 2, () => 90, o);
     const t = await api('test', { ...me, mode: 'daily', gameId: DAY, index: 3 }, slow);
-    assert.equal(t.json.showMs, Math.round(1500 + tempoExpected(t.json.stimulus.bpm, false).at(-1)));
+    assert.equal(t.json.showMs, Math.round(1500 + tempoExpected(dailyStimulus(DAY, 3).bpm, false).at(-1)));
     assert.equal(t.json.leadMs, 1500);
     const tooSoon = await api('submit', { ...me, mode: 'daily', gameId: DAY, index: 3, answer: [] }, slow);
     assert.equal(tooSoon.status, 400, 'ritim son vuruştan önce gönderildi');
@@ -146,7 +159,7 @@ test('zaman aşımı: geç cevap 0 sayılır; bırakılan test sonradan 0 olur',
   const me = await identity('Geç');
   const r = await api('test', { ...me, mode: 'daily', gameId: DAY, index: 0 });
   await sleep(r.json.endsAt - r.json.startedAt + 400); // 1.8 sn cevap + pay
-  const late = await api('submit', { ...me, mode: 'daily', gameId: DAY, index: 0, answer: r.json.stimulus.dots.length });
+  const late = await api('submit', { ...me, mode: 'daily', gameId: DAY, index: 0, answer: dailyStimulus(DAY, 0).dots.length });
   assert.equal(late.status, 200, late.text);
   assert.equal(late.json.played[0].score, 0);
   assert.equal(late.json.played[0].timedOut, true);
@@ -201,7 +214,8 @@ test('Cuma (FAKE_TODAY): kurallar otomatik, hareketli noktalar, sekmeli top, gen
   const o = { server: fri, gameId: FRIDAY };
   const { r: c } = await play(me, 0, (stim) => Math.round(stim.dots.length * 1.32), o);
   assert.equal(c.friday, true);
-  assert.equal(c.stimulus.dots[0].length, 5, 'Cuma noktaları hız taşır');
+  assert.ok(c.stimulus.frames > 1 && c.stimulus.fps > 0, 'Cuma noktaları hareketli (kare şeridi)');
+  assert.ok(!hasKey(c.stimulus, ['dots']));
   const { r: t, s } = await play(me, 1, (stim) => trackLanding(stim) + 90, o);
   assert.equal(t.stimulus.walls, true);
   assert.equal(s.played[1].score, 61, 'Cuma toleransı 90');
@@ -210,7 +224,7 @@ test('Cuma (FAKE_TODAY): kurallar otomatik, hareketli noktalar, sekmeli top, gen
   const { s: s3 } = await play(me, 3, (stim) => perfect('tempo', stim, true), o);
   assert.equal(s3.played[3].score, 100, 'Cuma ritmi vuruş aralarında');
   const { r: sp, s: s4 } = await play(me, 4, (stim) => splitValue(stim), o);
-  const v = splitValue(sp.stimulus);
+  const v = splitValue(sp.stimulus); // böl hedefi ekranda yazılı: olduğu gibi gelir
   assert.ok(v < 0 || v > 1, 'Cuma kesri çizginin dışında');
   assert.equal(s4.played[4].score, 100);
   assert.equal(s4.done, true);

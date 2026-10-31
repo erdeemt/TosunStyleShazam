@@ -3,6 +3,7 @@
 //   bitince tekrar oynanamaz, sıralama.
 // - Ton Avı tek kişilik lobi: tek başına oda kur/başlat, puan = sent formülü, dokunmadan süre dolunca başlangıç değeri gider.
 // - Regresyon: sonradan girilen ad sıralamaya yansır; lobide yeniden çizimde süre çubuğu baştan dolmaz.
+import { secret } from '../lib/media.js';
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
@@ -43,7 +44,7 @@ test('Nüans günlük: formül, hex↔kaydırıcı, rastgele başlangıç, yenil
   for (let round = 0; round < 5; round++) {
     if (round > 0) await page.click('.rc-go');
     await page.waitForSelector('.nu-target');
-    const target = cssHex(await page.$eval('.nu-target', (n) => getComputedStyle(n).backgroundColor));
+    const target = (await secret(srv, { recall: 'nuance', gameId: DAY })).targets[round]; // hex DOM'da/JSON'da yok
     await page.waitForSelector('.nu-input', { timeout: 6000 });
     starts.add(await page.inputValue('.nu-hex'));
     if (round === 2) {

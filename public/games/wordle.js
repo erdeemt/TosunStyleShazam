@@ -194,9 +194,9 @@ function leaderboardPanel() {
     el('h2', {}, `🏆 Bugünün sıralaması (#${board.puzzleNo})`),
     board.entries.length
       ? el('ol', { class: 'w-board' }, board.entries.map((e, i) =>
-        el('li', { class: e.me ? 'me' : '' },
-          el('span', { class: 'w-rank' }, `${i + 1}.`),
-          el('span', { class: 'player-name' }, e.name),
+        el('li', { class: `${e.me ? 'me' : ''}${e.fresh ? ' fresh' : ''}` },
+          el('span', { class: 'w-rank' }, e.fresh ? '🆕' : `${e.rank ?? i + 1}.`),
+          el('span', { class: 'player-name' }, e.name, e.fresh ? el('small', { class: 'w-fresh', title: 'Bu hesap bugün açıldı; günün sıralamasına girmez.' }, '🆕 sıralama dışı') : null),
           el('span', { class: 'w-tries' }, e.won ? `${e.tries}/${MAX}` : 'X'),
           e.grid ? el('span', { class: 'w-mini' }, e.grid.map((row) => row.map((m) => EMOJI[m]).join('')).join('\n')) : null)))
       : el('p', { class: 'hint' }, 'Henüz kimse bitirmedi.'),

@@ -73,7 +73,7 @@ Açık küçük notlar:
 - QA + güvenlik turları yapıldı, bulgular düzeltildi: günlük uyaran önbelleği, TIME_SCALE sadece TEST_MODE=1
   (tests/lib/server.js verir), ağ kesintisinde otomatik yeniden deneme + "Tekrar gönder", Açı/Böl'de Kilitle dokununca açılır,
   normal Açı'da tek dokunuş göndermez, canvas ölçüsü, 44 px dokunma, touch-action. npm test artık tests/security'yi de çalıştırır.
-- Bilinçli bırakılan: günlük uyaranlar herkese aynı (yan hesapla önizleme mümkün, Wordle gibi).
+- Bilinçli bırakılan: günlük uyaranlar herkese aynı (yan hesapla önizleme mümkün, Wordle gibi). → 2026-10-31: aynı gün açılan hesap sıralama dışı.
 - npm test 260/260, npm run e2e 46/46.
 
 ## ⚽ Tosun Top — main'e merge + push edildi (2026-10-29)
@@ -100,7 +100,16 @@ Açık küçük notlar:
 - Testler: tests/swarm/perceptle-lobby.test.mjs (11), tests/e2e/perceptle-lobby.test.mjs (2). Tek oyunculu değişmedi.
 - Kullanıcı denemeli: telefonlarda eşzamanlılık (özellikle Ritim) ve 30 sn cevap süresi yeterli mi.
 
-## 🎵 Shazam online ses vekili — sec/shazam dalında (main'e BİRLEŞTİRİLMEDİ, 2026-10-31)
+## 🔒 Gizli uyaranlar + yan hesap kuralı — main'e merge + push edildi (2026-11-01)
+
+- Ağ sekmesinden cevap okunmasın: Nüans hedefi (tek + lobi) gürültülü PNG, Ton Avı Zor hedefi WAV, Algıla Say noktaları PNG
+  (Cuma: kare şeridi), Yörünge sadece görünen kısmın örnekleri. Hepsi `/api/media/<jeton>` (sahibine + odaya bağlı, kısa ömürlü,
+  2 kullanım, IP sınırı, no-store). Kurallar PLAN.md §3.4, §3.6.1, §4.5–4.7. Dosyalar: server/media-tokens.js, server/media-encode.js,
+  public/media.js; testler tests/unit/media.test.mjs, tests/security/sec-hidden-media.test.mjs, tests/e2e/secure-hidden.test.mjs
+  (ekranlar test-results/secure-hidden/), yardımcı tests/lib/media.js; testler ham uyaranı `/api/_test/secret`'ten alır (TEST_GAMES=1 ve TEST_MODE=1).
+- Günlük: bulmacanın gününde açılan hesap sıralama dışı ("🆕 sıralama dışı", en altta). Kimliklere `createdAt` eklendi.
+- Kullanıcı denemeli: telefonda Nüans diski (görsel gecikmesi), Ton Avı Zor sesi (iOS kilit açma), Cuma Say animasyonu akıcılığı.
+## 🎵 Shazam online ses vekili — main'e merge + push edildi (2026-11-01)
 
 - Ağ sekmesinden cevap sızıntısı kapatıldı: istemci sadece `/api/clip/<opak>` görür (YouTube kimliği / CDN adresi yok),
   klip o adımın süresi kadar (sunucuda MP3 çerçeve kesici, bağımlılıksız). Ayrıntı: PLAN.md §4.4 "Ses vekili".

@@ -60,11 +60,15 @@ class RecallReferee {
     // history: 1..n sıralı, tekrarsız
     v.history.forEach((h, i) => { if (h.round !== i + 1) this.bad(bot, `history sırası bozuk ${v.history.map((x) => x.round)}`); });
     if (v.phase === 'memorize') {
-      if (v.target == null) this.bad(bot, 'ezberde hedef yok');
+      // Gizli hedef (Nüans, Ton Avı Zor): target yok, opak medya adresi var.
+      const hidden = this.gameId === 'nuance' || v.difficulty === 'hard';
+      if (hidden ? v.target !== null || !/^\/api\/media\/[0-9a-f]{32}$/.test(v.media ?? '') : v.target == null) this.bad(bot, `ezberde hedef/medya hatalı ${v.target} ${v.media}`);
       if (v.history.length !== v.round - 1) this.bad(bot, `ezberde history ${v.history.length} != ${v.round - 1}`);
       const t = this.targets.get(k);
-      if (t !== undefined && t !== v.target) this.bad(bot, `hedef değişti ${t} → ${v.target}`);
-      this.targets.set(k, v.target);
+      if (!hidden) {
+        if (t !== undefined && t !== v.target) this.bad(bot, `hedef değişti ${t} → ${v.target}`);
+        this.targets.set(k, v.target);
+      }
     }
     if (v.phase === 'recall') {
       if (v.target !== null) this.bad(bot, `hatırlamada hedef görünür: ${v.target}`);
@@ -332,7 +336,7 @@ test('[nuance] her fazda yeniden bağlanma: ezber/hatırlama/açıklama/bitiş g
     await b1.reconnect();
     const v = await b1.waitFreshView();
     assert.equal(v.round, 1);
-    if (v.phase === 'memorize') assert.ok(v.target);
+    if (v.phase === 'memorize') assert.ok(v.media && v.target === null, 'Nüans ezberinde hex yok, medya adresi var');
     else assert.equal(v.target, null);
   }
   await phase(b2, 1, 'recall');
@@ -473,7 +477,8 @@ test('[tone] tek kişilik oda: koparak/geri gelerek oynar; uzun süre yoksa oyun
     await sleep(700);
     await host.connect();
     vo = await host.waitFreshView(() => true, { timeout: 1000 });
-    assert.equal(vo.target === null, vo.phase === 'recall', `faz ${vo.phase} hedef ${vo.target}`);
+    // Ton Avı Kolay: hedef ezber/açıklamada görünür; hatırlamada yok (Zor'da ezberde de yok — media)
+    assert.equal(vo.target === null, vo.phase === 'recall' || (vo.phase === 'memorize' && vo.difficulty === 'hard'), `faz ${vo.phase} hedef ${vo.target}`);
     if (vo.over) break;
   }
   assert.equal(vo.over, true, `oyun bitmeliydi: ${vo.phase} tur ${vo.round}`);

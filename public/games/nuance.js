@@ -3,6 +3,7 @@
 import { el } from '../ui.js';
 import { hexToRgb, hsbToRgb, nuanceTier, normalizeHex, rgbToHex, rgbToHsb } from '../recall-math.js';
 import { createRecallGame, secondsTimer, timeBar } from './recall-client.js';
+import { fetchObjectUrl } from '../media.js';
 
 const swatch = (hex, cls = '') => {
   const node = el('div', { class: `nu-swatch ${cls}`, role: 'img', 'aria-label': hex ? `Renk ${hex}` : 'Renk yok' });
@@ -11,8 +12,33 @@ const swatch = (hex, cls = '') => {
   return node;
 };
 
-function memorizeView(target, { endsAt, totalMs }) {
+// Hedef hex JSON'da yok: sunucu küçük, hafif gürültülü bir PNG verir (opak, tek kullanımlık adres); büyütülüp gösterilir.
+const images = new Map(); // url -> Promise<blob: adresi>
+function prepareMedia(url) {
+  let p = images.get(url);
+  if (!p) {
+    p = fetchObjectUrl(url);
+    p.catch(() => images.delete(url));
+    images.set(url, p);
+    while (images.size > 4) {
+      const [old, op] = images.entries().next().value;
+      images.delete(old);
+      op.then((u) => URL.revokeObjectURL(u), () => {});
+    }
+  }
+  return p;
+}
+
+function memorizeView(target, { endsAt, totalMs, media }) {
   const big = swatch(target, 'nu-target nu-disc');
+  if (!target && media) {
+    big.classList.remove('empty');
+    big.classList.add('nu-img');
+    big.setAttribute('aria-label', 'Hedef renk');
+    const img = el('img', { class: 'nu-target-img', alt: '', draggable: 'false' });
+    big.prepend(img);
+    prepareMedia(media).then((u) => { img.src = u; }).catch(() => big.classList.add('empty'));
+  }
   big.append(el('span', { class: 'nu-count' }, secondsTimer(endsAt, { urgentAt: 1, suffix: '' })));
   return el('section', { class: 'card center nu-memo nu-card' },
     big,
@@ -164,6 +190,7 @@ const game = createRecallGame({
   ],
   readyHint: (g) => `Her turda renk ${Math.round(g.memorizeMs / 1000) || 1} sn görünecek, sonra ${Math.round(g.recallMs / 1000)} sn içinde yeniden oluşturacaksın.`,
   memorizeView,
+  prepareMedia,
   createInput,
   answerChip,
   roundDetail,

@@ -3,7 +3,7 @@
 import { net } from '../net.js';
 import { $, el, toast } from '../ui.js';
 import { TESTS, gradeOf, squareOf } from '../perceptle-math.js';
-import { TEST_UI, revealView } from './perceptle-tests.js';
+import { TEST_UI, preloadStimulus, revealView } from './perceptle-tests.js';
 import { unlockAudio } from './tone-audio.js';
 import { enterLobby, leaveLobby } from './perceptle-lobby.js';
 
@@ -219,6 +219,7 @@ async function beginTest() {
   const index = game.played.length;
   try {
     const r = await api('/test', { mode, gameId: game.gameId, index });
+    await preloadStimulus(r.stimulus); // Say: nokta görseli inmeden gösterim başlamasın
     runTest(index, r);
   } catch (err) {
     toast(err.message);
@@ -374,9 +375,9 @@ function leaderboardPanel() {
     el('h2', {}, `🏆 Bugünün sıralaması (#${board.puzzleNo})`),
     board.entries.length
       ? el('ol', { class: 'w-board rc-board pc-board' }, board.entries.map((e) =>
-        el('li', { class: e.me ? 'me' : '' },
-          el('span', { class: 'w-rank' }, `${e.rank}.`),
-          el('span', { class: 'player-name' }, e.name),
+        el('li', { class: `${e.me ? 'me' : ''}${e.fresh ? ' fresh' : ''}` },
+          el('span', { class: 'w-rank' }, e.fresh ? '🆕' : `${e.rank}.`),
+          el('span', { class: 'player-name' }, e.name, e.fresh ? el('small', { class: 'w-fresh', title: 'Bu hesap bugün açıldı; günün sıralamasına girmez.' }, '🆕 sıralama dışı') : null),
           el('span', { class: 'w-tries' }, `${e.total} (${e.grade})`),
           e.scores ? el('span', { class: 'rc-mini pc-mini' }, e.scores.map((s, i) => el('span', { class: `pc-chip ${scoreClass(s)}`, title: META[TESTS[i]].name }, `${META[TESTS[i]].icon}${s}`))) : null)))
       : el('p', { class: 'hint' }, 'Henüz kimse bitirmedi. İlk sen ol!'),
@@ -432,7 +433,7 @@ function body() {
     }
     case 'result': {
       const p = lastPlayed;
-      const view = p ? revealView(p.test, lastStim, p.answer, game.friday) : null;
+      const view = p ? revealView(p.test, p.stimulus ?? lastStim, p.answer, game.friday) : null;
       return [head(`Test ${p.index + 1} / ${TESTS.length} sonucu`),
         el('section', { class: 'card center pc-result' },
           el('div', { class: 'pc-result-icon' }, `${META[p.test].icon} ${META[p.test].name}`),
