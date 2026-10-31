@@ -1,5 +1,6 @@
 // QA yardımcıları: 👁️ Algıla'yı gerçek bir oyuncu gibi oynatmak (dokunmatik CDP sürükleme, fare, klavye),
 // gönderilen cevaplardan puanı formülle bağımsız olarak yeniden hesaplamak. qa-perceptle-*.test.mjs kullanır.
+import { secret } from '../lib/media.js';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -65,7 +66,11 @@ export async function openPage(browser, url, opts) {
   page.on('console', (m) => { if (m.type() === 'error') p.errors.push(`console: ${m.text()}`); });
   page.on('response', async (res) => {
     const u = res.url();
-    if (u.endsWith('/api/perceptle/test') && res.ok()) { const j = await res.json().catch(() => null); if (j) p.stimuli[j.index] = j; }
+    if (u.endsWith('/api/perceptle/test') && res.ok()) {
+      const j = await res.json().catch(() => null);
+      // Ham uyaran istemciye gitmiyor: testlere özel uçtan (TEST_GAMES=1)
+      if (j) { j.public = j.stimulus; j.stimulus = (await secret({ url: new URL(u).origin }, { gameId: j.gameId })).stimuli[j.index]; p.stimuli[j.index] = j; }
+    }
     if (u.endsWith('/api/perceptle/submit')) {
       const body = JSON.parse(res.request().postData() || '{}');
       p.submits.push({ body, status: res.status(), json: await res.json().catch(() => null) });

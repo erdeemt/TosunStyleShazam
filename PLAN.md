@@ -140,6 +140,17 @@ Kurallar:
 - `token` sadece sahibine gider; başka oyuncunun görünümünde `token` olmaz.
 - Sunucu hiçbir istemci girdisini dosya yolu, URL veya regex olarak kullanmaz.
 - `/api/resolve` vb. dış istekler sadece bilinen alan adlarına gider (SSRF yok).
+- **Gizli uyaran medyası** (2026-10-31, `server/media-tokens.js` + `server/media-encode.js`): ekranda gösterilen/çalınan ama
+  sayı olarak ağda görünmemesi gereken cevaplar (Nüans hedefi, Ton Avı Zor perdesi, Algıla "Say" noktaları) JSON'a yazılmaz;
+  JSON'da sadece `/api/media/<128 bit jeton>` gider. İstemci `POST /api/media/<jeton>` + gövdede `playerId, token` ile indirir
+  (`public/media.js`). Jeton sahibine bağlı (kimlik; lobide ayrıca kimliğin o anki oda kodu), ömrü ezber/gösterim süresi + 3 sn,
+  en fazla 2 kullanım; başkası → 403, yok/süresi geçmiş/tükenmiş → 404. Toplam ≤ 5000 jeton (en eskisi atılır), IP başına
+  dakikada 120 istek (`LIMIT_MEDIA_PER_MIN`). Yanıt: tam `Content-Type` (`image/png` | `audio/wav`), `Cache-Control: no-store`,
+  `X-Content-Type-Options: nosniff`, `Cross-Origin-Resource-Policy: same-origin`. Bağımlılıksız kodlayıcılar: PNG (zlib + CRC32),
+  WAV PCM16 mono 22050 Hz. CSP `img-src`'ye sadece `blob:` eklendi (Nüans görseli `<img src=blob:>`).
+  Mükemmel gizlilik imkânsız (görülen/duyulan şey analiz edilebilir: PNG'nin ortalaması, WAV'ın FFT'si, PNG'deki noktalar);
+  amaç ağ sekmesinden "hazır cevap" okunmasını engellemek.
+- Testlere özel `GET /api/_test/secret` (sadece `TEST_GAMES=1`, `FAKE_TODAY` gibi): oda/oyun için ham hedef/uyaran (kusursuz cevap testleri).
 
 ### 3.5 İstemci tarafı oyun modülü
 
@@ -156,6 +167,13 @@ Mobil öncelikli tasarım: 360 px genişlikte kusursuz çalışmalı, butonlar �
 - Hafıza oyunları (Nüans, Ton Avı) kendi uçlarını ve `data/recall-daily.json`'u kullanır (§4.4–4.5 ortak bölüm).
 - Sıralama `GET /api/daily/:game/:date`. Arkadaş ortamı: güven modeli gevşek ama sunucu, sonucun o günün
   bulmacasıyla tutarlı olduğunu doğrulamalı (ör. Wordle: sunucunun gördüğü tahmin geçmişinden puan hesaplanır).
+
+### 3.6.1 Günlük sıralama: yan hesap kuralı (2026-10-31)
+
+Kimlik `createdAt` taşır (`server/lobby.js`; eski kayıtlarda yok = eski hesap). Günlük bulmacanın İstanbul gününde açılmış
+hesap (gerçek saatle; `FAKE_TODAY`'den bağımsız) oynayabilir ama o günün sıralamasına girmez: `entries[i].fresh = true`,
+`rank = null`, sıralananlardan sonra en altta "🆕 sıralama dışı" (Wordle, Nüans/Ton Avı, Algıla; `rankDaily` server/wordle.js).
+Adlar benzersiz/güvenilir değildir: sıralama kimliğe göre, ad sadece etiket (taklit edilebilir, kabul edildi).
 
 ### 3.7 Gerçek zamanlı oyunlar (lobi çekirdeği kancaları) — 2026-10-29
 
@@ -378,6 +396,11 @@ herkes gönderince hemen biter) → `reveal` (hedef + herkesin cevabı ve puanı
 - Başka oyuncunun o turdaki cevabı `reveal` öncesi hiçbir mesajda yok; sıralamada başkalarının cevapları ancak bitirince.
 - Puanlar sunucuda hesaplanır; birim testler formülleri sabitler (bkz. `tests/unit/recall.test.mjs`).
 - Günlük: kişi başı günde bir deneme; sunucu yeniden başlasa da ilerleme korunur.
+- Gizli hedef (2026-10-31): Nüans'ta (tek + lobi, her zorluk) ve Ton Avı **Zor**'da hedef ezberde JSON'da yok; `round` yanıtı /
+  lobi `memorize` görünümü `media: '/api/media/<jeton>'` taşır (lobide oyuncu başına ayrı jeton). Nüans: 64×64 RGB PNG, her
+  pikselde her kanala ±3 gürültü (her istek yeni tohum; göz damlası yaklaşık değer verir), istemci diskte yumuşak büyütür.
+  Ton Avı Zor: sinüs WAV (30 ms rampa, mono 22050 Hz, uzunluk = ezber süresi), istemci `decodeAudioData` + `tss:volume`
+  ile çalar, ses kilidi akışı aynı. Kolay modda Hz sayısı gider (osilatör). Açıklama/sonuçta kesin hex / Hz görünür.
 - 360 px'te yatay kaydırma yok, dokunma hedefleri ≥ 44 px; e2e'de konsol hatası yok.
 
 ### 4.7 👁️ Algıla (günlük algı testi, perceptle.com tarzı) — 2026-10-26
@@ -428,7 +451,13 @@ Uçlar `POST /api/perceptle/<uç>`, gövdede `playerId, token`:
 
 **Kabul**: uyaran sadece `test` yanıtında, bir kez; sıra atlanamaz; erken cevap reddedilir; puanlar sunucuda (`tests/unit/perceptle.test.mjs`
 formülleri sabitler); 360 px'te yatay kaydırma yok, dokunma hedefleri ≥ 44 px, sürükleme yüzeyleri `touch-action: none`, canvas DPR'ye göre.
-Bilinçli sınırlama: uyaran (nokta listesi, atış parametreleri) istemciye gitmek zorunda — geliştirici araçlarıyla bakan hile yapabilir.
+Gizli uyaran (2026-10-31, §3.4 "Gizli uyaran medyası"): **Say** noktaları koordinat listesi değil sunucuda çizilmiş PNG
+(`stimulus: { image, size, frames, fps }`; normal 640×640 gri+alfa, kenarı yumuşatılmış; 🃏 Cuma hareketli: 320 px kareler,
+15 kare/sn × 2 sn = 31 kare alt alta tek PNG şeridi, istemci gerçek zamana göre kare seçer, INK rengine boyar).
+**Yörünge** sadece görünen kısmın örnekleri (`{ samples: [[t, x, y]…] (49 + duvar sekme anları), visible, walls }`); yerçekimi,
+hız, iniş hiçbir JSON'da yok; sonuçta `played[i].stimulus` / lobi `history[i].stimulus` = tüm uçuşun 73 örneği + `landing`.
+Ritim/Açı/Böl değişmedi (zaten ekranda/duyuluyor). Kalan bilinçli sınırlama: PNG'deki noktalar sayılabilir, örneklere
+parabol uydurulabilir (cevap "hazır" değil ama hesaplanabilir).
 
 **Çok oyunculu (lobi, 2026-10-29)** — sunucu `server/games/perceptle.js`, istemci `public/games/perceptle-lobby.js`
 (test ekranları yine `perceptle-tests.js`; `perceptle.js` `enter('multi')` ile lobiye geçer). 1–12 kişi (tek kişi de başlatabilir).

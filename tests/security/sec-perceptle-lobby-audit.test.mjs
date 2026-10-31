@@ -95,7 +95,8 @@ test('mesaj taraması: uyaran, gerçek değer ve başkalarının cevabı zamanı
       for (let i = 0; i < TESTS.length; i++) {
         if (!['track', 'angle'].includes(TESTS[i])) continue;
         const firstReveal = b.messages.findIndex((m) => m.t === 'view' && m.view?.gameKey === gk && m.view.index === i && (m.view.phase === 'reveal' || m.view.phase === 'over'));
-        const before = JSON.stringify(b.messages.slice(0, firstReveal).map((m) => (m.t === 'view' ? { ...m.view, me: null } : m)));
+        // Uyaran (yörünge örnekleri 1 ondalıklı x içerir) cevap değil: rastlantısal eşleşme olmasın diye taramadan çıkar
+        const before = JSON.stringify(b.messages.slice(0, firstReveal).map((m) => (m.t === 'view' ? { ...m.view, me: null, stimulus: null, history: m.view.history.map((h) => ({ ...h, stimulus: null })), last: m.view.last && { ...m.view.last, stimulus: null } } : m)));
         for (const [k, other] of r.bots.entries()) if (other !== b) assert.ok(!before.includes(String(myAnswers[k][i])), `${b.name}: ${other.name} cevabı erken`);
         const truth = over.history[i].truth;
         assert.ok(!before.includes(`"truth":${truth}`), 'gerçek değer erken');

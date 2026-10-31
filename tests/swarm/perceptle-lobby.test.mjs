@@ -135,7 +135,8 @@ function assertNoLeaks(r, gameKey, { stimuli, answers, tests }) {
       }
       if (v.phase === 'play') {
         for (const p of v.players) assert.deepEqual(Object.keys(p).sort(), ['answered', 'grade', 'id', 'name', 'scores', 'total']);
-        const text = JSON.stringify({ ...v, me: null });
+        // Uyaran (yörünge örnekleri) cevap değil: rastlantısal sayı eşleşmesi olmasın
+        const text = JSON.stringify({ ...v, me: null, stimulus: null, history: v.history.map((h) => ({ ...h, stimulus: null })) });
         if (tests[v.index] === 'track') {
           for (const [ok] of r.bots.entries()) {
             const a = answers[`${ok}:${v.index}`];

@@ -2,6 +2,7 @@
 // otomatik gönderimi, hiç dokunulmayınca "cevap yok", davet linkiyle gelen (sesi kapalı) oyuncuda "Sesi aç" + ritim,
 // sayfa yenileme (test ortası), dokunma hedefleri ≥44 px, yatay kaydırma, konsol hataları. Ayrıca gerçek süreyle 3 telefon:
 // intro/açıklamada host ayrılınca yeni host düğmeleri, bağlantı kopup gelince girdi.
+import { secret } from '../lib/media.js';
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
@@ -50,18 +51,18 @@ async function phone(srv, name, b = browser, hash = '#/multi/perceptle') {
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('dialog', (d) => d.accept(d.type() === 'prompt' ? name : undefined));
   page.on('websocket', (ws) => ws.on('framereceived', ({ payload }) => {
-    try { const m = JSON.parse(payload); if (m.t === 'view') views.push(m.view); } catch { /* yok say */ }
+    try { const m = JSON.parse(payload); if (m.t === 'view') views.push(m.view); if (m.t === 'room' && m.room) views.code = m.room.code; } catch { /* yok say */ }
   }));
   await page.goto(`${srv.url}/${hash}`);
   if (hash.startsWith('#/multi')) await page.fill('input[placeholder="Takma adın"]', name);
-  return { page, ctx, errors, views, name };
+  return { page, ctx, errors, views, name, srv };
 }
 
 const lastView = (p) => p.views.at(-1);
 async function stimOf(p, index) {
   for (let k = 0; k < 300; k++) {
     const v = p.views.find((x) => x.phase === 'play' && x.index === index && x.stimulus);
-    if (v) return v;
+    if (v) return { ...v, stimulus: (await secret(p.srv, { room: p.views.code })).stimuli[index] }; // ham uyaran
     await new Promise((r) => setTimeout(r, 25));
   }
   throw new Error(`${p.name}: ${index}. uyaran gelmedi`);
