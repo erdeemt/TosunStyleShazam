@@ -117,3 +117,28 @@ Açık küçük notlar:
 - Testler: `tests/unit/mp3.test.mjs`, `tests/swarm/swarm-shazam-clip.test.mjs`, `tests/e2e/shazam-secure.test.mjs`.
 - Açık: gerçek Safari/iOS cihazda Range + çerezli `<audio>` denenmedi (206 yolu testte var); sonraki adımın klibi bilerek
   önceden yüklenmiyor (adım kapısını delerdi) — yavaş ağda adım geçişinde kısa "yükleniyor" görülebilir.
+
+## 🧛 Vampir 3D – Aşama 1 — game/vampir-3d dalında (main'e BİRLEŞTİRİLMEDİ, 2026-10-31)
+
+- Oyun ekranının üstünde sevimli, Feign tarzı low-poly köy meydanı (sadece görsel; kurallar ve sunucu değişmedi). Ayrıntı PLAN.md §4.3 sonu.
+  - Ortada kamp ateşi (titreyen ışık + alev), 4 renkli ev, ağaçlar, toprak meydan. Oyuncular ateşin çevresinde halka; herkes
+    kendini önde, sırtı kameraya dönük görür (izleyici: nötr). Fasulye gövde + kafa + nokta gözler + yanak, kimlikten sabit renk ve
+    şapka (kasket, fes, kovboy, taç, bere, silindir, parti külahı, çiçek). İsimler ekranda sabit boy. Nefes alma, kafa çevirme, göz kırpma.
+  - Gece/gündüz 2,5 sn geçiş (reduced-motion: 0,3 sn): güneş batar/ay doğar, gökyüzü + sis + ışık rengi, yıldızlar, pencereler yanar,
+    ateş gece daha parlak. Gece yaşayanlar başını eğer, gözler kapanır, "zzz"; sabah uyanıp gerinir. Ölüler: yarı saydam hayalet + mezar taşı.
+  - Gündüz adayın üstünde ❗; savunma/oylamada sanığa spot (meydan biraz kararır) ve herkes ona döner.
+  - Gece karaktere dokunmak = hedef düğmesi (aynı kart kapısı ve uyarı); halka ve müttefik işareti sadece kart açıkken. Gündüz dokunmak
+    listede o satıra kaydırır.
+  - Performans: DPR ≤ 1.5, ≤ 30 fps, sekme gizli/blok ekran dışıyken durur, gölge yok (sahte daire gölge), ortak geometri/malzeme.
+    WebGL2 yoksa veya bağlam koparsa blok sessizce gizlenir. Lobiye dönülünce 4 sn sonra kendini kapatır.
+- Dosyalar: public/games/vampir-3d.js (yeni), public/games/vampir.js (blok yerleştirme, ortak `tapTarget`, satırlara data-pid),
+  public/style.css (.v3d), public/vendor/three/ (three.module.min.js + LICENSE).
+- Testler: tests/unit/vampir-3d.test.mjs (tarif sızıntı testi), tests/e2e/vampir-3d.test.mjs (7 telefon, 2 vampir; ekranlar
+  test-results/vampir-3d/: night, day, trial, night-card-open-vampire).
+- Kullanıcı denemeli: gerçek telefonlarda akıcılık/ısınma, arkadaki karaktere dokunma kolaylığı, 12 kişide isimlerin çakışması.
+
+**Sıradaki aşamalar**
+- **Aşama 2 — ölüm/asılma animasyonları:** sabah rastgele komik ölümler (yarasa sürüsü + hayalet çıkışı, mezar taşı "pop", tabut),
+  asılma yerine komik sürgün (mancınıkla fırlatma veya kafes).
+- **Aşama 3 — rol efektleri ve final:** kart açıkken rolüne göre efektler (yine sadece kart açıkken!), oyun sonunda rol açılışı +
+  kazananların dansı, sesler + sessiz düğmesi.

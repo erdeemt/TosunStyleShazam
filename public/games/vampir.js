@@ -3,6 +3,7 @@
 // sadece "kartını göster" açıkken görünür; gece herkesin ekranı aynı yapıda.
 import { mountLobby } from '../lobby.js';
 import { $, el, countdown, toast } from '../ui.js';
+import { createStage } from './vampir-3d.js';
 
 const ROLES = {
   vampir: { name: 'Vampir', icon: '🧛', desc: 'Her gece diğer vampirlerle bir kurban seç. Gündüz köylü gibi davran.', night: 'Kurbanını seç.' },
@@ -20,6 +21,8 @@ const TEAM_WIN = {
 let lobby = null;
 let cardOpen = false;
 let cardKey = '';
+let stage = null; // 3D köy meydanı: oyun boyunca tek tuval, her çizimde aynı öğe yeniden yerleştirilir
+let current = null; // { view, ctx } — sahnedeki dokunuşlar en son görünümle çalışsın
 
 function settingsUI(s, { editable, change, playerCount }) {
   const select = (key, options, label) => el('label', {},
@@ -45,10 +48,51 @@ function settingsUI(s, { editable, change, playerCount }) {
 
 const nameOf = (view, id) => view.players.find((p) => p.id === id)?.name ?? '?';
 
-function roleCard(view) {
-  // Her faz değişiminde kart kendiliğinden kapanır (gece açılan kart gündüz masada açık kalmasın).
+// Her faz değişiminde kart kendiliğinden kapanır (gece açılan kart gündüz masada açık kalmasın).
+function syncCard(view) {
   const key = `${view.gameKey}:${view.phase}:${view.night}`;
   if (cardKey !== key) { cardKey = key; cardOpen = false; }
+}
+
+// Gece hedef seçimi: düğme de 3D sahnedeki dokunuş da buradan geçer (aynı kapı: kart kapalıysa sadece uyarı).
+function tapTarget(view, ctx, targetId) {
+  const me = view.me;
+  if (view.phase !== 'night' || !me?.alive) return;
+  if (!view.players.some((p) => p.id === targetId && p.alive)) return;
+  if (!cardOpen) return toast('Seçim yapmak için kartını aç.');
+  if (!me.nightTargets.includes(targetId)) return; // düğmesi pasif
+  ctx.act({ type: 'nightPick', targetId });
+}
+
+// Gündüz sahnede birine dokununca listedeki satırına kaydır ve kısa vurgula (yeni eylem yok).
+function focusRow(targetId) {
+  const row = [...document.querySelectorAll('#game-vampir .player-list li[data-pid]')].find((li) => li.dataset.pid === targetId);
+  if (!row) return;
+  row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  row.classList.remove('flash');
+  void row.offsetWidth;
+  row.classList.add('flash');
+}
+
+function onStageTap(id) {
+  if (!current) return;
+  const { view, ctx } = current;
+  if (view.phase === 'night') tapTarget(view, ctx, id);
+  else focusRow(id);
+}
+
+function stageEl(view, ctx) {
+  if (!stage || stage.disposed || stage.gameKey !== view.gameKey) {
+    stage?.dispose();
+    stage = createStage({ onTap: onStageTap });
+    stage.gameKey = view.gameKey;
+  }
+  stage.update(view, ctx, { cardOpen });
+  return stage.el;
+}
+
+function roleCard(view) {
+  syncCard(view);
   if (!view.me) return null;
   const toggle = () => { cardOpen = !cardOpen; lobby.rerender(); };
   if (!cardOpen) {
@@ -125,10 +169,7 @@ function nightScreen(view, ctx) {
         return el('button', {
           class: `target${cardOpen && picked === p.id ? ' chosen' : ''}`,
           disabled: cardOpen && !allowed,
-          onclick: () => {
-            if (!cardOpen) return toast('Seçim yapmak için kartını aç.');
-            ctx.act({ type: 'nightPick', targetId: p.id });
-          },
+          onclick: () => tapTarget(view, ctx, p.id),
         }, p.name, p.id === ctx.playerId ? ' (sen)' : '',
         allies.length ? el('small', { class: 'ally-pick' }, `🧛 ${allies.join(', ')}`) : null);
       }))
@@ -187,7 +228,7 @@ function trialScreen(view, ctx) {
 function playerList(view, ctx, action) {
   const deathText = (d) => (d.cause === 'night' ? `${d.night}. gece öldü` : d.cause === 'hanged' ? `${d.night}. gün asıldı` : 'oyundan ayrıldı');
   return el('ul', { class: 'player-list' }, view.players.map((p) =>
-    el('li', { class: `${p.alive ? '' : 'dead'}${ctx.connected(p.id) ? '' : ' offline'}` },
+    el('li', { class: `${p.alive ? '' : 'dead'}${ctx.connected(p.id) ? '' : ' offline'}`, 'data-pid': p.id },
       el('span', { class: 'player-name' }, `${p.alive ? '' : '💀 '}${p.name}`),
       p.id === ctx.playerId ? el('span', { class: 'tag' }, 'sen') : null,
       p.id === ctx.hostId ? el('span', { class: 'tag' }, '👑') : null,
@@ -228,8 +269,10 @@ function overScreen(view, ctx) {
 }
 
 function renderGame(view, ctx) {
-  if (view.phase === 'over') return el('div', { class: 'stack' }, headline(view, ctx), overScreen(view, ctx));
-  const parts = [headline(view, ctx)];
+  syncCard(view);
+  current = { view, ctx };
+  if (view.phase === 'over') return el('div', { class: 'stack' }, headline(view, ctx), stageEl(view, ctx), overScreen(view, ctx));
+  const parts = [headline(view, ctx), stageEl(view, ctx)];
   if (view.me && !view.me.alive) parts.push(el('section', { class: 'card warn center' }, '💀 Öldün. Ölüler konuşmaz — oyun bitene kadar sessizce izle.'));
   parts.push(roleCard(view));
   if (view.phase === 'night') parts.push(nightScreen(view, ctx));
@@ -248,6 +291,8 @@ function renderGame(view, ctx) {
 
 export function enter() {
   lobby?.unmount();
+  stage?.dispose();
+  stage = null;
   lobby = mountLobby($('game-vampir'), {
     id: 'vampir',
     name: 'Vampir Köylü',
@@ -268,4 +313,7 @@ export function enter() {
 export function leave() {
   lobby?.unmount();
   lobby = null;
+  stage?.dispose();
+  stage = null;
+  current = null;
 }
