@@ -201,7 +201,8 @@ function qaCard(view, ctx) {
   const doneBy = (id) => qa.done.includes(id);
   const mine = amAsker || amTarget;
   return el('section', { class: 'card center qa-card' },
-    el('div', { class: 'hint' }, `${qa.number}. soru`),
+    el('div', { class: 'hint' }, `${qa.number}. soru`,
+      qa.tour ? ` · ${qa.tour}. tur: ${qa.askedCount}/${qa.playerCount} kişiye soruldu` : ''),
     el('div', { class: 'qa-pair' },
       el('b', { class: doneBy(qa.askerId) ? 'qa-done' : '' }, ctx.name(qa.askerId)),
       el('span', { class: 'qa-arrow' }, '→'),
