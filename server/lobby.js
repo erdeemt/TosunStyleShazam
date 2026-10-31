@@ -1,6 +1,6 @@
 // Lobi / oda yöneticisi: kimlik, oda kur/katıl, yeniden bağlanma, host devri, oyun eylemlerini yönlendirme.
 // Sunucu yetkilidir: oyun durumu burada yaşar, istemciye sadece view(state, playerId) gider. Bkz. PLAN.md §3.
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import { createRng, cryptoRng } from './rng.js';
 import { GameError, str } from './errors.js';
@@ -58,13 +58,21 @@ let roomCounter = 0;
 
 const scaled = (ms) => Math.max(1, Math.round(ms * TIME_SCALE));
 
+// Lobi botları (opsiyonel oyun kancası game.bots, PLAN.md §3.8): kimlikleri yok, dosyaya/sıralamaya yazılmaz.
+// Kimlik id'leri UUID; bot id'leri 'bot-' ile başlar, çakışamaz ve hello ile sahiplenilemez (identities'de yoklar).
+const BOT_NAMES = ['Hüsnü', 'Cemil', 'Şaban', 'Nuri', 'Fikriye', 'Bedriye', 'Zekiye', 'Hayri', 'Muhittin', 'Saffet',
+  'Naciye', 'Rıfkı', 'Sadık', 'Hatice', 'Kamil', 'Nazmi', 'Şükriye', 'Ziya'];
+const BOT_TIMER = 'bot:'; // room.timers içinde botların zamanlayıcı ön eki (oyunların kendi adları: 'main', 'nomination'…)
+const isHuman = (p) => !p.bot;
+const hasHumans = (room) => [...room.players.values()].some(isHuman);
+
 // ---------- Yardımcılar ----------
 
 // Kontrol karakterleri, sıfır genişlikli ve yön değiştiren karakterler atılır.
 const BAD_CHARS = new RegExp(`[${['0000-001f', '007f-009f', '200b-200f', '2028-202e', '2060-2069', 'feff-feff'].map((r) => r.split('-').map((h) => `\\u${h}`).join('-')).join('')}]`, 'g');
 
 export function sanitizeName(raw) {
-  const clean = str(raw).replace(BAD_CHARS, '').replace(/\s+/g, ' ').trim();
+  const clean = str(raw).replace(BAD_CHARS, '').replace(/\u{1F916}/gu, '').replace(/\s+/g, ' ').trim();
   const chars = [...clean].slice(0, LIMITS.nameMaxLength).join('').trim();
   return chars || 'Oyuncu';
 }
@@ -111,12 +119,13 @@ function roomInfo(room) {
     phase: room.phase,
     players: [...room.players.values()]
       .sort((a, b) => a.joinedAt - b.joinedAt)
-      .map((p) => ({ id: p.id, name: p.name, connected: p.connected, isHost: p.id === room.hostId, spectator: p.spectator })),
+      .map((p) => ({ id: p.id, name: p.name, connected: p.connected, isHost: p.id === room.hostId, spectator: p.spectator, ...(p.bot ? { bot: true } : {}) })),
     settings: room.settings,
     // Oyuna özel hazırlık verisinin herkese açık özeti (ör. Shazam: kaç şarkı, hangi kaynaklar)
     prep: room.game.prepInfo ? room.game.prepInfo(room.prep) : null,
     minPlayers: room.game.minPlayers,
     maxPlayers: Math.min(room.game.maxPlayers, LIMITS.maxPlayersPerRoom),
+    bots: !!room.game.bots, // bu oyun bot destekliyor mu (bekleme odasında "🤖 Bot ekle")
   };
 }
 
@@ -194,7 +203,89 @@ function afterChange(room) {
   }
   if (room.phase === 'playing' && room.state && room.game.realtime) startLoop(room);
   else stopLoop(room);
+  scheduleBots(room);
   broadcast(room);
+}
+
+// ---------- Botlar (opsiyonel oyun kancası) ----------
+// game.bots = { plan(state, botId, bctx) → { key, delayMs } | null, act(state, botId, bctx) → action | null }
+// bctx = { mem (bot başına, oyun başına nesne), rng (botlara ayrı üreteç), now }.
+// Her durum değişiminden sonra (afterChange) her bot için plan sorulur. Aynı key zaten bekliyorsa zamanlayıcı
+// ellenmez (gecikme sıfırlanmasın); farklıysa eskisi iptal edilip yenisi kurulur; null → bekleyen iptal.
+// Zamanlayıcılar odanın room.timers haritasında durur: oyun bitince, lobiye dönünce, oda silinince clearAllTimers temizler.
+// Dolunca act() bir eylem döner ve insanlarla aynı yoldan (applyAction → game.action) uygulanır; kurallar atlanamaz.
+
+function botCtx(room, botId) {
+  let mem = room.botMem.get(botId);
+  if (!mem) { mem = {}; room.botMem.set(botId, mem); }
+  return { mem, rng: room.botRng, now: Date.now() };
+}
+
+function scheduleBots(room) {
+  const hook = room.game.bots;
+  if (!hook) return;
+  const playing = room.phase === 'playing' && room.state;
+  for (const p of room.players.values()) {
+    if (!p.bot) continue;
+    const name = BOT_TIMER + p.id;
+    const cur = room.timers.get(name);
+    let plan = null;
+    if (playing && !p.spectator) {
+      try { plan = hook.plan(room.state, p.id, botCtx(room, p.id)); } catch (err) { console.error(`[${room.code}] bot plan hatası:`, err); }
+    }
+    if (cur && plan && cur.key === plan.key) continue;
+    if (cur) { clearTimeout(cur.handle); room.timers.delete(name); }
+    if (!plan) continue;
+    const token = ++room.timerSeq;
+    const delay = scaled(Math.max(0, Number(plan.delayMs) || 0));
+    room.timers.set(name, { token, key: plan.key, handle: setTimeout(() => runBot(room, p.id, name, token), delay) });
+  }
+}
+
+function runBot(room, botId, name, token) {
+  if (rooms.get(room.code) !== room || room.timers.get(name)?.token !== token) return;
+  room.timers.delete(name);
+  const p = room.players.get(botId);
+  if (!p?.bot || !room.state || room.phase !== 'playing') return;
+  let action = null;
+  try { action = room.game.bots.act(room.state, botId, botCtx(room, botId)); } catch (err) { console.error(`[${room.code}] bot act hatası:`, err); }
+  if (action && typeof action === 'object') {
+    try {
+      applyAction(room, botId, action);
+      return; // applyAction → afterChange → scheduleBots
+    } catch (err) {
+      if (!(err instanceof GameError)) console.error(`[${room.code}] bot eylem hatası:`, err);
+    }
+  }
+  scheduleBots(room); // eylem yok / reddedildi: aynı durum için yeniden planla (yayın gerekmez)
+}
+
+// İnsan ve bot eylemlerinin ortak, doğrulanmış yolu.
+function applyAction(room, playerId, action) {
+  if (room.phase !== 'playing' || !room.state) throw new GameError('Şu an oyun oynanmıyor.');
+  const p = room.players.get(playerId);
+  if (!p || p.spectator) throw new GameError('İzleyiciler oyuna müdahale edemez.');
+  room.game.action(room.state, playerId, action, makeCtx(room));
+  afterChange(room);
+}
+
+function addBot(room) {
+  const max = Math.min(room.game.maxPlayers, LIMITS.maxPlayersPerRoom);
+  if (room.players.size >= max) throw new GameError('Oda dolu.');
+  const taken = new Set([...room.players.values()].map((p) => p.name));
+  const free = BOT_NAMES.filter((n) => !taken.has(`🤖 Bot ${n}`));
+  const base = `🤖 Bot ${free.length ? free[randomInt(free.length)] : BOT_NAMES[randomInt(BOT_NAMES.length)]}`;
+  let id;
+  do id = `bot-${randomBytes(8).toString('hex')}`; while (room.players.has(id));
+  room.players.set(id, {
+    id,
+    name: uniqueName(room, base, id),
+    connected: true, // botlar hep bağlı: kopma süresi, hükmen, 📴 yok
+    joinedAt: Date.now() + room.players.size,
+    spectator: false,
+    leaveTimer: null,
+    bot: true,
+  });
 }
 
 // ---------- Gerçek zamanlı döngü (opsiyonel oyun kancası) ----------
@@ -301,7 +392,9 @@ function createRoom(identity, gameId, ip) {
     prep: game.initialPrep ? game.initialPrep() : null, // oyunlar arası korunur (bekleme odasında host doldurur)
     state: null,
     rng: BASE_SEED != null ? createRng(BASE_SEED + roomCounter) : cryptoRng(),
-    timers: new Map(), // isim -> { token, handle }
+    timers: new Map(), // isim -> { token, handle } (botlar: 'bot:<id>' -> { token, handle, key })
+    botMem: new Map(), // bot id -> oyun boyu bellek (her oyunda sıfırlanır)
+    botRng: BASE_SEED != null ? createRng(BASE_SEED * 7 + roomCounter) : cryptoRng(), // oyunun üretecini tüketmesin
     timerSeq: 0,
     seq: 0,
     emptyTimer: null,
@@ -366,7 +459,7 @@ function notifyConnection(room, p, connected) {
 // (İzleyici host olursa oyun "sonraki tur"da takılır.)
 function pickHost(room) {
   const score = (p) => (p.connected ? 2 : 0) + (p.spectator && room.phase !== 'lobby' ? 0 : 1);
-  return [...room.players.values()].sort((a, b) => score(b) - score(a) || a.joinedAt - b.joinedAt)[0];
+  return [...room.players.values()].filter(isHuman).sort((a, b) => score(b) - score(a) || a.joinedAt - b.joinedAt)[0];
 }
 
 // Ayar nesnesinden sadece düz değerleri al (nesne/dizi tuzakları validateSettings'e ulaşmasın).
@@ -391,7 +484,7 @@ function removePlayer(room, playerId, reason) {
       console.error(`[${room.code}] onPlayerLeave hatası:`, err);
     }
   }
-  if (room.players.size === 0) return deleteRoom(room);
+  if (!hasHumans(room)) return deleteRoom(room); // sadece botlar kaldıysa oda kapanır
   if (room.hostId === playerId) {
     room.hostId = pickHost(room).id;
   }
@@ -430,7 +523,7 @@ function onDisconnect(identity) {
       if (next.connected && next.id !== identity.id) { room.hostId = next.id; broadcast(room); }
     }, scaled(LIMITS.hostHandoffMs));
   }
-  if (![...room.players.values()].some((x) => x.connected)) {
+  if (![...room.players.values()].some((x) => x.connected && isHuman(x))) {
     clearTimeout(room.emptyTimer);
     room.emptyTimer = setTimeout(() => deleteRoom(room), scaled(LIMITS.emptyRoomMs));
   }
@@ -508,18 +601,32 @@ const handlers = {
     // Kopuk oyuncular oyuna alınmaz, izleyici olur.
     for (const p of room.players.values()) p.spectator = !p.connected;
     const ctx = makeCtx(room);
+    room.botMem.clear();
     room.state = room.game.setup({ players: players.map((p) => ({ id: p.id, name: p.name })), settings: room.settings, prep: room.prep, rng: room.rng, ctx });
     room.phase = 'playing';
     afterChange(room);
   },
   action(identity, msg) {
     const room = requireRoom(identity);
-    if (room.phase !== 'playing' || !room.state) throw new GameError('Şu an oyun oynanmıyor.');
-    const p = room.players.get(identity.id);
-    if (!p || p.spectator) throw new GameError('İzleyiciler oyuna müdahale edemez.');
     const action = msg.action && typeof msg.action === 'object' ? msg.action : {};
-    room.game.action(room.state, identity.id, action, makeCtx(room));
-    afterChange(room);
+    applyAction(room, identity.id, action);
+  },
+  // Host bekleme odasında bot ekler / çıkarır (sadece game.bots kancası olan oyunlarda).
+  addBot(identity) {
+    const room = requireRoom(identity);
+    requireHost(room, identity);
+    if (!room.game.bots) throw new GameError('Bu oyunda bot yok.');
+    if (room.phase !== 'lobby') throw new GameError('Bot sadece bekleme odasında eklenir.');
+    addBot(room);
+    broadcast(room);
+  },
+  removeBot(identity, msg) {
+    const room = requireRoom(identity);
+    requireHost(room, identity);
+    if (room.phase !== 'lobby') throw new GameError('Bot sadece bekleme odasında çıkarılır.');
+    const id = str(msg.playerId);
+    if (!room.players.get(id)?.bot) throw new GameError('Böyle bir bot yok.');
+    removePlayer(room, id, 'kick');
   },
   kick(identity, msg) {
     const room = requireRoom(identity);
@@ -823,5 +930,10 @@ export function _testRoomSecrets(code) {
 }
 
 export function stats() {
-  return { rooms: rooms.size, identities: identities.size, timeScale: TIME_SCALE, loops: loops.size };
+  let bots = 0, botTimers = 0;
+  for (const r of rooms.values()) {
+    for (const p of r.players.values()) if (p.bot) bots++;
+    for (const name of r.timers.keys()) if (name.startsWith(BOT_TIMER)) botTimers++;
+  }
+  return { rooms: rooms.size, identities: identities.size, timeScale: TIME_SCALE, loops: loops.size, bots, botTimers };
 }

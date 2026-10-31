@@ -108,6 +108,7 @@ export default {
 | `rename` | `name` | Ad değiştir (bekleme odasında). |
 | `prep` | `data` | Host: bekleme odasında oyuna özel hazırlık verisi (ör. Shazam şarkı listesi). Oyun modülü `prep(prev, data)` ile doğrular; `room.prep` alanında sadece `prepInfo` özeti herkese gider. |
 | `backToLobby` | — | Host: oyun **bittikten sonra** bekleme odasına dön (oyun sürerken reddedilir). |
+| `addBot` / `removeBot` | — / `playerId` | Host, bekleme odasında: 🤖 bot ekle / çıkar (sadece `game.bots` kancası olan oyunlarda, §3.8). |
 | `lobbyAction` | `data` | Bekleme odasında **her oyuncunun** yapabildiği oyuna özel seçim (ör. Tosun Top takım seçimi). `game.lobbyAction(prep, playerId, data, { isHost, playerIds, rng })` doğrular, yeni `prep` döner. |
 | `input` | `x, y, k` | Gerçek zamanlı oyun girdisi (§3.7): yön vektörü + şut. Hızlı yol; yanıt yok. |
 | `ping` | `c` (sayı) | Gecikme ölçümü; sunucu `pong` ile aynı `c`'yi döner. Hızlı yol. |
@@ -205,6 +206,29 @@ Hızlı akan oyunlar (Tosun Top) için lobiye eklenen, oyundan bağımsız ve op
 - `stats()` → `loops` (çalışan döngü sayısı). `GET /api/_test/stats` sadece `TEST_GAMES=1` iken: `stats()` + `process.cpuUsage()`.
 - İstemci: `net.on('frame')`, `net.frame` (son kare), `net.sendFast(msg)` (bağlı değilse kuyruğa girmez, düşer).
   Oynanan odadayken kopunca yeniden bağlanma beklemesi en fazla 1 sn (normalde üstel, 8 sn'ye kadar).
+
+### 3.8 Lobi botları (opsiyonel kanca) — 2026-10-31
+
+Tek telefonla çok kişilik oyun denemek için. Sadece kancayı tanımlayan oyunlarda açık (şimdilik 🧛 Vampir).
+
+- `game.bots = { plan(state, botId, bctx) → { key, delayMs } | null, act(state, botId, bctx) → action | null }`,
+  `bctx = { mem, rng, now }` (`mem`: bot başına, oyun başına nesne — `start`'ta sıfırlanır; `rng`: odanın oyun üretecinden
+  ayrı bot üreteci, üretimde crypto). Her `afterChange`'ten sonra lobi her bot için `plan` sorar: aynı `key` zaten bekliyorsa
+  zamanlayıcı ellenmez (gecikme sıfırlanmaz), farklıysa eskisi iptal edilip yenisi kurulur, `null` bekleyeni iptal eder.
+  Süre dolunca `act` güncel duruma göre eylem döner ve **insanlarla aynı yoldan** (`applyAction` → `game.action`) uygulanır;
+  reddedilirse sessizce yeniden planlanır. Botlar sunucuda çalışır, görünüme hiçbir şey eklenmez.
+- Zamanlayıcılar odanın `room.timers` haritasında (`bot:<id>`) durur; oyun bitince, `backToLobby`'de ve oda silinince
+  `clearAllTimers` temizler. Ek `setInterval` yok. Gecikmeler TIME_SCALE ile ölçeklenir.
+- Bot oyuncu: id `bot-<16 hex>` (kimlik id'leri UUID; `identities`'de yok → `hello` ile sahiplenilemez, dosyaya/sıralamaya
+  yazılmaz), ad "🤖 Bot Hüsnü" gibi (insan adlarından 🤖 silinir, taklit edilemez), `connected` hep true (kopma süresi /
+  hükmen / 📴 yok), `room.players[].bot = true`, `room.bots` = oyun bot destekliyor mu. Oyuncu sayısına (min/max) dahil,
+  `maxPlayers` ile sınırlı. Host olamaz; sadece botlar kalırsa oda kapanır; "oda boş" sayımı sadece bağlı insanlara bakar.
+  `backToLobby` / rövanşta kalır; host çıkarınca (`removeBot` veya bekleme odasında `kick`) veya oda kapanınca gider.
+  Oyun sırasında çıkarılamaz (kick kuralı: bağlı oyuncu atılamaz).
+- `stats()` → `bots`, `botTimers` (sızıntı testleri).
+- 🧛 Vampir botu: gece 2–8 sn sonra izin verilen rastgele hedef (vampir müttefikin seçimini tercih eder; gözcü bir kez);
+  gündüz açık adaya %35 destek (3–10 sn), günde bir kez %15 ihtimalle rastgele aday (10–40 sn); sanıksa 5–10 sn sonra savunmayı
+  bitirir; oylamada %50 evet (2–8 sn). Ölü bot bir şey yapmaz; botlar hiç oynamasa da oyun kendi süreleriyle ilerler.
 
 ## 4. Oyun kuralları ve kabul kriterleri
 
