@@ -314,6 +314,73 @@ export default {
     }
   },
 
+  // Lobi botları (server/lobby.js scheduleBots, PLAN.md §3.8): tek telefonla deneme için basit, biraz rastgele oyuncular.
+  // Sunucuda çalışır; görünüme hiçbir şey eklemez (rolleri sadece state'te). Eylemler insanlarla aynı action() yolundan geçer.
+  bots: {
+    // Şu an yapacak bir şey varsa { key, delayMs }. Aynı key bekliyorken gecikme sıfırlanmaz.
+    plan(state, botId, { mem, rng, now }) {
+      const me = alivePlayer(state, botId);
+      if (!me || state.phase === 'over') return null; // ölüler bir şey yapmaz
+      const between = (lo, hi) => lo + Math.floor(rng.next() * (hi - lo));
+      const stage = `${state.night}:${state.log.length}`; // aynı gün içindeki her yargılama ayrı
+      switch (state.phase) {
+        case 'night':
+          if (botId in state.nightPicks) return null; // gözcü tek bakar; diğerleri de bir kez seçer
+          return { key: `night:${state.night}`, delayMs: between(2000, 8000) };
+        case 'day': {
+          const nom = nominationActive(state, now);
+          if (nom) {
+            if (nom.byId === botId || nom.targetId === botId) return null;
+            const k = `support:${nom.at}:${nom.targetId}`;
+            mem[k] ??= rng.next() < 0.35;
+            return mem[k] ? { key: k, delayMs: between(3000, 10000) } : null;
+          }
+          const k = `nominate:${state.night}`;
+          mem[k] ??= rng.next() < 0.15; // günde bir kez zar
+          if (!mem[k] || state.nominatedToday.includes(botId)) return null;
+          return { key: k, delayMs: between(10_000, 40_000) };
+        }
+        case 'trial':
+          return state.trial.targetId === botId ? { key: `defense:${stage}`, delayMs: between(5000, 10_000) } : null;
+        case 'trialVote':
+          if (state.trial.targetId === botId || botId in state.trial.votes) return null;
+          return { key: `vote:${stage}`, delayMs: between(2000, 8000) };
+        default:
+          return null;
+      }
+    },
+    // Zamanı gelince güncel duruma göre eylem.
+    act(state, botId, { rng, now }) {
+      const me = alivePlayer(state, botId);
+      if (!me) return null;
+      switch (state.phase) {
+        case 'night': {
+          const targets = nightTargets(state, me);
+          if (!targets.length) return null;
+          let pick = rng.pick(targets);
+          if (me.role === 'vampir') {
+            const allyPicks = state.players
+              .filter((p) => p.alive && p.role === 'vampir' && p.id !== botId && targets.includes(state.nightPicks[p.id]))
+              .map((p) => state.nightPicks[p.id]);
+            if (allyPicks.length) pick = rng.pick(allyPicks);
+          }
+          return { type: 'nightPick', targetId: pick };
+        }
+        case 'day': {
+          if (nominationActive(state, now)) return { type: 'support' };
+          const others = alive(state).filter((p) => p.id !== botId);
+          return others.length ? { type: 'nominate', targetId: rng.pick(others).id } : null;
+        }
+        case 'trial':
+          return { type: 'endDefense' };
+        case 'trialVote':
+          return { type: 'trialVote', yes: rng.next() < 0.5 };
+        default:
+          return null;
+      }
+    },
+  },
+
   isOver: (state) => state.phase === 'over',
 
   view(state, playerId) {

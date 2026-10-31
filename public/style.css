@@ -354,6 +354,7 @@ body { display: flex; }
   border-radius: 8px; width: 36px; height: 36px; cursor: pointer;
 }
 .icon-btn:hover { color: var(--bad); border-color: var(--bad); }
+.add-bot { margin-top: 10px; width: 100%; }
 .btn.small { padding: 8px 12px; font-size: 14px; min-height: 36px; }
 
 .big-timer { font-size: 28px; font-weight: 900; font-variant-numeric: tabular-nums; }

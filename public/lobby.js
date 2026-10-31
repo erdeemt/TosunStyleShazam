@@ -162,10 +162,19 @@ export function mountLobby(root, game) {
             el('span', { class: 'player-name' }, p.name),
             p.isHost ? el('span', { class: 'tag' }, '👑 oda sahibi') : null,
             p.id === ctx.playerId ? el('span', { class: 'tag' }, 'sen') : null,
-            p.connected ? null : el('span', { class: 'tag' }, '📴'),
-            ctx.isHost && p.id !== ctx.playerId
-              ? el('button', { class: 'icon-btn', title: 'Çıkar', 'aria-label': `${p.name} adlı oyuncuyu çıkar`, onclick: () => { if (confirm(`${p.name} odadan çıkarılsın mı?`)) net.send({ t: 'kick', playerId: p.id }); } }, '✕')
-              : null))),
+            p.connected || p.bot ? null : el('span', { class: 'tag' }, '📴'),
+            ctx.isHost && p.bot
+              ? el('button', { class: 'icon-btn', title: 'Botu çıkar', 'aria-label': `${p.name} botunu çıkar`, 'data-remove-bot': p.id, onclick: () => net.send({ t: 'removeBot', playerId: p.id }) }, '✕')
+              : ctx.isHost && p.id !== ctx.playerId
+                ? el('button', { class: 'icon-btn', title: 'Çıkar', 'aria-label': `${p.name} adlı oyuncuyu çıkar`, onclick: () => { if (confirm(`${p.name} odadan çıkarılsın mı?`)) net.send({ t: 'kick', playerId: p.id }); } }, '✕')
+                : null))),
+        // Bot destekleyen oyunlarda (sunucu room.bots der) host tek telefonla deneyebilsin diye bot ekler.
+        room.bots && ctx.isHost ? el('button', {
+          class: 'btn ghost add-bot',
+          disabled: room.players.length >= room.maxPlayers,
+          onclick: () => net.send({ t: 'addBot' }),
+        }, '🤖 Bot ekle') : null,
+        room.bots && ctx.isHost && room.players.some((p) => p.bot) ? el('p', { class: 'hint' }, 'Botlar sunucuda basitçe, biraz rastgele oynar.') : null,
         enough ? null : el('p', { class: 'hint' }, `Başlamak için en az ${room.minPlayers} kişi lazım.`)),
       game.renderSettings ? el('section', { class: 'card' },
         el('h2', {}, '⚙️ Ayarlar'),
