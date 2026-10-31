@@ -71,6 +71,42 @@ export function playTone(freq, ms) {
   return () => release(v);
 }
 
+// Zor mod hedefi: sunucunun ürettiği WAV (Hz JSON'da yok). Rampalar dosyada; seviye osilatörle aynı olsun diye
+// kazanç PEAK·ses / dosya genliği (server/media-encode.js TONE_AMPLITUDE).
+const WAV_AMPLITUDE = 0.9;
+
+export async function decodeAudio(blob) {
+  const c = audioCtx();
+  if (!c) throw new Error('Tarayıcı sesi desteklemiyor.');
+  const data = await blob.arrayBuffer();
+  // Eski Safari: sadece geri çağırmalı biçim
+  return new Promise((resolve, reject) => {
+    const p = c.decodeAudioData(data, resolve, reject);
+    if (p && typeof p.then === 'function') p.then(resolve, reject);
+  });
+}
+
+// buffer'ı offsetMs'ten çal (ses kilidi geç açıldıysa kalan kısım; ortadan başlarken kısa açılış rampası).
+export function playBuffer(buffer, offsetMs = 0) {
+  const c = audioCtx();
+  if (!c || !buffer) return () => {};
+  const src = c.createBufferSource();
+  src.buffer = buffer;
+  const gain = c.createGain();
+  const t = c.currentTime;
+  const level = (PEAK * volume()) / WAV_AMPLITUDE;
+  if (offsetMs > 0) {
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(level, t + FADE);
+  } else gain.gain.setValueAtTime(level, t);
+  src.connect(gain).connect(c.destination);
+  src.start(t, Math.max(0, offsetMs / 1000));
+  const v = { osc: src, gain };
+  live.add(v);
+  src.onended = () => { live.delete(v); src.disconnect(); gain.disconnect(); };
+  return () => release(v);
+}
+
 // Parmak basılıyken çalan ton: set(freq) ile kayar, stop() ile söner.
 export function startLive(freq) {
   const v = voice(freq);

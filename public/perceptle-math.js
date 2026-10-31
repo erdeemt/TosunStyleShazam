@@ -93,6 +93,50 @@ export function trackPos(p, t) {
 
 export const trackLanding = (p) => trackPos(p, flightTime(p)).x;
 
+// İstemciye atış parametreleri (g, hız, iniş) gitmez; sadece uçuşun [t0, t1] aralığından örnekler:
+// n + 1 eşit aralıklı an + aradaki duvar sekme anları (köşe kesilmesin). → [[t sn, x, y], ...]
+export function trackSamples(p, t0, t1, n) {
+  const ts = new Set();
+  for (let i = 0; i <= n; i++) ts.add(t0 + ((t1 - t0) * i) / n);
+  if (p.walls && p.vx) {
+    const lo = FIELD.ball;
+    const span = FIELD.w - 2 * FIELD.ball;
+    const a = p.x0 + p.vx * t0;
+    const b = p.x0 + p.vx * t1;
+    // Ham x (yansımasız) lo + k·span olduğunda top duvara değer.
+    for (let k = Math.ceil((Math.min(a, b) - lo) / span); k <= Math.floor((Math.max(a, b) - lo) / span); k++) {
+      const t = (lo + k * span - p.x0) / p.vx;
+      if (t > t0 && t < t1) ts.add(t);
+    }
+  }
+  return [...ts].sort((x, y) => x - y).map((t) => {
+    const { x, y } = trackPos(p, t);
+    return [r3(t), r1(x), r1(y)];
+  });
+}
+
+// Örneklerden t anındaki konum (doğrusal ara değer; aralık dışında uçlara kırpılır).
+export function samplePos(samples, t) {
+  if (!samples?.length) return { x: 0, y: 0 };
+  if (t <= samples[0][0]) return { x: samples[0][1], y: samples[0][2] };
+  for (let i = 1; i < samples.length; i++) {
+    const [tb, xb, yb] = samples[i];
+    if (t <= tb) {
+      const [ta, xa, ya] = samples[i - 1];
+      const k = tb > ta ? (t - ta) / (tb - ta) : 1;
+      return { x: xa + (xb - xa) * k, y: ya + (yb - ya) * k };
+    }
+  }
+  const last = samples.at(-1);
+  return { x: last[1], y: last[2] };
+}
+
+// Oyun sırasında gönderilen yörünge: sadece görünen kısmın örnekleri.
+export const TRACK_SAMPLES = { visible: 48, full: 72 };
+export const trackPublic = (p) => ({ samples: trackSamples(p, 0, p.visible, TRACK_SAMPLES.visible), visible: p.visible, walls: Boolean(p.walls) });
+// Sonuçta (gerçek değer açıklanınca) çizim için: tüm uçuşun örnekleri + iniş.
+export const trackReveal = (p) => ({ samples: trackSamples(p, 0, flightTime(p), TRACK_SAMPLES.full), visible: p.visible, walls: Boolean(p.walls), landing: r1(trackLanding(p)) });
+
 function makeTrack(rng, friday) {
   const g = friday ? GRAVITY.friday : GRAVITY.normal;
   for (let i = 0; i < 1000; i++) {

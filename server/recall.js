@@ -6,7 +6,9 @@ import { createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { cryptoRng } from './rng.js';
 import { GameError, num, str } from './errors.js';
 import { jsonStore } from './store.js';
-import { todayIstanbul } from './wordle.js';
+import { mintMedia } from './media-tokens.js';
+import { nuancePng, toneWav } from './media-encode.js';
+import { isFreshAccount, rankDaily, todayIstanbul } from './wordle.js';
 import {
   TONE_RANGES, hexToRgb, hsbToRgb, normalizeHex, rgbToHex, round2, scoreColor, scoreTone, freqAt,
 } from '../public/recall-math.js';
@@ -42,6 +44,8 @@ export const RECALL_GAMES = {
       return hex;
     },
     score: (target, guess) => scoreColor(hexToRgb(target), hexToRgb(guess)),
+    // Ezberde hedef hex JSON'a yazılmaz: gürültülü küçük PNG olarak opak adresten gelir (bkz. media-tokens.js).
+    media: { contentType: 'image/png', hidden: () => true, render: (target) => nuancePng(target) },
     // Chroma: turların ortalaması (0–1000)
     total: (scores) => (scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0),
   },
@@ -65,6 +69,8 @@ export const RECALL_GAMES = {
       return Math.round(Math.min(max, Math.max(min, f)) * 10) / 10;
     },
     score: (target, guess) => scoreTone(target, guess),
+    // Zor modda Hz JSON'a yazılmaz: ton WAV olarak opak adresten gelir. Kolayda sayı gider (istemci osilatörle çalar).
+    media: { contentType: 'audio/wav', hidden: (difficulty) => difficulty === 'hard', render: (target, ms) => toneWav(target, ms) },
     // Toplam: tur puanlarının toplamı (0–50)
     total: (scores) => round2(scores.reduce((a, b) => a + b, 0)),
   },
@@ -140,6 +146,18 @@ const deadlineOf = (def, difficulty, startedAt) => {
 };
 const EARLY_SLACK_MS = 150; // saat/ağ farkı payı
 const graceMs = () => Math.max(250, scaled(SUBMIT_GRACE_MS));
+const MEDIA_GRACE_MS = 3000; // medya adresi ezber bitince + bu kadar (gerçek ms) geçerli
+
+// Gizli hedef: JSON'da { media: '/api/media/<jeton>' } (sahibine bağlı, kısa ömürlü); açık hedef: { target }.
+function targetPayload(def, difficulty, target, { owner, room = null, memorizeMs, ttlMs }) {
+  if (!def.media.hidden(difficulty)) return { target };
+  return {
+    media: mintMedia({
+      owner, room, contentType: def.media.contentType, ttlMs,
+      render: () => def.media.render(target, memorizeMs),
+    }),
+  };
+}
 
 // Süresi geçmiş, cevaplanmamış tur 0 puan olur (sayfayı kapatan oyuncu turu "dondurmasın").
 function settle(def, game, now = Date.now()) {
@@ -245,7 +263,9 @@ export function startRound(identity, gameId, mode, rawGameId, rawRound) {
   const now = Date.now();
   game.rounds.push({ startedAt: now });
   if (mode === 'daily') { game.name = identity.name ?? game.name; daily.save(); }
-  return { ...extra, round, target: targetOf(round), ...timing(def, game.difficulty), startedAt: now, endsAt: deadlineOf(def, game.difficulty, now), serverNow: now };
+  const t = timing(def, game.difficulty);
+  const shown = targetPayload(def, game.difficulty, targetOf(round), { owner: identity.id, memorizeMs: t.memorizeMs, ttlMs: t.memorizeMs + MEDIA_GRACE_MS });
+  return { ...extra, round, ...shown, ...t, startedAt: now, endsAt: deadlineOf(def, game.difficulty, now), serverNow: now };
 }
 
 export function submitGuess(identity, gameId, mode, rawGameId, rawRound, rawGuess) {
@@ -285,18 +305,16 @@ export function leaderboard(gameId, date, viewerId) {
     date,
     puzzleNo: dayIndex(date) + 1,
     viewerDone,
-    entries: Object.entries(day)
+    entries: rankDaily(Object.entries(day)
       .filter(([, e]) => e.done)
       .map(([id, e]) => ({
         name: identityStore.data[id]?.name ?? e.name, // oyun bittikten sonra ad değişirse sıralama da güncel olsun
         me: id === viewerId,
+        fresh: isFreshAccount(identityStore.data[id], date), // bugün açılmış hesap: sıralama dışı
         total: e.total,
         finishedAt: e.finishedAt,
         rounds: viewerDone ? e.rounds.map((r, i) => ({ target: dailyTarget(def.id, date, i), guess: r.guess, score: r.score })) : null,
-      }))
-      .sort((a, b) => b.total - a.total || a.finishedAt - b.finishedAt)
-      .map((e, i) => ({ ...e, rank: i + 1 }))
-      .filter((e) => e.rank <= BOARD_LIMIT || e.me),
+      })), (a, b) => b.total - a.total || a.finishedAt - b.finishedAt, BOARD_LIMIT),
     finishers: Object.values(day).filter((e) => e.done).length,
     playing: Object.values(day).filter((e) => !e.done && e.rounds.length).length,
   };
@@ -309,6 +327,14 @@ function pruneFree() {
 setInterval(() => pruneFree(), 600_000).unref();
 
 export { todayIstanbul };
+
+// Sadece testler (server.js bunu TEST_GAMES=1 iken /api/_test/secret ile açar): oyunun hedefleri.
+export function _testSecrets(gameId, rawGameId) {
+  const def = getDef(gameId);
+  const free = freeGames.get(str(rawGameId));
+  if (free) return { targets: free.targets };
+  return { targets: Array.from({ length: ROUNDS }, (_, i) => dailyTarget(def.id, str(rawGameId), i)) };
+}
 
 // ---------- Lobi oyun modülü ----------
 // Fazlar (her tur): memorize (hedef görünür) → recall (hedef yok, herkes cevaplar) → reveal (hedef + herkesin cevabı) → … → over
@@ -327,6 +353,7 @@ export function lobbyGame(gameId) {
     state.answers = {};
     ctx.clearTimer('reveal');
     state.endsAt = ctx.setTimer(def.difficulties[state.settings.difficulty].memorizeMs, 'memorize');
+    state.media = new Map(); // bu turun medya adresleri: playerId -> url (görünümde bir kez üretilir)
   }
 
   function startRecall(state, ctx) {
@@ -389,6 +416,8 @@ export function lobbyGame(gameId) {
     setup({ players, settings, rng, ctx }) {
       const state = {
         settings,
+        roomCode: ctx.roomCode ?? null, // medya jetonu odaya bağlı
+        media: new Map(),
         gameKey: randomBytes(4).readUInt32BE(0), // istemci yeni oyunu ayırt etsin
         players: players.map((p) => ({ id: p.id, name: p.name, left: false, scores: [] })),
         targets: Array.from({ length: settings.rounds }, () => def.makeTarget(rng, settings.difficulty)),
@@ -451,6 +480,19 @@ export function lobbyGame(gameId) {
       const showTarget = state.phase === 'memorize' || state.phase === 'reveal' || state.phase === 'over';
       const mine = state.answers[playerId];
       const last = state.history.at(-1);
+      const difficulty = state.settings.difficulty;
+      const memoTarget = state.phase === 'memorize' ? state.targets[state.round - 1] : null;
+      let media = null;
+      if (memoTarget != null && def.media.hidden(difficulty)) {
+        media = state.media.get(playerId);
+        if (!media) {
+          const memorizeMs = Math.round(def.difficulties[difficulty].memorizeMs * TIME_SCALE);
+          media = targetPayload(def, difficulty, memoTarget, {
+            owner: playerId, room: state.roomCode, memorizeMs, ttlMs: state.endsAt - Date.now() + MEDIA_GRACE_MS,
+          }).media;
+          state.media.set(playerId, media);
+        }
+      }
       return {
         game: def.id,
         gameKey: state.gameKey,
@@ -464,7 +506,9 @@ export function lobbyGame(gameId) {
         recallMs: Math.round(state.settings.recallSeconds * 1000 * TIME_SCALE),
         // Hedef sadece ezber ve açıklama anında görünür.
         // Oyun tur ortasında bittiyse (herkes ayrıldı) oynanmamış turun hedefi değil, son açıklanan gösterilir.
-        target: state.phase === 'over' ? last?.target ?? null : showTarget ? state.targets[state.round - 1] : null,
+        // Gizli hedefli modda ezberde target yok, sadece opak medya adresi (media) var.
+        target: state.phase === 'over' ? last?.target ?? null : media ? null : showTarget ? state.targets[state.round - 1] : null,
+        media,
         me: { submitted: Boolean(mine), guess: mine ? mine.guess : null },
         players: state.players.filter((p) => !p.left).map((p) => ({
           id: p.id,

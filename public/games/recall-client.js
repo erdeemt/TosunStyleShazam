@@ -54,7 +54,8 @@ spec = {
   difficulties: [{ id, label, hint }], dailyDifficulty,
   howTo: [metin],
   verbs: { show: 'Rengi göster', submit: 'Rengimi gönder', memorize: 'Ezberle!', recall: 'Hatırla!' },
-  memorizeView(target, { endsAt, totalMs, difficulty, key }) → düğüm (tek seferlik ses vb. key ile)
+  memorizeView(target, { endsAt, totalMs, difficulty, key, media }) → düğüm (tek seferlik ses vb. key ile)
+    gizli hedefte target null, media = opak adres (/api/media/…); prepareMedia(media) → Promise (önceden indirme)
   createInput({ difficulty, submit }) → { node, value(), stop?() }  (her turda rastgele başlangıç)
   inlineSubmit: true → gönder düğmesini girdi kendisi çizer (submit() çağırır, .rc-submit sınıfıyla); dışarıda düğme yok
   answerChip(guess, { difficulty }) → küçük gösterim (null = cevap yok)
@@ -188,8 +189,10 @@ export function createRecallGame(spec) {
     const round = game.played.length;
     try {
       const r = await api('/round', { mode, gameId: game.gameId, round });
+      // Gizli hedef (Nüans görseli, Ton Avı Zor sesi): ezber ekranından önce indir, süre indirmeye gitmesin.
+      if (r.media && spec.prepareMedia) await spec.prepareMedia(r.media).catch(() => {});
       const now = Date.now();
-      current = { round, target: r.target, memorizeMs: r.memorizeMs, recallMs: r.recallMs, memorizeEnds: now + r.memorizeMs, endsAt: now + r.memorizeMs + r.recallMs };
+      current = { round, target: r.target ?? null, media: r.media ?? null, memorizeMs: r.memorizeMs, recallMs: r.recallMs, memorizeEnds: now + r.memorizeMs, endsAt: now + r.memorizeMs + r.recallMs };
       phase = 'memorize';
       render();
       later(() => enterRecall(), r.memorizeMs);
@@ -275,9 +278,9 @@ export function createRecallGame(spec) {
       el('h2', {}, `🏆 Bugünün sıralaması (#${board.puzzleNo})`),
       board.entries.length
         ? el('ol', { class: 'w-board rc-board' }, board.entries.map((e, i) =>
-          el('li', { class: e.me ? 'me' : '' },
-            el('span', { class: 'w-rank' }, `${e.rank ?? i + 1}.`),
-            el('span', { class: 'player-name' }, e.name),
+          el('li', { class: `${e.me ? 'me' : ''}${e.fresh ? ' fresh' : ''}` },
+            el('span', { class: 'w-rank' }, e.fresh ? '🆕' : `${e.rank ?? i + 1}.`),
+            el('span', { class: 'player-name' }, e.name, e.fresh ? el('small', { class: 'w-fresh', title: 'Bu hesap bugün açıldı; günün sıralamasına girmez.' }, '🆕 sıralama dışı') : null),
             el('span', { class: 'w-tries' }, spec.formatTotal(e.total, { short: true })),
             e.rounds ? el('span', { class: 'rc-mini' }, e.rounds.map((r) => spec.answerChip(r.guess, { difficulty: spec.dailyDifficulty, target: r.target, mini: true }))) : null)))
         : el('p', { class: 'hint' }, 'Henüz kimse bitirmedi. İlk sen ol!'),
@@ -340,7 +343,7 @@ export function createRecallGame(spec) {
       }
       case 'memorize':
         return [roundHead(spec.verbs.memorize),
-          spec.memorizeView(current.target, { endsAt: current.memorizeEnds, totalMs: current.memorizeMs, difficulty: game.difficulty, key: `${game.gameId}:${current.round}` }),
+          spec.memorizeView(current.target, { endsAt: current.memorizeEnds, totalMs: current.memorizeMs, difficulty: game.difficulty, key: `${game.gameId}:${current.round}`, media: current.media }),
           progressDots()];
       case 'recall':
         return [roundHead(spec.verbs.recall),
@@ -449,7 +452,7 @@ export function createRecallGame(spec) {
     if (view.phase === 'memorize') {
       mStatusSlot = el('div', {});
       return el('div', { class: `stack recall rc-${spec.id}` }, head,
-        spec.memorizeView(view.target, { endsAt: endsLocal, totalMs: view.memorizeMs, difficulty: view.difficulty, key: `${view.gameKey}:${view.round}` }),
+        spec.memorizeView(view.target, { endsAt: endsLocal, totalMs: view.memorizeMs, difficulty: view.difficulty, key: `${view.gameKey}:${view.round}`, media: view.media ?? null }),
         mStatusSlot);
     }
 

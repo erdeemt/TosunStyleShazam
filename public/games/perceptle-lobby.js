@@ -5,7 +5,7 @@ import { net } from '../net.js';
 import { mountLobby } from '../lobby.js';
 import { el, toast } from '../ui.js';
 import { TESTS, gradeOf } from '../perceptle-math.js';
-import { TEST_UI, revealView } from './perceptle-tests.js';
+import { TEST_UI, preloadStimulus, revealView } from './perceptle-tests.js';
 import { secondsTimer, timeBar } from './recall-client.js';
 import { audioReady, unlockAudio } from './tone-audio.js';
 import { HOW_TO, META, detailText, scoreClass } from './perceptle.js';
@@ -191,6 +191,7 @@ function ensurePlay(view, ctx) {
   const stage = el('div', { class: 'pl-stage' });
   const c = { key, index: view.index, ui: null, stage, timers: [], sent: false, resent: false, lastAnswer: undefined, stim: view.stimulus };
   cur = c;
+  preloadStimulus(c.stim); // Say görseli "Hazır ol…" sırasında insin
   const later = (fn, ms) => c.timers.push(setTimeout(fn, Math.max(0, ms)));
   const submit = (answer) => {
     if (c.sent || cur !== c) return;

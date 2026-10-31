@@ -3,8 +3,9 @@
 // stim null olabilir (sayfa test sürerken yenilendi: zamanlı gösterim tekrar edilmez). Kurallar: PLAN.md §4.7.
 import { el } from '../ui.js';
 import { timeBar } from './recall-client.js';
-import { FIELD, SPLIT_RANGE, angleError, dotAt, splitLabel, splitValue, tempoExpected, trackLanding, trackPos } from '../perceptle-math.js';
+import { FIELD, SPLIT_RANGE, angleError, samplePos, splitLabel, splitValue, tempoExpected } from '../perceptle-math.js';
 import { audioContext, clickAt, unlockAudio } from './tone-audio.js';
+import { fetchBitmap } from '../media.js';
 
 const TAU = Math.PI * 2;
 const INK = '#f3ecff';
@@ -76,22 +77,45 @@ const local = (node, e) => {
 };
 
 // ---------- 1. Say ----------
+// Noktalar koordinat listesi olarak gelmez: sunucunun çizdiği PNG (stim.image, opak adres). Cuma'da alt alta
+// stim.frames kare (stim.fps kare/sn) — gerçek zamana göre kare seçilir. Beyaz noktalar INK rengine boyanır.
+
+const bitmaps = new Map(); // url -> Promise<ImageBitmap>
+// Uyaran gelir gelmez görseli indirmeye başla (tek oyunculu bekler, lobide "Hazır ol…" sırasında iner).
+export function preloadStimulus(stim) {
+  if (!stim?.image) return Promise.resolve();
+  let p = bitmaps.get(stim.image);
+  if (!p) {
+    p = fetchBitmap(stim.image);
+    p.catch(() => bitmaps.delete(stim.image));
+    bitmaps.set(stim.image, p);
+    while (bitmaps.size > 4) bitmaps.delete(bitmaps.keys().next().value);
+  }
+  return p.then(() => {}, () => {});
+}
 
 function countTest({ stim, friday, showMs, timeScale, submit }) {
   const st = stage('pc-square', 1);
   const t0 = performance.now();
   let shown = Boolean(stim);
   let raf = 0;
+  let sprite = null;
+  if (stim?.image) {
+    preloadStimulus(stim);
+    bitmaps.get(stim.image)?.then((b) => { sprite = b; st.paint(); }, () => {});
+  }
   st.setDraw((ctx, w) => {
-    if (!shown) return;
+    if (!shown || !sprite) return;
     const t = (performance.now() - t0) / timeScale / 1000;
+    const size = stim.size;
+    const f = friday && stim.frames > 1 ? Math.min(stim.frames - 1, Math.max(0, Math.round(t * stim.fps))) : 0;
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(sprite, 0, f * size, size, size, 0, 0, w, w);
+    ctx.globalCompositeOperation = 'source-atop'; // sadece nokta piksellerini boya
     ctx.fillStyle = INK;
-    for (const d of stim.dots) {
-      const [x, y] = friday ? dotAt(d, t) : d;
-      ctx.beginPath();
-      ctx.arc(x * w, y * w, d[2] * w, 0, TAU);
-      ctx.fill();
-    }
+    ctx.fillRect(0, 0, w, w);
+    ctx.restore();
   });
   const field = el('input', {
     type: 'text', inputmode: 'numeric', pattern: '[0-9]*', maxlength: '3', autocomplete: 'off',
@@ -161,17 +185,18 @@ function drawField(ctx, w, h, friday) {
   return { X: (x) => x * k, Y: (y) => h - y * k };
 }
 
-function drawPath(ctx, p, X, Y, from, to, color, width = 3) {
+// Yörünge sunucudan sadece örnek noktalar olarak gelir ([t, x, y]; atış parametreleri yok): [from, to] arası çizilir.
+function drawPath(ctx, samples, X, Y, from, to, color, width = 3) {
   ctx.strokeStyle = color;
   ctx.lineWidth = width;
   ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
   ctx.beginPath();
-  const steps = Math.max(2, Math.ceil((to - from) * 120));
-  for (let i = 0; i <= steps; i++) {
-    const t = from + ((to - from) * i) / steps;
-    const { x, y } = trackPos(p, t);
-    if (i) ctx.lineTo(X(x), Y(y)); else ctx.moveTo(X(x), Y(y));
-  }
+  const a = samplePos(samples, from);
+  ctx.moveTo(X(a.x), Y(a.y));
+  for (const [t, x, y] of samples) if (t > from && t < to) ctx.lineTo(X(x), Y(y));
+  const b = samplePos(samples, to);
+  ctx.lineTo(X(b.x), Y(b.y));
   ctx.stroke();
 }
 
@@ -204,9 +229,9 @@ function trackTest({ stim, friday, showMs, timeScale, submit }) {
     const { X, Y } = drawField(ctx, w, h, friday);
     if (stim) {
       const t = flying ? Math.min(stim.visible, (performance.now() - t0) / timeScale / 1000) : stim.visible;
-      drawPath(ctx, stim, X, Y, 0, t, flying ? ACCENT : '#ffb54799');
+      drawPath(ctx, stim.samples, X, Y, 0, t, flying ? ACCENT : '#ffb54799');
       if (flying) {
-        const { x, y } = trackPos(stim, t);
+        const { x, y } = samplePos(stim.samples, t);
         ctx.fillStyle = INK;
         ctx.beginPath();
         ctx.arc(X(x), Y(y), FIELD.ball * (w / FIELD.w) + 2, 0, TAU);
@@ -532,18 +557,21 @@ export const TEST_UI = { count: countTest, track: trackTest, angle: angleTest, t
 
 // ---------- Sonuç çizimleri (doğru cevap ve senin cevabın yan yana) ----------
 
+// Yörüngede stim = sunucunun sonuç örnekleri { samples (tüm uçuş), visible, landing }.
 export function revealView(test, stim, answer, friday) {
   if (!stim || answer == null) return null;
   if (test === 'track') {
+    if (!stim.samples?.length || stim.landing == null) return null;
+    const end = stim.samples.at(-1)[0];
     const st = stage('pc-field', FIELD.w / FIELD.h);
     st.setDraw((ctx, w, h) => {
       const { X, Y } = drawField(ctx, w, h, friday);
-      drawPath(ctx, stim, X, Y, 0, stim.visible, ACCENT);
+      drawPath(ctx, stim.samples, X, Y, 0, stim.visible, ACCENT);
       ctx.save();
       ctx.setLineDash([4, 6]);
-      drawPath(ctx, stim, X, Y, stim.visible, (stim.vy + Math.sqrt(stim.vy ** 2 + 2 * stim.g * stim.y0)) / stim.g, GOOD, 2);
+      drawPath(ctx, stim.samples, X, Y, stim.visible, end, GOOD, 2);
       ctx.restore();
-      drawGuessX(ctx, X, h, trackLanding(stim), GOOD);
+      drawGuessX(ctx, X, h, stim.landing, GOOD);
       drawGuessX(ctx, X, h, answer, PINK);
     });
     return st.node;
