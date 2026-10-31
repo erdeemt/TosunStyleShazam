@@ -886,3 +886,32 @@ body.hx-live { overflow: hidden; }
   min-height: 44px; padding: 8px 14px; border-radius: 999px; border: 2px dashed var(--bad); background: var(--bg);
   color: var(--text); font: inherit; font-weight: 800; cursor: pointer;
 }
+
+/* 🧛 Vampir 3D köy meydanı (public/games/vampir-3d.js). Butonların üstünde ayrı bir blok; dokunuşları engellemez. */
+.v3d {
+  position: relative;
+  height: min(48vh, 420px);
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  background: linear-gradient(180deg, #8fd3ff 0%, #ffe7c4 62%);
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.v3d[hidden] { display: none; }
+.v3d.off { height: auto; background: var(--card); padding: 8px; display: flex; justify-content: center; }
+.v3d-canvas { display: block; width: 100%; height: 100%; }
+.v3d-toggle {
+  position: absolute; top: 8px; right: 8px;
+  min-height: 32px; padding: 4px 12px;
+  border-radius: 999px; border: 0;
+  background: rgba(20, 10, 40, .55); color: #fff;
+  font: inherit; font-size: 13px; cursor: pointer;
+}
+.v3d.off .v3d-toggle { position: static; min-height: 44px; background: var(--card2); border: 1px solid var(--line); }
+.v3d-note { position: absolute; left: 12px; bottom: 10px; font-size: 13px; color: rgba(30, 20, 50, .7); pointer-events: none; }
+.v3d.off .v3d-note { display: none; }
+.player-list li.flash { animation: v3d-flash 1.2s ease-out; }
+@keyframes v3d-flash { 0% { box-shadow: 0 0 0 3px var(--accent2); } 100% { box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .player-list li.flash { animation-duration: .3s; } }
