@@ -142,3 +142,16 @@ Açık küçük notlar:
   asılma yerine komik sürgün (mancınıkla fırlatma veya kafes).
 - **Aşama 3 — rol efektleri ve final:** kart açıkken rolüne göre efektler (yine sadece kart açıkken!), oyun sonunda rol açılışı +
   kazananların dansı, sesler + sessiz düğmesi.
+
+## 🤖 Botlar (Vampir) — game/vampir-bots dalında (main'e BİRLEŞTİRİLMEDİ, 2026-10-31)
+
+- Tek telefonla Vampir (5–12 kişi) denemek için: host bekleme odasında "🤖 Bot ekle" / bot satırında ✕. Ayrıntı PLAN.md §3.8.
+- Genel, opsiyonel lobi kancası `game.bots = { plan, act }`; şimdilik sadece Vampir tanımlıyor (diğer oyunlarda düğme yok,
+  sunucu da reddeder). Botlar sunucuda, odanın zamanlayıcı haritasıyla; eylemleri insanlarla aynı doğrulamadan geçer.
+- Botlar kimlik dosyasına/sıralamaya yazılmaz, hep bağlı, host olamaz, lobiye dönüşte kalır; sadece botlar kalırsa oda kapanır.
+  İnsan adlarından 🤖 silinir (bot taklidi olmasın).
+- Dosyalar: server/lobby.js (addBot/removeBot, scheduleBots/runBot, ortak applyAction, stats bots/botTimers),
+  server/games/vampir.js (`bots`), public/lobby.js (+ .add-bot stili).
+- Testler: tests/unit/vampir-bots.test.mjs (sanal saatle 40 tam bot oyunu), tests/swarm/vampir-bots.test.mjs (7),
+  tests/e2e/vampir-bots.test.mjs (tek telefon + 4 bot, bir gece; ekranlar test-results/vampir-bots/).
+- Kullanıcı denemeli: tek telefon + 4–11 bot; gündüzü hızlandırmak için "🌙 Geceye geç". Botlar konuşmaz, oyları rastgele.
