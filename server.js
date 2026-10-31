@@ -315,11 +315,11 @@ async function handleApi(url, res, req) {
     return sendJson(res, 200, perceptle.leaderboard(perceptle.todayIstanbul(), identity.id));
   }
   // Sadece testlerde (TEST_GAMES=1): oda/döngü sayısı + işlemci süresi (sızıntı ve yük testleri için).
-  if (process.env.TEST_GAMES === '1' && url.pathname === '/api/_test/stats') {
+  if (process.env.TEST_GAMES === '1' && process.env.TEST_MODE === '1' && url.pathname === '/api/_test/stats') {
     return sendJson(res, 200, { ...lobbyStats(), media: mediaStats(), cpu: process.cpuUsage(), uptimeMs: Math.round(process.uptime() * 1000), rss: process.memoryUsage().rss });
   }
   // Sadece testlerde (TEST_GAMES=1): gizli hedef/uyaran (oyun artık bunları JSON'da göndermiyor; testler kusursuz cevap için).
-  if (process.env.TEST_GAMES === '1' && url.pathname === '/api/_test/secret') {
+  if (process.env.TEST_GAMES === '1' && process.env.TEST_MODE === '1' && url.pathname === '/api/_test/secret') {
     if (q.get('room')) return sendJson(res, 200, _testRoomSecrets(q.get('room')));
     if (q.get('recall')) return sendJson(res, 200, recall._testSecrets(q.get('recall'), q.get('gameId')));
     return sendJson(res, 200, perceptle._testSecrets(q.get('gameId')));
