@@ -285,6 +285,16 @@ Hızlı akan oyunlar (Tosun Top) için lobiye eklenen, oyundan bağımsız ve op
 - Ölüm duyurusunda rol yok; ölü oyuncunun görünümünde de diğer roller yok.
 - Doktor aynı kişiyi üst üste koruyamaz; vampir vampiri seçemez; ölü kimse eylem yapamaz.
 
+**3D köy meydanı (2026-10-31, game/vampir-3d dalı) — görsel katman, kurallar aynı**
+- `public/games/vampir-3d.js`: oyun ekranının üstünde ayrı blok (≈ min(48vh, 420px)); HTML kartlar/düğmeler aşağıda aynen çalışır.
+  Three.js r187 `public/vendor/three/three.module.min.js` (MIT; npm paketindeki build esbuild ile tek dosyaya küçültüldü),
+  sadece 3D açıkken ve WebGL2 varken tembel yüklenir. Kapat düğmesi `localStorage['tss:vampir-3d']='0'` (kapalıyken WebGL yok).
+- **Gizlilik kuralı:** sahne sadece `describe(view, {cardOpen})` tarifinden çizilir; rol türevli alanlar (seçim halkası, müttefik
+  işareti) sadece kart açıkken. Kart kapalıyken herkesin tarifi (`.v3d[data-state]`) birebir aynı; tek fark kamera (herkes kendini
+  önde görür, kendi adı gizli). Gece dokunuşu düğmeyle aynı kapıdan geçer (`tapTarget`: kart kapalıysa sadece uyarı).
+- Aşamalar: 1 = sahne, gece/gündüz, uyku, aday ❗, yargılama spotu, hayalet + mezar taşı (bitti) · 2 = ölüm/asılma animasyonları ·
+  3 = kart açıkken rol efektleri, oyun sonu rol açılışı + dans, sesler + sessiz düğmesi.
+
 ### 4.4 🎵 Tosun Shazam — Online (lobili) mod — kullanıcı ile netleşti (2026-10-23)
 
 - Menü: Çok Oyunculu → Tosun Shazam → 🌐 Online. 2–12 oyuncu, herkes kendi telefonundan; **ses her telefonda çalar**.

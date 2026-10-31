@@ -93,6 +93,7 @@ export function createStage({ onTap } = {}) {
   let loading = false;
   let last = null;
   let disposed = false;
+  let failed = false; // WebGL yok/koptu: bu oyunda bir daha deneme
 
   const setReady = (s) => { el.dataset.ready = s; };
   const paint = () => {
@@ -102,13 +103,14 @@ export function createStage({ onTap } = {}) {
     note.textContent = enabled && el.dataset.ready === 'loading' ? 'Köy kuruluyor…' : '';
   };
   const fail = () => {
+    failed = true;
     world?.dispose();
     world = null;
     setReady('fallback');
     el.hidden = true; // sessizce gizle: oyun 2D olarak aynen sürer
   };
   const enable = () => {
-    if (world || loading || disposed) return;
+    if (world || loading || disposed || failed) return;
     if (!hasWebGL2()) return fail();
     loading = true;
     setReady('loading');
