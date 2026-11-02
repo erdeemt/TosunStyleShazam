@@ -35,7 +35,11 @@ test('tek telefon 4 bot ekler, Vampir başlar, bir gece geçer', async () => {
   await page.screenshot({ path: `${SHOTS}waiting.png`, fullPage: true });
 
   await page.click('#game-vampir button:has-text("Oyunu başlat")');
-  await waitNet(page, "room && room.phase === 'playing' && view && view.phase === 'night'");
+  // açılış anlatımı (intro) → 1. gece
+  await waitNet(page, "room && room.phase === 'playing' && view && view.phase === 'dusk'");
+  await page.waitForSelector('#game-vampir .vnar.active[data-kind="intro"] .vnar-box');
+  assert.match(await page.locator('#game-vampir .vnar-title').textContent(), /Köye hoş geldiniz/);
+  await waitNet(page, "view && view.phase === 'night'", 15000);
   const s = await state(page);
   assert.equal(s.view.players.length, 5);
   for (const x of s.view.players) assert.ok(!('role' in x));
@@ -52,7 +56,14 @@ test('tek telefon 4 bot ekler, Vampir başlar, bir gece geçer', async () => {
   const targetName = s.view.players.find((x) => x.id === target).name;
   await nightClick(p, targetName);
   // Botlar 2–8 sn (×0.25) içinde seçer; herkes seçince gece biter
+  // sabah anlatımı: anlatıcı ölen kişiyi ya da "kimse ölmedi"yi duyurur, sonra gündüz
   await waitNet(page, "view && view.phase !== 'night'", 20000);
+  if ((await state(page)).view.phase === 'dawn') {
+    await page.waitForSelector('#game-vampir .vnar.active[data-kind="dawn"] .vnar-box');
+    await page.waitForFunction(() => /öldü|kimse ölmedi/.test(document.querySelector('#game-vampir .vnar-title')?.textContent ?? ''), undefined, { timeout: 10000 });
+    await page.screenshot({ path: `${SHOTS}dawn.png`, fullPage: true });
+  }
+  await waitNet(page, "view && ['day', 'over'].includes(view.phase)", 20000);
   const after = await state(page);
   assert.ok(['day', 'over'].includes(after.view.phase), after.view.phase);
   assert.equal(after.view.night, 1);

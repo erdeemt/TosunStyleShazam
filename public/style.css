@@ -947,6 +947,13 @@ body.hx-live { overflow: hidden; }
   position: absolute; left: 10px; right: 10px; bottom: calc(min(48vh, 420px) - 30px);
   transform: translateY(100%);
 }
+/* sahne üstünde kompakt şerit: emoji solda, animasyonu kapatmasın */
+.v3d:not(.off):not([hidden]) + .vnar .vnar-box { text-align: left; padding: 8px 12px 8px 10px; display: none; grid-template-columns: auto 1fr; column-gap: 10px; align-items: center; }
+.v3d:not(.off):not([hidden]) + .vnar.active .vnar-box { display: grid; }
+.v3d:not(.off):not([hidden]) + .vnar .vnar-emoji { grid-row: span 2; font-size: 34px; }
+.v3d:not(.off):not([hidden]) + .vnar .vnar-title { font-size: 19px; margin: 0; }
+.v3d:not(.off):not([hidden]) + .vnar .vnar-sub { font-size: 14px; margin-top: 1px; }
+.v3d:not(.off):not([hidden]) + .vnar .vnar-bar { grid-column: 1 / -1; margin-top: 6px; height: 3px; }
 .v3d:not(.off):not([hidden]) + .vnar .vnar-box.in, .v3d:not(.off):not([hidden]) + .vnar .vnar-cue.in { animation-name: vnar-in-over; }
 @keyframes vnar-in-over { 0% { opacity: 0; transform: translateY(calc(100% - 14px)) scale(.94); } 100% { opacity: 1; transform: translateY(100%); } }
 .big-timer.hurry { color: var(--bad); animation: vnar-pulse 1s ease-in-out infinite; }

@@ -143,6 +143,26 @@ Açık küçük notlar:
 - **Aşama 3 — rol efektleri ve final:** kart açıkken rolüne göre efektler (yine sadece kart açıkken!), oyun sonunda rol açılışı +
   kazananların dansı, sesler + sessiz düğmesi.
 
+## 🧛 Vampir 3D – Aşama 2: akış + ölüm/sürgün — game/vampir-flow dalında (main'e BİRLEŞTİRİLMEDİ, 2026-11-02)
+
+- Kullanıcı geri bildirimi: "gece gündüz, ölüm geçişleri direkt olmasın, akış takip edilsin". Ayrıntı PLAN.md §4.3 "Anlatıcı ara fazları".
+- Sunucu: yeni kısa, eş zamanlı ara fazlar `dusk` (açılış intro 6 sn / akşam 5 sn), `dawn` 8 sn, `verdict` 7 sn; bu sırada eylem yok,
+  botlar beklemez/eylem yapmaz. Kazanma kontrolü anlatımdan sonra. `view.narration` herkese aynı (sadece açık bilgi).
+- İstemci: anlatıcı kutusu (büyük emoji + başlık + alt satır + ilerleme çubuğu, sunucu saatine göre satır satır), 3D kapalıyken de kart
+  olarak görünür. Küçük ipuçları (aday / destek / oylama), son 10 sn sayaç nabzı. Sabah/karar anlatımında oyuncu listesi gizli (ölüm
+  herkese anlatıcıyla aynı anda açıklanır).
+- 3D: akşam kamera geri çekilir, güneş batarken herkes uyur; sabah kamera ölene yaklaşır ve oyun+geceden seçilen ölüm oynar
+  (🦇 yarasa sürüsü + solup devrilme / devrilip mezar taşı "pop" + toz / tabut düşer, kapak kapanır, gömülür) → hayalet + mezar taşı.
+  Asılan: köylüler meşale/yaba kaldırır, mancınık sanığı evlerin üstünden fırlatır (✨). Kurtulan: zıplar + 😮‍💨. Oyun sonu: herkes
+  ateşe yaklaşır, anlatıcı kazananı duyurur. reduced-motion: metin ve zamanlama aynı, kamera/parçacık/animasyon yok.
+- Dosyalar: server/games/vampir.js, public/games/vampir-flow.js (yeni), public/games/vampir.js, public/games/vampir-3d.js, public/style.css.
+- Testler: tests/unit/vampir-flow.test.mjs (yeni: fazlar, anlatım aynılığı/sızıntı, deli/kazanma sırası, istemci satırları),
+  tests/e2e/vampir-flow.test.mjs (yeni: 3 telefon (biri 3D kapalı) + 2 bot: açılış → gece → sabah → aday/destek → oylama → karar
+  → akşam; ekranlar test-results/vampir-flow/). Sürü hakemi (swarm-vampir-lib) yeni fazları/geçişleri denetler; eski testler
+  güncellendi (sabah/karar anlatımını bekler). vampir-fuzz artık TIME_SCALE 0.25 (anlatım 6+8 sn × her bağlam yavaştı).
+- Kullanıcı denemeli: anlatım süreleri (6/5/8/7 sn) kısa/uzun mu, sahnedeki anlatıcı şeridi animasyonu kapatıyor mu,
+  gerçek telefonda okunabilirlik; mancınık kamera açısı bazen öndeki karakterin arkasında kalabiliyor.
+
 ## 🤖 Botlar (Vampir) — game/vampir-bots dalında (main'e BİRLEŞTİRİLMEDİ, 2026-10-31)
 
 - Tek telefonla Vampir (5–12 kişi) denemek için: host bekleme odasında "🤖 Bot ekle" / bot satırında ✕. Ayrıntı PLAN.md §3.8.

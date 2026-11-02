@@ -63,6 +63,8 @@ test('5 telefon: gece → sabah → yargılama → asma → oyun sonu', async ()
 
   // Gece 1: herkes kartını açar; ekran yapısı herkes için aynı olmalı (aynı sayıda hedef düğmesi)
   const infos = [];
+  // önce açılış anlatımı (6 sn), sonra 1. gece
+  for (const p of phones) await until(p, (v) => v.phase === 'night');
   for (const p of phones) {
     await p.page.waitForSelector('.role-card.hidden-card');
     const hiddenText = await p.page.locator('#game-vampir').textContent();

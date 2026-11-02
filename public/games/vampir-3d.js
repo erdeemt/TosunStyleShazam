@@ -528,7 +528,7 @@ function buildWorld(T, host, { onTap, onLost, onDetached }) {
   scene.add(fxRoot);
   const fxObjs = []; // her karede önce hepsi gizlenir, oynayan efekt açar
   const fxAdd = (o, parent = fxRoot) => { o.visible = false; parent.add(o); fxObjs.push(o); return o; };
-  const batSprites = Array.from({ length: 7 }, () => fxAdd(sprite(emojiTex('🦇'), 0.7, 0.35)));
+  const batSprites = Array.from({ length: 7 }, () => fxAdd(sprite(emojiTex('🦇'), 0.95, 0.48)));
   const dustMat = basic({ color: '#d9ccb2', transparent: true, opacity: 0, depthWrite: false });
   const dustGeo = new T.IcosahedronGeometry(0.14, 0);
   const dust = Array.from({ length: 9 }, () => fxAdd(mesh(dustGeo, dustMat)));
@@ -658,6 +658,7 @@ function buildWorld(T, host, { onTap, onLost, onDetached }) {
   const camFocus = new T.Vector3(0, 0.6, -0.4);
   const camTmp = new T.Vector3();
   const camTmp2 = new T.Vector3();
+  const camTmp3 = new T.Vector3();
   let camW = 0; // odak (ölen / sanık)
   let camPB = 0; // akşam geri çekilme
   let gather = 1; // oyun sonu: herkes ateşe yaklaşır
@@ -815,7 +816,8 @@ function buildWorld(T, host, { onTap, onLost, onDetached }) {
       const w = smooth(camW);
       camTmp.copy(camLook).lerp(camFocus, 0.8 * w);
       camTmp2.copy(camBase).sub(camLook).multiplyScalar(1 + 0.22 * smooth(camPB)).add(camLook);
-      camTmp2.lerp(camFocus, 0.32 * w);
+      // odak: kurbanın biraz önü ve yukarısı (öndeki karakterler kapatmasın)
+      camTmp2.lerp(camTmp3.set(camFocus.x, camFocus.y + 5.4, camFocus.z + 3.8), 0.5 * w);
       camera.position.copy(camTmp2);
       camera.lookAt(camTmp);
     }
