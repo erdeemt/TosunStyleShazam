@@ -157,8 +157,10 @@ export function createNarrator() {
       const left = endsAt ? endsAt - now : Infinity;
       timerEl.classList.toggle('hurry', !INTERMISSIONS.includes(phase) && left > 0 && left <= 10_000);
     }
-    const busy = active || cueOn || (endsAt && endsAt - now > 0 && endsAt - now <= 11_000);
+    const left = endsAt ? endsAt - now : 0;
+    const busy = active || cueOn || (left > 0 && left <= 11_000);
     if (busy || (n && n.kind !== 'over')) timer = setTimeout(tick, 200);
+    else if (left > 11_000) timer = setTimeout(tick, left - 10_800); // son 10 sn nabzı için uyan
     else timer = 0;
   }
   const kick = () => { if (!timer && !disposed) tick(); };
