@@ -8,7 +8,7 @@ import { windowCounter } from './limits.js';
 const MAX_TOKENS = Number(process.env.MEDIA_MAX_TOKENS) > 0 ? Number(process.env.MEDIA_MAX_TOKENS) : 5000;
 const DEFAULT_USES = 2; // bir kez ağ hatası payı
 const RENDER_CACHE_MAX = 16; // aynı uyaran (günlük / aynı oda) için üretilmiş medya
-export const MEDIA_TYPES = new Set(['image/png', 'audio/wav']);
+export const MEDIA_TYPES = new Set(['image/png', 'audio/wav', 'image/jpeg']); // jpeg: 📸 Ne Zaman Nerede? fotoğrafları
 export const TOKEN_RE = /^[0-9a-f]{32}$/;
 
 const tokens = new Map(); // jeton -> { owner, room, contentType, render, cacheKey, expiresAt, usesLeft } (ekleme sırası = yaş)
