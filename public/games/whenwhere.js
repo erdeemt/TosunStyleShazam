@@ -289,7 +289,7 @@ function revealScreen() {
 }
 
 function finalCard() {
-  const t = game.title ?? titleFor(game.total, game.rounds);
+  const t = game.badge ?? titleFor(game.total, game.rounds);
   return el('section', { class: 'card center ww-final' },
     el('div', { class: 'hint' }, mode === 'daily' ? `📅 Günlük #${game.puzzleNo}` : `♾️ Serbest · ${setById(game.set).icon} ${setById(game.set).name}`),
     el('div', { class: 'ww-title-icon' }, t.icon),

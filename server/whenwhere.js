@@ -296,7 +296,7 @@ function publicGame(game, extra) {
     pending: pendingIndex >= 0 ? { index: pendingIndex, image: photoMedia(game.photos[pendingIndex], { owner: game.playerId }) } : null,
     done: Boolean(game.done),
     total,
-    title: game.done ? titleFor(total, game.photos.length) : null,
+    badge: game.done ? titleFor(total, game.photos.length) : null, // bitiş unvanı
     ...extra,
   };
 }
@@ -359,7 +359,7 @@ export function startRound(identity, mode, rawGameId, rawIndex) {
   const r = game.rounds[index];
   if (r && r.guess !== undefined) throw new GameError('Bu tur zaten bitti.');
   if (!r) {
-    if (index !== game.rounds.length) throw new GameError('Önce önceki turu bitir.');
+    if (index !== game.rounds.length || game.rounds.some((x) => x.guess === undefined)) throw new GameError('Önce önceki turu bitir.');
     game.rounds.push({ startedAt: Date.now() });
     if (mode === 'daily') { game.rec.name = identity.name ?? game.rec.name; daily.save(); }
     if (mode === 'free') {
@@ -404,7 +404,7 @@ export function leaderboard(date, viewerId) {
     fresh: isFreshAccount(identityStore.data[id], date),
     total: e.total,
     finishedAt: e.finishedAt,
-    title: titleFor(e.total, DAILY_ROUNDS).name,
+    badge: titleFor(e.total, DAILY_ROUNDS).name,
     scores: viewerDone ? e.rounds.map((x) => x.result?.score ?? 0) : null,
   }));
   return {

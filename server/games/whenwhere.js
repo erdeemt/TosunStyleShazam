@@ -186,7 +186,7 @@ export default {
         locked: inPlay ? Boolean(state.guesses[p.id]) : null,
         scores: p.scores,
         total: total(p),
-        title: state.over ? titleFor(total(p), state.photos.length) : null,
+        badge: state.over ? titleFor(total(p), state.photos.length) : null,
       })),
       // Başkalarının tahminleri ve gerçek cevap sadece tur kapandıktan sonra (history).
       history: state.history,

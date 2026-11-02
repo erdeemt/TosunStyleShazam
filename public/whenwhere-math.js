@@ -64,11 +64,11 @@ export function scoreRound(guess, truth, scaleKm) {
 // Boylamı [-180, 180) aralığına sar (harita yatayda tekrar ettiği için 200° gibi değerler gelebilir).
 export const wrapLon = (lon) => ((((lon + 180) % 360) + 360) % 360) - 180;
 
-// İstemciden gelen tahmini doğrula: sadece sayı (ya da sayı metni), aralık dışı reddedilir (enlem) / sarılır (boylam).
+// İstemciden gelen tahmini doğrula: sadece JSON sayısı (metin, nesne, NaN reddedilir); enlem/yıl aralık dışıysa red, boylam sarılır.
 // Geçersizse null döner (çağıran hata verir).
 export function cleanGuess(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const n = (v) => (typeof v === 'number' ? v : typeof v === 'string' && /^\s*-?\d+(\.\d+)?\s*$/.test(v) ? Number(v) : NaN);
+  const n = (v) => (typeof v === 'number' ? v : NaN);
   const lat = n(raw.lat);
   const lon = n(raw.lon);
   const year = n(raw.year);

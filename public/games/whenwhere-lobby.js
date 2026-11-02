@@ -232,7 +232,7 @@ function overScreen(view, ctx) {
       rows.length ? el('ol', { class: 'rc-rank ww-final-rank' }, rows.map(({ p, rank }) => el('li', { class: p.id === ctx.playerId ? 'me' : '' },
         el('span', { class: 'w-rank' }, medals[rank - 1] ?? `${rank}.`),
         el('span', { class: 'player-name' }, p.name),
-        p.title ? el('span', { class: 'ww-player-title' }, `${p.title.icon} ${p.title.name}`) : null,
+        p.badge ? el('span', { class: 'ww-player-title' }, `${p.badge.icon} ${p.badge.name}`) : null,
         el('b', { class: 'rc-sum' }, `${p.total} / ${view.rounds * 1000}`))))
         : el('p', { class: 'hint' }, 'Herkes oyundan ayrıldı.')),
     view.history.length && rows.length ? el('section', { class: 'card' },
