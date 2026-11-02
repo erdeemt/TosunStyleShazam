@@ -14,6 +14,12 @@ export const VIEWS = {
   istanbul: { center: [41.03, 28.99], zoom: 11 },
 };
 
+// Animasyon sürerken kaldırılan harita Leaflet'te geç gelen transitionend ile hata atar: önce durdur, olayları kes.
+function safeRemove(map) {
+  if (!map) return;
+  try { map.stop(); map.off(); map.remove(); } catch { /* zaten kaldırıldı */ }
+}
+
 let loading = null;
 export function loadLeaflet() {
   if (window.L) return Promise.resolve(window.L);
@@ -88,7 +94,7 @@ export function guessMap(node, { view = VIEWS.world, initial = null, onChange = 
       marker?.dragging?.disable();
     },
     invalidate: () => map?.invalidateSize(),
-    destroy() { map?.remove(); map = null; marker = null; },
+    destroy() { safeRemove(map); map = null; marker = null; },
   };
 }
 
@@ -113,12 +119,12 @@ export function revealMap(node, { pins = [], truth, view = VIEWS.world }) {
     const fit = () => {
       if (!map) return;
       map.invalidateSize();
-      if (pts.length > 1) map.fitBounds(L.latLngBounds(pts), { padding: [36, 36], maxZoom: 15 });
-      else map.setView(t, Math.max(view.zoom, 12));
+      if (pts.length > 1) map.fitBounds(L.latLngBounds(pts), { padding: [36, 36], maxZoom: 15, animate: false });
+      else map.setView(t, Math.max(view.zoom, 12), { animate: false });
     };
     requestAnimationFrame(fit);
     setTimeout(fit, 300);
     return map;
   });
-  return { node, ready, destroy() { map?.remove(); map = null; } };
+  return { node, ready, destroy() { safeRemove(map); map = null; } };
 }
