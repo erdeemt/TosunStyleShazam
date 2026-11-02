@@ -6,3 +6,4 @@ Thumbs.db
 data/
 test-results/
 .claude/worktrees/
+!public/data/
