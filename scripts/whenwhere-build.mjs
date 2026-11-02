@@ -21,7 +21,7 @@ const OUT = join(ROOT, 'content', 'whenwhere', 'photos.json');
 const CACHE = process.env.WW_CACHE || join(tmpdir(), 'ww-build-cache');
 const SAMPLE_DIR = process.env.WW_SAMPLE_DIR || join(tmpdir(), 'ww-sample');
 const UA = 'TosunStyleGames/1.0 (https://github.com/erdeemt/TosunStyleShazam; offline photo pool builder) node';
-const GAP_MS = 650;
+const GAP_MS = Number(process.env.WW_GAP_MS) || 650;
 mkdirSync(CACHE, { recursive: true });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -238,7 +238,7 @@ async function catMembers(cat) {
 }
 
 // Konu kategorisinden tarihli alt kategorilere in (en fazla maxCats kategori). → [{ title, hint }]
-async function gatherFiles(seed, maxCats = 30) {
+async function gatherFiles(seed, maxCats = Number(process.env.WW_MAX_CATS) || 30) {
   const seen = new Set();
   const files = new Map();
   const queue = [{ cat: seed.cat, hint: null, depth: 0 }];
