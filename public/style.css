@@ -962,3 +962,79 @@ body.hx-live { overflow: hidden; }
   .vnar-box.in, .vnar-cue.in { animation: none; }
   .big-timer.hurry { animation: none; }
 }
+
+/* ---------- 📸 Ne Zaman Nerede? (PLAN.md §4.10) ---------- */
+.ww { display: flex; flex-direction: column; gap: 14px; }
+.ww .card h2 { margin-bottom: 10px; }
+.ww-set-badge { font-size: 13px; color: var(--accent2); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; }
+.ww-photo { position: relative; margin: 0; border-radius: var(--radius); overflow: hidden; background: #000; border: 1px solid var(--line);
+  min-height: 180px; display: flex; align-items: center; justify-content: center; cursor: zoom-in; }
+.ww-img { display: block; width: 100%; max-height: 42vh; object-fit: contain; user-select: none; -webkit-user-drag: none; }
+.ww-photo.loading .ww-img { visibility: hidden; height: 0; }
+.ww-img-status { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 15px; }
+.ww-photo.full { position: fixed; inset: 0; z-index: 2000; border-radius: 0; border: 0; cursor: zoom-out; }
+.ww-photo.full .ww-img { max-height: 100vh; height: 100%; }
+body.ww-noscroll { overflow: hidden; }
+.ww-map { position: relative; z-index: 0; isolation: isolate; height: 46vh; min-height: 260px; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: #aad3df; touch-action: none; }
+.ww-map-reveal { height: 40vh; min-height: 240px; margin-top: 12px; }
+.ww-map-hint { margin-top: 6px; }
+.ww-when { margin-top: 16px !important; }
+.ww-year { display: flex; flex-direction: column; gap: 8px; }
+.ww-year-row { display: grid; grid-template-columns: 1fr 1fr 2fr 1fr 1fr; gap: 6px; align-items: center; }
+.ww-year-out { text-align: center; font-size: 40px; font-weight: 900; letter-spacing: 1px; color: var(--accent2); font-variant-numeric: tabular-nums; }
+.ww-step { padding: 10px 0; min-height: 44px; font-weight: 700; }
+.ww-year-range { width: 100%; height: 44px; accent-color: var(--accent); }
+.ww-year-ends { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-top: -6px; }
+.ww-lock { width: 100%; margin-top: 14px; }
+.ww-big-score { font-size: 52px; font-weight: 900; line-height: 1; }
+.ww-big-score small { font-size: 18px; color: var(--muted); font-weight: 500; }
+.ww-big-score.good, .ww-row-score.good { color: var(--good); }
+.ww-big-score.mid, .ww-row-score.mid { color: var(--accent2); }
+.ww-big-score.bad, .ww-row-score.bad { color: var(--bad); }
+.ww-miss { font-size: 18px; font-weight: 700; margin: 8px 0 4px; }
+.ww-pts { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; color: var(--muted); font-size: 14px; }
+.ww-pts b { color: var(--text); }
+.ww-next { width: 100%; margin-top: 14px; }
+.ww-credit .ww-caption { margin: 0; line-height: 1.45; }
+.ww-credit a { color: var(--accent2); }
+.ww-links { margin: 10px 0 0; }
+.ww-attr { font-size: 12px; overflow-wrap: anywhere; }
+.ww-desc { font-size: 13px; font-style: italic; overflow-wrap: anywhere; }
+.ww-dots .rc-dot { min-width: 44px; }
+.ww-sets { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; }
+.ww-set { min-height: 56px; }
+.ww-final .ww-title-icon { font-size: 54px; line-height: 1.1; }
+.ww-final .ww-title { margin: 4px 0 0; font-size: 26px; }
+.ww-total { font-size: 44px; font-weight: 900; color: var(--accent2); }
+.ww-total small { font-size: 18px; color: var(--muted); font-weight: 500; }
+.ww-rows { list-style: none; padding: 0; margin: 12px 0; display: flex; flex-direction: column; gap: 6px; text-align: left; }
+.ww-rows li { display: grid; grid-template-columns: 1fr auto; gap: 0 10px; background: var(--bg2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+.ww-rows li small { color: var(--muted); grid-column: 1; }
+.ww-rows li b { grid-column: 2; grid-row: 1 / 3; align-self: center; font-size: 20px; }
+.ww-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: var(--c); margin-right: 6px; vertical-align: middle; flex: none; }
+.ww-player-title { font-size: 13px; color: var(--muted); }
+.ww-final-rank li { display: grid; grid-template-columns: auto 1fr auto; gap: 2px 10px; }
+.ww-final-rank .ww-player-title { grid-column: 2; grid-row: 2; }
+.ww-final-rank .rc-sum { grid-column: 3; grid-row: 1 / 3; align-self: center; }
+.ww-podium-row { display: flex; justify-content: center; align-items: flex-end; gap: 8px; }
+.ww-step-col { flex: 1; max-width: 120px; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.ww-step-col .player-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.ww-medal { font-size: 34px; }
+.ww-podium-score { color: var(--accent2); font-weight: 900; }
+.ww-podium-block { width: 100%; background: var(--card2); border: 1px solid var(--line); border-radius: 10px 10px 0 0; display: flex; align-items: flex-start; justify-content: center; padding-top: 6px; font-weight: 900; color: var(--muted); }
+.ww-step-col.r1 .ww-podium-block { height: 90px; background: linear-gradient(#ffb54755, var(--card2)); }
+.ww-step-col.r2 .ww-podium-block { height: 64px; }
+.ww-step-col.r3 .ww-podium-block { height: 44px; }
+.ww-table-wrap { overflow-x: auto; }
+.ww-table td:first-child { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ww-settings .ww-sets { margin: 6px 0 10px; }
+/* Harita iğneleri (Leaflet divIcon) */
+.ww-pin-wrap { background: none; border: 0; }
+.ww-pin { position: absolute; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; pointer-events: auto; }
+.ww-pin-dot { width: 22px; height: 22px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--c, #ff4d8d);
+  border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, .45); order: 2; }
+.ww-pin-truth .ww-pin-dot { background: none; border: 0; box-shadow: none; transform: none; width: auto; height: auto; font-size: 30px; line-height: 1; border-radius: 0; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .5)); }
+.ww-pin-label { order: 1; margin-bottom: 4px; background: rgba(18, 10, 31, .85); color: #fff; font: 600 12px 'Rubik', sans-serif; padding: 1px 6px; border-radius: 6px; white-space: nowrap; max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+.ww-pin-truth .ww-pin-label { background: #1d7a46; }
+.ww .leaflet-container { font-family: 'Rubik', system-ui, sans-serif; }
+.ww .leaflet-control-attribution { font-size: 10px; }
