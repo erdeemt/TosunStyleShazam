@@ -40,7 +40,14 @@ const MEDIA_USES = 3;
 
 function loadPool() {
   const file = TEST_MODE && process.env.WW_POOL !== 'real' ? 'test-photos.json' : 'photos.json';
-  const json = JSON.parse(readFileSync(join(ROOT, 'content', 'whenwhere', file), 'utf8'));
+  let json;
+  try {
+    json = JSON.parse(readFileSync(join(ROOT, 'content', 'whenwhere', file), 'utf8'));
+  } catch (err) {
+    // Havuz yoksa/bozuksa sunucu yine açılsın (diğer oyunlar etkilenmesin); bu oyun "yeterli fotoğraf yok" der.
+    console.error(`📸 Ne Zaman Nerede? havuzu okunamadı (${file}): ${err.message}`);
+    return [];
+  }
   return json.photos.filter((p) => p && typeof p.id === 'string' && Number.isFinite(p.lat) && Number.isFinite(p.lon) && Number.isInteger(p.year));
 }
 
@@ -329,6 +336,7 @@ function lookup(identity, mode, rawGameId, create = false) {
 // ---------- HTTP uçları (server.js; identity doğrulanmış) ----------
 
 export function startGame(identity, mode, rawSet) {
+  if (POOL.length < DAILY_ROUNDS) throw new GameError('Fotoğraf havuzu hazır değil.');
   if (mode === 'free') {
     const mine = [...freeGames].filter(([, g]) => g.playerId === identity.id);
     for (const [oldId] of mine.slice(0, Math.max(0, mine.length - (FREE_PER_PLAYER - 1)))) freeGames.delete(oldId);

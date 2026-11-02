@@ -101,7 +101,7 @@ const TURKIYE = [
   S('Bursa', ['sehir'], { n: 3, city: true }), S('Green Mosque, Bursa'), S('Trabzon', ['sehir'], { n: 3, city: true }), S('Sümela Monastery', [], { n: 2 }),
   S('Ephesus', [], { n: 3 }), S('Pamukkale'), S('Mount Nemrut', [], { n: 2 }), S('Göreme'), S('Selimiye Mosque, Edirne', [], { n: 2 }),
   S('Edirne', ['sehir'], { n: 2, city: true }), S('Kaleiçi', ['sehir']), S('Hıdırlık Tower'), S('Mevlana Museum', [], { n: 2 }), S('Konya', ['sehir'], { n: 2, city: true }),
-  S('Diyarbakır', ['sehir'], { n: 2, city: true }), S('Mardin', ['sehir'], { n: 2, city: true }), S('Gallipoli Campaign', ['savas'], { n: 4, lat: 40.2306, lon: 26.2789, tr: 'Çanakkale Savaşı (Gelibolu)' }),
+  S('Diyarbakır', ['sehir'], { n: 2, city: true }), S('Mardin', ['sehir'], { n: 2, city: true }), S('Gallipoli Campaign', ['savas'], { n: 4, lat: 40.2306, lon: 26.2789, tr: 'Çanakkale Savaşı (Gelibolu)', years: [1915, 1916] }),
   S('Çanakkale', ['sehir'], { n: 2, city: true }), S('Troy', [], { n: 2 }), S('Erzurum', ['sehir'], { n: 2, city: true }), S('Kars', ['sehir'], { n: 2, city: true }),
   S('Ani', [], { n: 2 }), S('Samsun', ['sehir'], { n: 2, city: true }), S('Taşköprü (Adana)', ['ulasim']), S('Adana', ['sehir'], { n: 2, city: true }),
   S('Aspendos', [], { n: 2 }), S('Safranbolu', ['sehir']), S('Amasya', ['sehir'], { n: 2, city: true }), S('İznik', ['sehir']),
@@ -115,13 +115,13 @@ const WORLD = [
   // Avrupa
   S('Eiffel Tower', ['icat'], { n: 4 }), S('Arc de Triomphe', [], { n: 2 }), S('Notre-Dame de Paris', [], { n: 2 }), S('Avenue des Champs-Élysées', ['sehir'], { n: 2 }),
   S('Sacré-Cœur Basilica', [], { n: 2 }), S('Place de la Concorde', ['sehir'], { n: 2 }), S('Gare Saint-Lazare', ['ulasim']), S('Gare du Nord', ['ulasim']),
-  S('Exposition Universelle (1889)', ['icat'], { n: 2, lat: 48.8556, lon: 2.2986, tr: '1889 Paris Dünya Fuarı' }),
-  S('Exposition Universelle (1900)', ['icat'], { n: 2, lat: 48.8606, lon: 2.3126, tr: '1900 Paris Dünya Fuarı' }),
+  S('Exposition Universelle (1889)', ['icat'], { n: 2, lat: 48.8556, lon: 2.2986, tr: '1889 Paris Dünya Fuarı', years: [1887, 1890] }),
+  S('Exposition Universelle (1900)', ['icat'], { n: 2, lat: 48.8606, lon: 2.3126, tr: '1900 Paris Dünya Fuarı', years: [1898, 1901] }),
   S('Big Ben', [], { n: 2 }), S('Tower Bridge', ['ulasim'], { n: 3 }), S('Trafalgar Square', ['sehir'], { n: 2 }), S('Piccadilly Circus', ['sehir'], { n: 3 }),
   S("St Paul's Cathedral", [], { n: 2 }), S('Buckingham Palace', [], { n: 2 }), S('London Bridge', ['ulasim']), S('St Pancras railway station', ['ulasim']),
-  S('Wembley Stadium (1923)', ['spor'], { n: 2 }), S('The Crystal Palace', ['icat'], { n: 2 }), S('Forth Bridge', ['ulasim'], { n: 2 }), S('Edinburgh Castle'),
+  S('Wembley Stadium (1923)', ['spor'], { n: 2 }), S('The Crystal Palace', ['icat'], { n: 2, years: [1851, 1936] }), S('Forth Bridge', ['ulasim'], { n: 2 }), S('Edinburgh Castle'),
   S('Brandenburg Gate', [], { n: 3 }), S('Berlin Wall', ['savas'], { n: 4 }), S('Checkpoint Charlie', ['savas'], { n: 2 }), S('Reichstag building', [], { n: 2 }),
-  S('Potsdamer Platz', ['sehir'], { n: 2 }), S('Olympiastadion (Berlin)', ['spor'], { n: 2 }), S('Tempelhof Airport', ['ulasim'], { n: 2 }), S('Berlin Blockade', ['savas'], { n: 2, lat: 52.4731, lon: 13.4039, tr: 'Berlin Hava Köprüsü' }),
+  S('Potsdamer Platz', ['sehir'], { n: 2 }), S('Olympiastadion (Berlin)', ['spor'], { n: 2 }), S('Tempelhof Airport', ['ulasim'], { n: 2 }), S('Berlin Blockade', ['savas'], { n: 2, lat: 52.4731, lon: 13.4039, tr: 'Berlin Hava Köprüsü', years: [1948, 1949] }),
   S('Cologne Cathedral', [], { n: 2 }), S('Neuschwanstein Castle'), S('Hamburg Hauptbahnhof', ['ulasim']), S('Frauenkirche, Dresden', ['savas'], { n: 2 }),
   S('Colosseum', [], { n: 3 }), S("St. Peter's Square", ['sehir'], { n: 2 }), S('Trevi Fountain', [], { n: 2 }), S('Leaning Tower of Pisa', [], { n: 2 }),
   S('Piazza San Marco', ['sehir'], { n: 3 }), S('Rialto Bridge', ['ulasim'], { n: 2 }), S('Milan Cathedral', [], { n: 2 }), S('Galleria Vittorio Emanuele II', ['sehir']),
@@ -140,15 +140,15 @@ const WORLD = [
   // Kuzey Amerika
   S('Statue of Liberty', ['icat'], { n: 3 }), S('Empire State Building', ['icat'], { n: 3 }), S('Brooklyn Bridge', ['ulasim'], { n: 3 }), S('Times Square', ['sehir'], { n: 3 }),
   S('Grand Central Terminal', ['ulasim'], { n: 2 }), S('Flatiron Building', [], { n: 2 }), S('Chrysler Building', [], { n: 2 }), S('Ellis Island', ['ulasim'], { n: 2 }),
-  S('1939 New York World\'s Fair', ['icat'], { n: 2, lat: 40.7464, lon: -73.8448, tr: '1939 New York Dünya Fuarı' }), S('Yankee Stadium (1923)', ['spor'], { n: 2 }),
+  S('1939 New York World\'s Fair', ['icat'], { n: 2, lat: 40.7464, lon: -73.8448, tr: '1939 New York Dünya Fuarı', years: [1937, 1940] }), S('Yankee Stadium (1923)', ['spor'], { n: 2 }),
   S('Golden Gate Bridge', ['ulasim'], { n: 3 }), S('Hollywood Sign', [], { n: 2 }), S('Lincoln Memorial', [], { n: 2 }), S('United States Capitol', [], { n: 2 }),
   S('White House', [], { n: 2 }), S('Washington Monument', [], { n: 2 }), S('Mount Rushmore', ['icat'], { n: 2 }), S('Niagara Falls', [], { n: 2 }),
   S('Space Needle', ['icat'], { n: 2 }), S('Wrigley Field', ['spor'], { n: 2 }), S('Fenway Park', ['spor']), S('Alamo Mission in San Antonio'), S('Gateway Arch', ['icat'], { n: 2 }),
   S('Hoover Dam', ['icat'], { n: 3 }), S('Panama Canal', ['ulasim', 'icat'], { n: 3 }), S('CN Tower'), S('Château Frontenac'), S('Kitty Hawk, North Carolina', ['icat'], { n: 2 }),
   S('Kennedy Space Center Launch Complex 39', ['icat'], { n: 2 }), S('Cape Canaveral Air Force Station', ['icat'], { n: 2 }), S('Pearl Harbor', ['savas'], { n: 2 }),
-  S('Zócalo', ['sehir'], { n: 2 }), S('Palacio de Bellas Artes'), S('Golden Gate International Exposition', ['icat']), S('World\'s Columbian Exposition', ['icat'], { n: 2, lat: 41.7906, lon: -87.5830, tr: '1893 Chicago Dünya Fuarı' }),
+  S('Zócalo', ['sehir'], { n: 2 }), S('Palacio de Bellas Artes'), S('Golden Gate International Exposition', ['icat'], { years: [1938, 1940] }), S('World\'s Columbian Exposition', ['icat'], { n: 2, lat: 41.7906, lon: -87.5830, tr: '1893 Chicago Dünya Fuarı', years: [1891, 1894] }),
   S('Chicago Water Tower'), S('Las Vegas Strip', ['sehir'], { n: 2 }), S('Route 66', ['ulasim'], { n: 1, lat: 35.0272, lon: -111.0222, tr: 'Route 66 (Arizona)' }),
-  S('Havana', ['sehir'], { n: 2, city: true }), S('El Capitolio', [], { n: 2 }), S('Montreal Olympic Stadium', ['spor']), S('Expo 67', ['icat'], { n: 2, lat: 45.5126, lon: -73.5319, tr: 'Expo 67 (Montreal)' }),
+  S('Havana', ['sehir'], { n: 2, city: true }), S('El Capitolio', [], { n: 2 }), S('Montreal Olympic Stadium', ['spor']), S('Expo 67', ['icat'], { n: 2, lat: 45.5126, lon: -73.5319, tr: 'Expo 67 (Montreal)', years: [1965, 1968] }),
   // Güney Amerika
   S('Christ the Redeemer (statue)', ['icat'], { n: 2 }), S('Sugarloaf Mountain', [], { n: 2 }), S('Copacabana, Rio de Janeiro', ['sehir'], { n: 2 }), S('Maracanã Stadium', ['spor'], { n: 2 }),
   S('Obelisco de Buenos Aires', [], { n: 2 }), S('Casa Rosada'), S('Avenida de Mayo', ['sehir']), S('Machu Picchu', [], { n: 2 }), S('Estadio Centenario', ['spor']),
@@ -182,6 +182,7 @@ const BAD = new RegExp([
   'gravure', 'etching', 'woodcut', 'artwork', 'postage', 'stamp', 'coin', 'banknote', 'logo', 'poster', 'document', 'letter', 'manuscript',
   'newspaper', 'book', 'cover', 'page', 'portrait', 'corpse', 'dead', 'death', 'execut', 'hanged', 'hanging', 'massacre', 'killed', 'victim',
   'wounded', 'casualt', 'atrocit', 'genocide', 'funeral', 'burial', 'cemetery', 'grave', 'model', 'medal', 'seal\\b', 'signature', 'ticket',
+  'squad', '\\bteam\\b', 'group photo', 'group portrait', 'delegation', 'gazete', 'cumhuriyet \\d', 'piano', 'interior of a', 'award',
   'advert', 'menu', 'text', 'inscription', 'tughra', 'calligraph', 'blueprint', 'elevation', 'section', 'facsimile', 'nude', 'naked', 'x-ray',
   'microscop', 'specimen', 'scan of', 'leaflet', 'brochure', 'stereo', 'mugshot', 'icon', 'mosaic', 'fresco', 'relief', 'sculpture\\b',
 ].join('|'), 'i');
@@ -265,14 +266,23 @@ async function gatherFiles(seed, maxCats = Number(process.env.WW_MAX_CATS) || 30
   return [...files].map(([title, hint]) => ({ title, hint }));
 }
 
+const batchInfo = (batch) => commons({
+  action: 'query', titles: batch.join('|'), prop: 'imageinfo|coordinates|categories',
+  iiprop: 'url|size|mime|extmetadata', iiurlwidth: '1280', iiextmetadatafilter: 'DateTimeOriginal|LicenseShortName|LicenseUrl|Artist|ImageDescription|Categories|Credit',
+  clshow: '!hidden', cllimit: 'max', colimit: 'max',
+}, true);
+
 async function fileInfos(titles) {
   const out = new Map();
-  for (let i = 0; i < titles.length; i += 50) {
-    const j = await commons({
-      action: 'query', titles: titles.slice(i, i + 50).join('|'), prop: 'imageinfo|coordinates|categories',
-      iiprop: 'url|size|mime|extmetadata', iiurlwidth: '1280', iiextmetadatafilter: 'DateTimeOriginal|LicenseShortName|LicenseUrl|Artist|ImageDescription|Categories|Credit',
-      clshow: '!hidden', cllimit: 'max', colimit: 'max',
-    }, true);
+  // Toplu sorgular (50 dosya) 3'er 3'er paralel; istek başlangıçları yine GAP_MS aralıklı.
+  const starts = [];
+  for (let i = 0; i < titles.length; i += 50) starts.push(i);
+  const pages = [];
+  const worker = async () => {
+    for (let i = starts.shift(); i !== undefined; i = starts.shift()) pages.push(await batchInfo(titles.slice(i, i + 50)));
+  };
+  await Promise.all([worker(), worker(), worker()]);
+  for (const j of pages) {
     for (const p of j.query?.pages ?? []) {
       const ii = p.imageinfo?.[0];
       if (!ii) continue;
@@ -327,6 +337,45 @@ async function placesFor(cats) {
     }
   }
   return out;
+}
+
+const wd = (ids) => getJson(`https://www.wikidata.org/w/api.php?${new URLSearchParams({ action: 'wbgetentities', format: 'json', ids: ids.join('|'), props: 'claims|labels|descriptions|sitelinks', languages: 'tr|en', sitefilter: 'trwiki|enwiki' })}`);
+const claimVal = (e, p) => e?.claims?.[p]?.[0]?.mainsnak?.datavalue?.value;
+
+async function placeFallback(cat) {
+  const pp = await commons({ action: 'query', titles: `Category:${cat}`, prop: 'pageprops', ppprop: 'wikibase_item' });
+  let qid = pp.query?.pages?.[0]?.pageprops?.wikibase_item;
+  if (!qid) return null;
+  let e = (await wd([qid])).entities?.[qid];
+  const main = claimVal(e, 'P301')?.id;
+  if (main) { qid = main; e = (await wd([qid])).entities?.[qid]; }
+  let c = claimVal(e, 'P625');
+  if (!c) {
+    const loc = claimVal(e, 'P276')?.id;
+    if (loc) c = claimVal((await wd([loc])).entities?.[loc], 'P625');
+  }
+  if (!c) return null;
+  const country = claimVal(e, 'P17')?.id ?? null;
+  const ce = country ? (await wd([country])).entities?.[country] : null;
+  const city = claimVal(e, 'P131')?.id ?? null;
+  const cie = city ? (await wd([city])).entities?.[city] : null;
+  const site = e.sitelinks?.trwiki ? `https://tr.wikipedia.org/wiki/${encodeURIComponent(e.sitelinks.trwiki.title.replace(/ /g, '_'))}`
+    : e.sitelinks?.enwiki ? `https://en.wikipedia.org/wiki/${encodeURIComponent(e.sitelinks.enwiki.title.replace(/ /g, '_'))}` : null;
+  return {
+    qid, coord: { lat: c.latitude, lon: c.longitude },
+    tr: e.labels?.tr?.value ?? null, en: e.labels?.en?.value ?? null, desc: e.descriptions?.tr?.value ?? null,
+    country, countryTr: ce?.labels?.tr?.value ?? null, cityTr: cie?.labels?.tr?.value ?? null,
+    continent: claimVal(ce, 'P30')?.id ?? null, wiki: site,
+  };
+}
+
+// Küçük resim adresi: API bazen thumb.wikimedia.org + izleme parametresi verir; sunucu sadece upload.wikimedia.org'a gider.
+function thumbUrl(raw) {
+  const u = new URL(raw);
+  if (u.hostname === 'thumb.wikimedia.org') u.hostname = 'upload.wikimedia.org';
+  u.search = '';
+  u.hash = '';
+  return u.href;
 }
 
 // ---------- Yardımcılar ----------
@@ -385,7 +434,24 @@ async function main() {
   const reject = new Set(prev.rejected ?? []); // göz kontrolünde elenenler (dosya adı)
   const seeds = [...ISTANBUL.map((s) => ({ ...s, group: 'istanbul' })), ...TURKIYE.map((s) => ({ ...s, group: 'turkiye' })), ...WORLD.map((s) => ({ ...s, group: 'world' }))];
   console.log(`${seeds.length} tohum; Wikidata sorgusu…`);
+  // Yönlendirmeli kategoriler ({{Category redirect|Hedef}}): hedef adla devam et (Big Ben → Elizabeth Tower gibi).
+  for (let i = 0; i < seeds.length; i += 50) {
+    const batch = seeds.slice(i, i + 50);
+    const j = await commons({ action: 'query', titles: batch.map((x) => `Category:${x.cat}`).join('|'), prop: 'revisions', rvprop: 'content', rvslots: 'main' }, true);
+    const norm = new Map((j.query?.normalized ?? []).map((n) => [n.to, n.from]));
+    for (const p of j.query?.pages ?? []) {
+      const text = p.revisions?.[0]?.slots?.main?.content ?? '';
+      const m = text.match(/\{\{\s*(?:Category redirect|Cat redirect|Seecat|Categoryredirect)\s*\|\s*(?:1=)?\s*(?:Category:)?([^|}\n]+)/i);
+      if (!m) continue;
+      const from = (norm.get(p.title) ?? p.title).replace(/^Category:/, '');
+      for (const seed of batch) if (seed.cat === from || seed.cat === from.replace(/_/g, ' ')) { seed.from = seed.cat; seed.cat = m[1].trim(); }
+    }
+  }
   const places = await placesFor(seeds.map((s) => s.cat));
+  for (const seed of seeds) {
+    if (seed.lat != null || places.get(seed.cat)?.coord) continue;
+    try { const p = await placeFallback(seed.cat); if (p) places.set(seed.cat, p); } catch (err) { console.warn(`  ! yer ${seed.cat}: ${err.message}`); }
+  }
   const used = new Set();
   const photos = [];
   const stats = { seedsNoPlace: [], seedsEmpty: [] };
@@ -393,7 +459,7 @@ async function main() {
     const place = places.get(seed.cat);
     const center = seed.lat != null ? { lat: seed.lat, lon: seed.lon } : place?.coord;
     if (!center) { stats.seedsNoPlace.push(seed.cat); continue; }
-    const listed = await gatherFiles(seed);
+    const listed = (await gatherFiles(seed)).slice(0, Number(process.env.WW_MAX_FILES) || 300);
     const infos = await fileInfos(listed.map((f) => f.title).filter((t) => !used.has(t) && !reject.has(t)));
     const cands = [];
     for (const { title, hint } of listed) {
@@ -409,7 +475,9 @@ async function main() {
       // Konum: dosyanın kendi koordinatı (konuya ≤ 25 km ise), yoksa konunun koordinatı. Şehir tohumunda kendi koordinatı şart değil.
       let coord = center;
       let precise = !seed.city;
-      if (f.coord && km(f.coord, center) <= (seed.city ? 40 : 25)) { coord = f.coord; precise = true; }
+      if (f.coord && km(f.coord, center) > (seed.city ? 40 : 25)) continue;
+      if (f.coord) { coord = f.coord; precise = true; }
+      if (seed.years && (year < seed.years[0] || year > seed.years[1])) continue;
       if (seed.group === 'istanbul' && !inIstanbul(coord)) continue;
       cands.push({ f, year, coord, precise, photoHint: PHOTO_HINT.test(text) });
     }
@@ -435,7 +503,7 @@ async function main() {
       const file = c.f.title.replace(/^File:/, '');
       photos.push({
         id: prevIds.get(file) ?? randomBytes(6).toString('hex'),
-        src: { file, thumb: c.f.thumb },
+        src: { file, thumb: thumbUrl(c.f.thumb) },
         lat: Math.round(c.coord.lat * 1e5) / 1e5,
         lon: Math.round(c.coord.lon * 1e5) / 1e5,
         precise: c.precise,
@@ -449,10 +517,17 @@ async function main() {
         license: c.f.license,
         licenseUrl: c.f.licenseUrl || c.f.page,
         tags: { era: eraOf(c.year), region, sets, themes: themesOf(seed, c.f) },
+        city: Boolean(seed.city),
       });
     }
     console.log(`+ ${seed.cat}: ${picked.length} (${cands.length} aday / ${listed.length})`);
   }
+  const MAX_TR = Number(process.env.WW_MAX_TR_SHARE) || 0.3;
+  const trOf = () => photos.filter((p) => p.tags.sets.includes('turkiye')).length;
+  const droppable = photos.filter((p) => p.tags.sets.includes('turkiye') && !p.tags.sets.includes('istanbul'))
+    .sort((a, b) => Number(b.city) - Number(a.city) || b.year - a.year);
+  while (trOf() / photos.length > MAX_TR && droppable.length) photos.splice(photos.indexOf(droppable.shift()), 1);
+  for (const p of photos) delete p.city;
   photos.sort((a, b) => a.id.localeCompare(b.id));
   const count = (fn) => photos.filter(fn).length;
   const summary = {
@@ -475,7 +550,7 @@ async function sample(photos, n) {
   mkdirSync(SAMPLE_DIR, { recursive: true });
   const pick = [...photos].sort(() => Math.random() - 0.5).slice(0, n);
   for (const p of pick) {
-    const url = p.src.thumb.replace(/\/\d+px-/, '/480px-');
+    const url = p.src.thumb.replace(/\/\d+px-/, '/500px-');
     await sleep(GAP_MS);
     const res = await fetch(url, { headers: { 'User-Agent': UA } });
     if (!res.ok) { console.warn(`örnek alınamadı ${res.status}: ${p.src.file}`); continue; }

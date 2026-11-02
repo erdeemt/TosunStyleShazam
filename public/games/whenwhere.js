@@ -19,6 +19,7 @@ let phase = 'loading'; // loading | error | setup | ready | guess | retry | reve
 let current = null; // { index, image, photo, map, year, pin }
 let lastReveal = null;
 let board = null;
+let counts = null; // set başına fotoğraf sayısı (5'ten azı seçilemez)
 let busy = false;
 let loadSeq = 0;
 let disposers = [];
@@ -68,9 +69,10 @@ async function load(newMode = mode) {
   try {
     await ensureIdentity();
     if (seq !== loadSeq) return;
-    if (mode === 'free') { phase = 'setup'; render(); return; }
-    const g = await api('/start', { mode: 'daily' });
+    const g = await api('/start', { mode: 'daily' }); // serbest modda da: set sayıları için (günlük kayıt açmaz)
     if (seq !== loadSeq) return;
+    counts = g.counts ?? null;
+    if (mode === 'free') { if (counts && counts[set] < DAILY_ROUNDS) set = 'karisik'; phase = 'setup'; render(); return; }
     applyGame(g);
   } catch (err) {
     if (seq !== loadSeq) return;
@@ -333,7 +335,7 @@ function body() {
       return [el('section', { class: 'card' },
         el('h2', {}, '♾️ Serbest oyun'),
         el('p', { class: 'hint' }, '5 fotoğraf. Seti seç; istediğin kadar oyna (sıralamaya girmez). Yakında gördüklerin tekrar gelmez.'),
-        setPicker(set, (id) => { set = id; try { localStorage.setItem(SET_KEY, id); } catch { /* yok say */ } render(); }),
+        setPicker(set, (id) => { set = id; try { localStorage.setItem(SET_KEY, id); } catch { /* yok say */ } render(); }, { counts }),
         el('button', { class: 'btn big primary rc-go', disabled: busy, onclick: startFree }, 'Başla →'))];
     case 'ready':
     case 'between':
