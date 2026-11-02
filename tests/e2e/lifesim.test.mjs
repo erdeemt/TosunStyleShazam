@@ -116,7 +116,7 @@ test('telefon: doğ → ad → seçim → 4× ve ⏭ ile sona → Hayat Karnesi 
 
   // Paylaşım kartı PNG olarak iner
   const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 15_000 }), page.click('button:has-text("📤 Kartı paylaş")')]);
-  assert.match(dl.suggestedFilename(), /^dogum-piyangosu-[a-z]{3}.png$/);
+  assert.match(dl.suggestedFilename(), /^dogum-piyangosu-[a-z]{3}\.png$/);
   await dl.saveAs(join(SHOTS, 'life-share-card.png'));
 
   await page.click('button:has-text("📜 Geçmiş")');
