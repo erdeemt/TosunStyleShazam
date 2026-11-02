@@ -1,0 +1,480 @@
+// 🎲 Doğum Piyangosu — olay kütüphanesi (Türkçe). Her olayın olasılığı ya gerçek bir veriden türetilir (`src`),
+// ya da olay sadece renk katar (`fl: true`: sonuca etkisi yok, en fazla küçük bir Keyif ±3).
+//
+// Alanlar:
+//   id, st (yaşam evresi), age [min,max] (yoksa evrenin aralığı), p (yıllık olasılık: sayı | (L, c, W) => sayı),
+//   if (L, c, W) => bool, max (en fazla kaç kez, varsayılan 1), gap (tekrarlar arası yıl), sex ('M'|'F'),
+//   src { d: veri alanı(ları) veya LIT anahtarı, how: olasılığın nasıl türetildiği, v?: varsayım notu }  ← dayanağı olan olaylar
+//   fl: true ← renk olayı, t (metin | [varyantlar] | fn), fx { j, h, z } (Keyif/Sağlık gösterimi ve gelir için geçici etki),
+//   do (L, c, api) → false dönerse olay iptal, pre (L) seçim sorulurken, ic (simge), hl (karne önemi 0–3),
+//   stat (L, c, W) => "📊" açıklaması, ch [seçenekler] { l, t?, fx?, do?, odds?, win, lose },
+//   def (verideki "olağan" seçeneğin indeksi; yoksa seçenekler rastgele seçildiğinde ortalama veriye eşit olacak şekilde dengeli).
+// Yer tutucular: {name} {yas} {ulke} {ulkede} {ulkeden} {ulkeye} {es} {cocuk} {is} {arkadas}
+// L: hayat durumu, c: yaşanan ülkenin göstergeleri (lifesim.json), W: dünya (W.fn yardımcıları lifesim-sim.js'te).
+
+export const STAGES = [
+  { id: 'bebek', name: 'Bebeklik', age: [0, 2] },
+  { id: 'cocuk', name: 'Çocukluk', age: [3, 11] },
+  { id: 'ergen', name: 'Ergenlik', age: [12, 17] },
+  { id: 'genc', name: 'Gençlik', age: [18, 29] },
+  { id: 'yetiskin', name: 'Yetişkinlik', age: [30, 44] },
+  { id: 'orta', name: 'Orta yaş', age: [45, 64] },
+  { id: 'yasli', name: 'Yaşlılık', age: [65, 115] },
+];
+export const stageOf = (age) => STAGES.find((s) => age >= s.age[0] && age <= s.age[1]) ?? STAGES.at(-1);
+
+const P = (x, d = 1) => `%${Number(x).toLocaleString('tr-TR', { maximumFractionDigits: d })}`;
+const N = (x, d = 1) => Number(x).toLocaleString('tr-TR', { maximumFractionDigits: d });
+const cl = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
+const poorC = (c) => cl((Math.log(40000) - Math.log(c.gdp)) / (Math.log(40000) - Math.log(2000)), 0, 1);
+const hasKids = (L) => L.kids.some((k) => !k.lost);
+const adultKids = (L) => L.kids.filter((k) => !k.lost && L.age - k.born >= 20).length;
+const smk = (L, c) => (L.sex === 'M' ? c.smkM : c.smkF);
+const lfp = (L, c) => (L.sex === 'M' ? c.lfpM : c.lfpF);
+const divP = (c) => c.div / 1000 / 0.5; // kaba boşanma hızı → evli kişi başına (nüfusun ~yarısı evli varsayımı)
+const unempIn = (c) => { const u = cl(c.unem / 100, 0.005, 0.5); return (u * 0.75) / (1 - u); }; // durağan durum: u = s/(s+f)
+const retireAge = (c) => (c.gdp > 30000 ? 65 : c.gdp > 12000 ? 62 : 60);
+const LITP = (key, div = 1) => (L, c, W) => W.fn.lit[key].v / div; // LIT sabitleri çalışma anında W.fn.lit'ten (döngüsel içe aktarma yok)
+const CONSCRIPTION = new Set(['TUR', 'KOR', 'ISR', 'GRC', 'CYP', 'EGY', 'IRN', 'RUS', 'UKR', 'AZE', 'ARM', 'GEO', 'DZA', 'SYR', 'VNM', 'PRK', 'ERI', 'BRA', 'MEX', 'COL', 'THA', 'CHE', 'AUT', 'FIN', 'NOR', 'DNK', 'EST', 'LTU', 'LVA', 'SGP', 'KAZ', 'UZB', 'BLR', 'CUB', 'BOL', 'MAR', 'TUN', 'JOR', 'SWE', 'MNG', 'TKM', 'KGZ', 'TJK']);
+
+export const EVENTS = [
+  // ======================= BEBEKLİK (0–2) =======================
+  { id: 'asi', st: 'bebek', age: [0, 0], p: (L, c) => c.dpt / 100, ic: '💉', src: { d: 'dpt', how: 'DTP3 aşı kapsamı (12–23 ay) = P(aşıları tam)' },
+    stat: (L, c) => `${c.n}: bebeklerin ${P(c.dpt, 0)}'i üç doz karma aşısını alıyor (WHO/UNICEF).`, t: `Aşıların zamanında yapıldı. Ağladın, ama bu yıl birçok hastalığı kapıdan çevirdin.`, fx: { h: 3 } },
+  { id: 'asi-eksik', st: 'bebek', age: [1, 1], p: 1, if: (L) => !L.cnt.asi, ic: '🩺', src: { d: 'dpt', how: '1 − DTP3 kapsamı = P(aşıları eksik)' },
+    stat: (L, c) => `${c.n}: bebeklerin ${P(100 - c.dpt, 0)}'i temel aşılarını tamamlayamıyor (WHO/UNICEF).`, t: `Aşıların tamamlanamadı; sağlık ekibi bölgenize ulaşamadı ya da aşı bulunamadı.`, fx: { h: -2 } },
+  { id: 'bodurluk', st: 'bebek', age: [2, 2], p: 1, if: (L) => L.lat.stunt, ic: '🥣', hl: 1, src: { d: 'stunt', how: '5 yaş altı bodurluk oranı = P(yetersiz beslenmeden boy kısalığı)' },
+    stat: (L, c) => `${c.n}: 5 yaş altı çocukların ${P(c.stunt, 0)}'i yetersiz beslenmeden bodur (UNICEF/WHO/Dünya Bankası).`, t: `Evde yemek çoğu zaman yetmedi; yaşıtlarından kısa ve zayıf kaldın. Doktorlar buna bodurluk diyor.`, fx: { h: -6, j: -2 } },
+  { id: 'ishal', st: '*', age: [0, 4], p: (L, c) => (1 - (L.urban ? 0.97 : c.waterR / 100)) * 0.25, max: 2, gap: 2, ic: '💧', src: { d: 'waterR', how: '(1 − kırsalda temel içme suyu erişimi) × 0,25', v: '0,25 ölçek katsayısı varsayım' },
+    stat: (L, c) => `${c.n}: kırsalda nüfusun ${P(100 - c.waterR, 0)}'i temel içme suyundan yoksun (WHO/UNICEF JMP). Kirli su, küçük çocuklarda ishalin başlıca nedeni.`, t: `Mahallede ishal salgını çıktı; temiz su azdı. Haftalarca zayıf düştün ama kurtuldun.`, fx: { h: -6, j: -1 } },
+  { id: 'ilk-gulus', st: 'bebek', age: [0, 0], p: 0.6, fl: true, ic: '😄', t: [`{name} ilk kez gülümsedi. Odadaki herkes gülümsemenin kendine olduğundan emin.`, `{name} ilk kahkahasını attı; sebep, babasının hapşırığıydı.`], fx: { j: 2 } },
+  { id: 'ilk-kelime', st: 'bebek', age: [1, 1], p: 0.7, fl: true, ic: '🗣️', t: [`İlk kelimen "anne" oldu. Baba itiraz etti, kaybetti.`, `İlk kelimen "baba" oldu. Annen bunu hâlâ bir hile sayıyor.`, `İlk kelimen "hayır" oldu. Karakterin erkenden belli.`, `İlk kelimen "mama" oldu. Önceliklerin net.`], fx: { j: 1 } },
+  { id: 'ilk-adim', st: 'bebek', age: [1, 2], p: 0.6, fl: true, ic: '👣', t: `İlk adımlarını attın. Üçüncü adımda halıya kapaklandın ama alkışlar dinmedi.`, fx: { j: 2 } },
+  { id: 'ninni', st: 'bebek', p: 0.15, fl: true, ic: '🎶', t: `Büyükannen seni uyutmak için bildiği bütün ninnileri söyledi. Sen en sonda uyudun, o en önce.`, fx: { j: 2 } },
+  { id: 'emzik', st: 'bebek', age: [2, 2], p: 0.2, fl: true, ic: '🍼', t: `Emziğin "kayboldu". Üç gün boyunca bütün evi dedektif gibi aradın.`, fx: { j: -1 } },
+
+  // ======================= ÇOCUKLUK (3–11) =======================
+  { id: 'kardes', st: '*', age: [1, 10], p: (L, c) => cl((c.tfr - 1) / 10, 0, 0.5), max: 8, gap: 2, ic: '👶', src: { d: 'tfr', how: '(TFR − 1) / 10 yıl = yıllık kardeş olasılığı (ortalama kardeş sayısı ≈ TFR − 1)' },
+    stat: (L, c) => `${c.n}: kadın başına ${N(c.tfr, 2)} çocuk (UN WPP).`, t: (L) => (L.siblings === 0 ? `Bir kardeşin oldu. İlgi artık bölüşülecek; oyuncaklar da.` : `Bir kardeşin daha oldu. Evde ses hiç eksik olmayacak.`), do: (L) => { L.siblings++; }, fx: { j: 1 } },
+  { id: 'okul-basla', st: 'cocuk', age: [6, 6], p: 1, if: (L) => L.lat.edu.yrs >= 1 && !L.edu.inSchool && L.edu.yrs === 0, ic: '🎒', hl: 1, src: { d: 'oos', how: '1 − ilkokul çağında okul dışı oranı = P(okula başlar)' },
+    stat: (L, c) => `${c.n}: ilkokul çağındaki çocukların ${P(c.oos)}'i okul dışında (UNESCO UIS).`,
+    t: (L) => (L.urban ? `Okula başladın. Önlüğün bir beden büyük, heyecanın iki beden.` : `Köyündeki okula başladın. Okula yürümek her gün yarım saat sürüyor.`), do: (L) => { L.edu.inSchool = true; }, fx: { j: 2 } },
+  { id: 'okula-gidemedi', st: 'cocuk', age: [7, 7], p: 1, if: (L) => L.lat.edu.yrs === 0, ic: '🌾', hl: 2, src: { d: 'oos', how: 'okul dışı çocuk oranı (ebeveyn varlığıyla 0,42 korelasyonlu gizli değişkenle)' },
+    stat: (L, c) => `${c.n}: ilkokul çağındaki çocukların ${P(c.oos)}'i okula gidemiyor (UNESCO UIS).`,
+    t: (L) => (L.urban ? `Okula hiç kaydolamadın; ailenin seni okutacak gücü yoktu.` : `Okula hiç gidemedin; evde ve tarlada ellere ihtiyaç vardı.`), fx: { j: -3 } },
+  { id: 'cocuk-isci', st: 'cocuk', age: [7, 11], p: (L) => (L.age === 11 ? 1 : 0.3), if: (L, c) => L.lat.clab < c.clab / 100, ic: '🧺', hl: 1, src: { d: 'clab', how: '7–14 yaş çalışan çocuk oranı = P(çocuk işçi)' },
+    stat: (L, c) => `${c.n}: 7–14 yaş çocukların ${P(c.clab)}'i çalışıyor (ILO/UNICEF/Dünya Bankası).`,
+    t: (L) => (L.urban ? `Ailene destek olmak için pazarda ve sokakta iş yapmaya başladın. Paranın değerini erken öğrendin.` : `Okuldan arta kalan her saatte tarlada ve hayvanların başında çalışıyorsun.`), fx: { j: -3 } },
+  { id: 'sitma', st: '*', age: [1, 85], p: (L, c) => Math.min(0.5, c.mal / 1000), max: 3, gap: 3, ic: '🦟', src: { d: 'mal', how: 'sıtma insidansı (risk altındaki binde) / 1000 = yıllık olasılık', v: 'tüm nüfusun risk altında olduğu varsayıldı; günlükte en fazla 3 kez' },
+    stat: (L, c) => `${c.n}: risk altındaki her 1000 kişiden ${N(c.mal, 0)}'i her yıl sıtmaya yakalanıyor (WHO).`, t: `Sıtmaya yakalandın; günlerce titreyerek yattın. İyileştin; cibinlik artık kutsal.`, fx: { h: -8, j: -2 } },
+  { id: 'kizamik', st: 'cocuk', age: [3, 9], p: 0.05, if: (L) => !L.cnt.asi, ic: '🔴', src: { d: 'dpt, meas', how: 'sadece aşısızlarda; yıllık %5', v: '%5 yıllık bulaşma varsayım' },
+    stat: (L, c) => `${c.n}: çocukların ${P(c.meas, 0)}'i kızamık aşısı oluyor (WHO/UNICEF).`, t: `Kızamık geçirdin. Bir hafta karanlık odada yattın; sonra her şey daha parlak göründü.`, fx: { h: -6 } },
+  { id: 'elektrik-geldi', st: '*', age: [1, 60], p: 0.05, if: (L) => L.lat.noElec, ic: '💡', hl: 1, src: { d: 'elecR', how: 'doğumda elektriksiz ev = 1 − kırsal elektrik erişimi; bağlanma hızı yılda %5', v: 'yıllık %5 bağlanma hızı varsayım' },
+    stat: (L, c) => `${c.n}: kırsalda nüfusun ${P(100 - c.elecR, 0)}'inin elektriği yok (Dünya Bankası / IEA).`, do: (L) => { L.lat.noElec = false; }, t: `Evinize elektrik geldi! Akşamlar artık daha uzun, gaz lambası emekli.`, fx: { j: 3 } },
+  { id: 'su-geldi', st: '*', age: [1, 60], p: 0.05, if: (L) => L.lat.noWater, ic: '🚰', src: { d: 'waterR', how: 'doğumda temiz susuz ev = 1 − kırsal temel su erişimi; bağlanma hızı yılda %5', v: 'yıllık %5 bağlanma hızı varsayım' },
+    stat: (L, c) => `${c.n}: kırsalda nüfusun ${P(100 - c.waterR, 0)}'i temel içme suyundan yoksun (WHO/UNICEF JMP).`, do: (L) => { L.lat.noWater = false; }, t: `Köye temiz su kuyusu açıldı. Artık her sabah kilometrelerce su taşınmıyor.`, fx: { j: 3, h: 2 } },
+  { id: 'sehre-tasinma', st: '*', age: [1, 40], p: (L, c) => 0.003 + 0.012 * poorC(c), if: (L) => !L.urban, ic: '🏙️', hl: 1, src: { d: 'urb, gdp', how: 'kırdan kente göç: yılda %0,3 + %1,2 × yoksulluk ölçeği', v: 'oran varsayım (BM Dünya Kentleşme Beklentileri\'ndeki kent büyümesi ölçeğinde)' },
+    stat: (L, c) => `${c.n}: nüfusun ${P(c.urb, 0)}'i kentlerde yaşıyor (UN WUP).`, t: `Ailen iş bulmak için şehre taşındı. Gürültü fazla, olanaklar da.`, do: (L) => { L.urban = true; }, fx: { j: -1 } },
+  { id: 'internet', st: '*', age: [8, 20], p: (L, c) => (c.net / 100) * 0.3, ic: '🌐', src: { d: 'net', how: 'internet kullanan nüfus payı × 0,3 (ilk tanışma yaşına yayılım)' },
+    stat: (L, c) => `${c.n}: nüfusun ${P(c.net, 0)}'i internet kullanıyor (ITU).`, t: `İnternetle tanıştın. İlk aramanın ne olduğu aranızda kalsın.`, fx: { j: 2 } },
+  { id: 'okumayi-sokmek', st: 'cocuk', age: [6, 9], p: 0.5, if: (L) => L.edu.inSchool, fl: true, ic: '🔤', t: `Okumayı söktün. Artık bütün tabelaları yüksek sesle okuyorsun; yolculuklar herkes için daha uzun.`, fx: { j: 2 } },
+  { id: 'kirik-kol', st: 'cocuk', p: 0.03, fl: true, ic: '🦴', t: [`Ağaçtan düştün, kolun kırıldı. Alçına imza toplamak iyi bir teselli oldu.`, `Bisikletle merdivenden inmeyi denedin. Sonuç: kırık bilek, efsanevi bir hikâye.`], fx: { j: -1 } },
+  { id: 'en-iyi-arkadas', st: 'cocuk', age: [5, 10], p: 0.25, fl: true, ic: '🤝', do: (L, c, api) => { L.flags.friend = api.pickName(api.R.r() < 0.5 ? 'M' : 'F'); }, t: `{arkadas} ile kopmaz bir arkadaşlık başladı. Serçe parmak sözü verdiniz; bu ciddi bir iş.`, fx: { j: 3 } },
+  { id: 'zorbalik', st: 'cocuk', age: [7, 11], p: 0.05, if: (L) => L.edu.inSchool, fl: true, ic: '😠', t: `Okulda bir grup çocuk seninle uğraşmaya başladı.`,
+    ch: [
+      { l: 'Öğretmene anlat', t: `Öğretmen durumu ciddiye aldı; uğraşanlar geri çekildi.`, fx: { j: 2 } },
+      { l: 'Arkadaşlarınla birlikte dur', t: `Yalnız olmadığını görünce vazgeçtiler. Dostluk güçlendi.`, fx: { j: 3 } },
+      { l: 'Görmezden gel', t: `Bir süre zor geçti, sonra sıkılıp bıraktılar.`, fx: { j: -2 } },
+    ] },
+  { id: 'bilgi-yarismasi', st: 'cocuk', age: [8, 11], p: 0.06, if: (L) => L.edu.inSchool, fl: true, ic: '🏅', t: `Okul bilgi yarışmasında ikinci oldun. Son soruda Moğolistan'ı Moğolya diye yazdın.`, fx: { j: 3 } },
+  { id: 'bisiklet', st: 'cocuk', age: [5, 10], p: 0.15, fl: true, ic: '🚲', t: `Bisiklet sürmeyi öğrendin. Diz kapakların bu başarının faturasını ödedi.`, fx: { j: 3 } },
+  { id: 'kaybolma', st: 'cocuk', age: [3, 7], p: 0.04, fl: true, ic: '🧭', t: `Kalabalık bir pazarda kayboldun. On dakika sonra bulundun; hayatının en uzun on dakikasıydı.`, fx: { j: -1 } },
+  { id: 'deniz', st: 'cocuk', age: [4, 11], p: 0.08, fl: true, ic: '🏖️', t: `İlk kez denize girdin. Tuzlu suyu içip içmediğin ailede hâlâ tartışma konusu.`, fx: { j: 3 } },
+  { id: 'sut-disi', st: 'cocuk', age: [6, 7], p: 0.4, fl: true, ic: '🦷', t: `Ön dişlerin düştü. Bu yılın fotoğraflarında hep aynı boşluklu gülümseme var.`, fx: { j: 1 } },
+  { id: 'muzik', st: 'cocuk', age: [7, 11], p: 0.08, fl: true, ic: '🎻', t: `Bir müzik aleti öğrenmek ister misin?`,
+    ch: [
+      { l: 'Evet, ders alayım', t: `Haftada iki gün derse gidiyorsun. Komşular ilk aylarda sabırlıydı.`, fx: { j: 3 } },
+      { l: 'Ben top oynamayı seçerim', t: `Sokaktaki maçların vazgeçilmez oyuncusu oldun.`, fx: { j: 3 } },
+    ] },
+  { id: 'kutuphane', st: 'cocuk', age: [7, 11], p: 0.07, fl: true, ic: '📖', t: `Kütüphaneyi keşfettin. Kütüphaneci adını ezberledi, sen de rafları.`, fx: { j: 2 } },
+  { id: 'sinif-birincisi', st: 'cocuk', age: [9, 11], p: (L) => (L.edu.inSchool && L.lat.pe > 0.8 ? 0.15 : 0), fl: true, ic: '🥇', t: `Sınıf birincisi oldun. Karne günü eve koşarak döndün.`, fx: { j: 3 } },
+  { id: 'dogum-gunu', st: 'cocuk', age: [4, 10], p: 0.15, fl: true, ic: '🎂', t: `Doğum gününe sürpriz parti yapıldı. Pasta, sandıkları kadar sürpriz değildi; dolapta görmüştün.`, fx: { j: 2 } },
+  { id: 'kedi', st: 'cocuk', age: [3, 11], p: 0.05, fl: true, ic: '🐈', t: `Evde bir kedi beslemeye başladınız. Daha doğrusu kedi sizi beslemeye başladı.`, fx: { j: 3 } },
+  { id: 'gozluk', st: '*', age: [8, 16], p: 0.03, fl: true, ic: '👓', t: `Tahtayı göremediğin anlaşıldı; gözlük taktın. Ağaçların yaprakları varmış meğer!`, fx: { j: 1 } },
+  { id: 'kar-tatili', st: 'cocuk', age: [6, 11], p: 0.05, fl: true, ic: '❄️', t: `Okullar kar yüzünden tatil edildi. Kardan adamın havuç burnu ertesi gün kayıptı.`, fx: { j: 3 } },
+  { id: 'bayram', st: 'cocuk', age: [4, 11], p: 0.1, fl: true, ic: '🍬', t: `Bayramda kapı kapı dolaştın; şeker stoğun ay sonuna kadar yetti.`, fx: { j: 2 } },
+  { id: 'karne', st: 'cocuk', age: [7, 11], p: 0.1, if: (L) => L.edu.inSchool, fl: true, ic: '📄', t: `Karne günü geldi. Bir dersin notunu parmağınla kapatarak gösterdin.`, fx: { j: 1 } },
+
+  // ======================= ERGENLİK (12–17) =======================
+  { id: 'okul-devam', st: '*', age: [11, 15], p: 0.8, if: (L) => L.edu.inSchool && L.edu.plan < 12 && L.edu.plan - L.edu.yrs <= 1, ic: '🏫', def: 1,
+    src: { d: 'cmpP, cmpL, upE', how: 'okulu bırakma yaşı tamamlama oranlarından; "devam" seçeneği %15 şans ekler', v: '%15 ek şans varsayım' },
+    stat: (L, c) => `${c.n}: ilkokulu ${P(Math.min(100, c.cmpP), 0)}, ortaokulu ${P(Math.min(100, c.cmpL), 0)} tamamlıyor; liseye kayıt ${P(Math.min(100, c.upE), 0)} (UNESCO UIS).`,
+    t: `Ailen eve katkı bekliyor; öğretmenin ise okula devam etmeni istiyor.`,
+    ch: [
+      { l: 'Okula devam etmek istiyorum', odds: 0.15, win: { t: `Ailen fedakârlık yapıp okumana izin verdi. Okula devam ediyorsun.`, fx: { j: 3 }, do: (L) => { L.edu.plan = Math.min(12, L.edu.plan + 3); } }, lose: { t: `İstedin ama olmadı; para yetmedi. Okulu bırakmak zorunda kalacaksın.`, fx: { j: -3 } } },
+      { l: 'Çalışıp aileme destek olayım', t: `Okulu bırakıp çalışmaya karar verdin. Eve ilk parayı getirdiğin gün annen ağladı.`, fx: { j: -1 } },
+    ] },
+  { id: 'okul-bitti', st: '*', age: [7, 30], p: 1, if: (L) => L.edu.inSchool && L.edu.yrs >= L.edu.plan, ic: '🎓', hl: (L) => (L.edu.uni ? 2 : 1),
+    src: { d: 'oos, cmpP, cmpL, upE, ter, msA/baA', how: 'okulda kalınan yıl: tamamlama/okullaşma oranlarına göre gizli eğitim yüzdeliğinden (ebeveyn varlığıyla 0,42 korelasyon, Hertz vd. 2007)' },
+    stat: (L, c) => `${c.n}: ilkokulu ${P(Math.min(100, c.cmpP), 0)}, ortaokulu ${P(Math.min(100, c.cmpL), 0)} tamamlıyor; lise okullaşması ${P(Math.min(100, c.upE), 0)}, üniversite ${P(Math.min(100, c.ter), 0)} (UNESCO UIS).`,
+    do: (L) => {
+      L.edu.inSchool = false;
+      if (L.edu.uni) L.edu.level = Math.max(L.edu.level, L.edu.yrs >= 18 ? 4 : 3);
+      else L.edu.level = L.edu.yrs >= 12 ? 2 : L.edu.yrs >= 6 ? 1 : 0;
+    },
+    t: (L) => {
+      if (L.edu.level >= 4) return `Yüksek lisansını tamamladın. Tezin dört kişi tarafından okundu; biri annendi.`;
+      if (L.edu.uni) return `Üniversiteden mezun oldun! Kep havaya uçtu, kira gerçekliği yere indi.`;
+      if (L.edu.yrs >= 12) return `Liseden mezun oldun. Okulun kapısından çıkarken biraz büyüdüğünü hissettin.`;
+      if (L.edu.yrs >= 9) return `{yas} yaşında ortaokulu bitirip okuldan ayrıldın.`;
+      if (L.edu.yrs >= 6) return `{yas} yaşında ilkokulu bitirip okuldan ayrıldın.`;
+      return `{yas} yaşında okulu bıraktın. Toplam ${L.edu.yrs} yıl okula gidebildin.`;
+    } },
+  { id: 'sigara', st: 'ergen', age: [13, 17], p: (L) => (L.age === 17 ? 1 : 0.25), ic: '🚬',
+    src: { d: 'smkM, smkF', how: 'cinsiyete göre tütün kullanım yaygınlığı = P(sigara içer); "denerim" ×1,5, "almam" ×0,5 (ortalaması veriye eşit); ölüm riski ×2 (Doll vd. 2004; Jha vd. 2013), nüfusa göre normalize', v: '×1,5 / ×0,5 seçenek etkisi varsayım' },
+    stat: (L, c) => `${c.n}: ${L.sex === 'M' ? 'erkeklerin' : 'kadınların'} ${P(smk(L, c), 0)}'i tütün kullanıyor (WHO). Sigara içenlerde kronik hastalıktan ölüm riski 2–3 kat (Doll vd. 2004; Jha vd. 2013).`,
+    t: `Arkadaşların okul arkasında bir sigara uzattı.`,
+    ch: [
+      { l: 'Bir tane denerim', do: (L, c) => { L.smoker = L.lat.smk < Math.min(0.95, (smk(L, c) / 100) * 1.5); }, t: (L) => (L.smoker ? `Önce denemekti, sonra alışkanlık oldu. Sigara hayatına yerleşti.` : `Öksürdün ve bir daha elini sürmedin.`), fx: { j: 1 } },
+      { l: 'Teşekkürler, almayayım', do: (L, c) => { L.smoker = L.lat.smk < (smk(L, c) / 100) * 0.5; }, t: (L) => (L.smoker ? `O gün reddettin; ama birkaç yıl sonra stresli bir dönemde başladın.` : `"Havalı değilsin" dediler. Ciğerlerin aynı fikirde değil.`) },
+    ] },
+  { id: 'erken-evlilik', st: '*', age: [14, 17], p: 1, if: (L) => L.lat.marry && L.lat.mAge === L.age && !L.married, ic: '💍', def: 0,
+    src: { d: 'm18', how: '20–24 yaş kadınlarda 18\'inden önce evlenmiş olanların payı (erkeklerde 1/6\'sı, UNICEF) = P(çocuk yaşta evlilik)', v: 'itirazın başarı şansı %30 varsayım' },
+    stat: (L, c) => `${c.n}: kadınların ${P(c.m18, 0)}'i 18 yaşından önce evlendiriliyor (UNICEF).`,
+    t: (L) => (L.sex === 'F' ? `Ailen seni yaşça büyük biriyle evlendirmek istiyor.` : `Ailen seni erken yaşta evlendirmek istiyor.`),
+    ch: [
+      { l: 'Kabul et', t: `{yas} yaşında evlendin ve okulu bıraktın. Çocukluk aniden bitti.`, hl: 2, fx: { j: -5 }, do: (L, c, api) => { api.meet(); api.marry(); L.edu.inSchool = false; L.edu.plan = L.edu.yrs; } },
+      { l: 'İtiraz et, okumak istiyorum', odds: 0.3, win: { t: `Bir öğretmenin ve teyzenin desteğiyle ailen geri adım attı.`, fx: { j: 3 }, do: (L, c, api) => { api.redrawMarriage(18); } },
+        lose: { t: `İtirazın dinlenmedi; {yas} yaşında evlendin.`, hl: 2, fx: { j: -8 }, do: (L, c, api) => { api.meet(); api.marry(); L.edu.inSchool = false; L.edu.plan = L.edu.yrs; } } },
+    ] },
+  { id: 'sinav', st: '*', age: [17, 23], p: 0.9, if: (L) => !L.edu.inSchool && !L.edu.uni && L.edu.yrs >= 12 && !L.flags.examDone, ic: '📝', def: 1,
+    src: { d: 'ter, upE', how: 'yükseköğretim brüt okullaşma oranı (≤%85) = P(üniversiteye başlar); "çok çalışırım" +%10', v: '+%10 çalışma etkisi varsayım; brüt oran yaşça büyük öğrencileri de sayar' },
+    stat: (L, c) => `${c.n}: yükseköğretim brüt okullaşma oranı ${P(c.ter, 0)} (UNESCO UIS).`,
+    t: `Üniversite sınavı kapıda.`,
+    ch: [
+      { l: 'Gece gündüz çalışırım', do: (L, c, api) => { L.flags.examDone = true; if (L.lat.edu.uni || api.R.r() < 0.1) api.startUni(); }, t: (L) => (L.edu.uni ? `Kazandın! Sonucu gördüğün an bağırdığını mahalle duydu.` : `Çok çalıştın ama puan yetmedi. Hayat başka bir kapı aralayacak.`), hl: 2 },
+      { l: 'Normal hazırlanırım', do: (L, c, api) => { L.flags.examDone = true; if (L.lat.edu.uni) api.startUni(); }, t: (L) => (L.edu.uni ? `Kazandın! Üniversiteli oldun.` : `Bu sefer olmadı. Çalışma hayatına atılıyorsun.`), hl: 2 },
+      { l: 'Sınava girmeyip çalışmaya başlarım', do: (L) => { L.flags.examDone = true; }, t: `Kitapları kaldırdın, iş ilanlarına baktın.` },
+    ] },
+  { id: 'askerlik', st: '*', age: [18, 24], sex: 'M', p: (L, c) => (CONSCRIPTION.has(c.iso) && !L.edu.inSchool ? 0.6 : 0), ic: '🪖', hl: 1, src: { d: 'conscription', how: 'zorunlu askerlik olan ülkelerde (CIA World Factbook) 18–24 yaş erkeklerde' },
+    stat: (L, c) => `${c.n}: zorunlu askerlik var (CIA World Factbook).`,
+    t: (L, c) => (c.iso === 'TUR' ? `Askerlik vakti. Kınan yakıldı, davul zurnayla yola çıktın. Döndüğünde ütü yapmayı biliyordun.` : `Zorunlu askerlik hizmetine gittin. Sabah 5'te kalkmak artık bir refleks.`), fx: { j: -2 } },
+  { id: 'arkadas-siddet', st: '*', age: [13, 40], p: (L, c) => (150 * c.hom) / 1e5, max: 2, gap: 5, ic: '🕊️', hl: 1, src: { d: 'hom', how: '150 tanıdık × cinayet hızı (100 binde) = P(bir tanıdığın öldürülmesi)', v: '150 kişilik tanıdık çevresi (Dunbar) varsayım' },
+    stat: (L, c) => `${c.n}: her 100 bin kişiden ${N(c.hom)}'i her yıl kasten öldürülüyor (UNODC).`, t: `Mahalleden bir arkadaşın sokakta yaşanan bir şiddet olayında hayatını kaybetti. Cenazede kimse konuşamadı.`, fx: { j: -10 } },
+  { id: 'sivilce', st: 'ergen', age: [12, 15], p: 0.25, fl: true, ic: '🪞', t: `Alnının ortasında bir sivilce. Dünya başına yıkıldı; fotoğraf günü de yarın.`, fx: { j: -2 } },
+  { id: 'ilk-ask', st: 'ergen', age: [12, 17], p: 0.15, fl: true, ic: '💌', t: [`İlk kez birine âşık oldun. Uzun bir mektup yazdın ve hiç göndermedin.`, `İlk aşk! Koridorda göz göze geldiğiniz an tüm teneffüsün özetiydi.`], fx: { j: 3 } },
+  { id: 'spor-takimi', st: 'ergen', age: [12, 16], p: 0.08, fl: true, ic: '⚽', t: `Okul takımına seçildin. Yedek kulübesinde geçen maçlar bile güzeldi.`, fx: { j: 3 } },
+  { id: 'yaz-isi', st: 'ergen', age: [14, 17], p: 0.1, fl: true, ic: '🍦', t: `Yazın dondurmacıda çalıştın. Kazanç: biraz harçlık, sayısız beyin donması.`, fx: { j: 2 } },
+  { id: 'kavga', st: 'ergen', age: [13, 17], p: 0.04, fl: true, ic: '🥊', t: `Okul çıkışı bir itiş kakışa karıştın. Kaş patladı, gurur sağlam.`, fx: { j: -1 } },
+  { id: 'viral', st: 'ergen', age: [12, 17], p: (L, c) => (c.net / 100) * 0.05, fl: true, ic: '📱', t: `Çektiğin bir video okulda viral oldu. On beş dakikalık şöhret üç gün sürdü.`, fx: { j: 2 } },
+  { id: 'gonullu', st: 'ergen', age: [14, 17], p: 0.05, fl: true, ic: '🤲', t: `Bir yardım kampanyasında gönüllü oldun. Koli taşırken kendini hiç bu kadar işe yarar hissetmemiştin.`, fx: { j: 3 } },
+  { id: 'sac-boya', st: 'ergen', age: [13, 17], p: 0.05, fl: true, ic: '💙', t: `Saçını maviye boyadın. Ailen konuşmayı bir hafta askıya aldı.`, fx: { j: 2 } },
+  { id: 'kamp', st: 'ergen', age: [12, 16], p: 0.05, fl: true, ic: '⛺', t: `İlk kez çadırda kamp yaptın. Gece duyduğun sesin bir kirpi olduğu sabah anlaşıldı.`, fx: { j: 3 } },
+
+  // ======================= GENÇLİK (18–29) =======================
+  { id: 'is-bul', st: '*', age: [12, 70], p: (L) => (L.unemployed ? 0.75 : 0.9), if: (L) => !L.job && !L.edu.inSchool && !L.retired && L.lat.lf && (L.age >= 15 || L.cnt['cocuk-isci']), ic: '💼', hl: (L) => (L.cnt['is-bul'] ? 0 : 1),
+    src: { d: 'lfpM, lfpF, unem', how: 'cinsiyete göre işgücüne katılım = P(iş arar); işsizlikten çıkış yılda %75', v: 'çıkış hızı %75 varsayım (ortalama işsizlik 3–18 ay, ILO)' },
+    stat: (L, c) => `${c.n}: ${L.sex === 'M' ? 'erkeklerin' : 'kadınların'} ${P(lfp(L, c), 0)}'i işgücünde; işsizlik ${P(c.unem)} (ILO).`,
+    do: (L, c, api) => { api.getJob(); },
+    t: (L) => (L.cnt['is-bul'] > 1 ? `Yeni bir işe girdin: {is}.` : L.age < 15 ? `Henüz {yas} yaşındayken düzenli çalışmaya başladın: {is}.` : `İlk işin: {is}. İlk maaşla ailene küçük bir hediye aldın.`), fx: { j: 2 } },
+  { id: 'ev-isleri', st: '*', age: [16, 30], p: 1, if: (L) => !L.lat.lf && !L.edu.inSchool, ic: '🏠', src: { d: 'lfpM, lfpF', how: '1 − işgücüne katılım oranı = P(ücretli iş dışında kalır)' },
+    stat: (L, c) => `${c.n}: ${L.sex === 'M' ? 'erkeklerin' : 'kadınların'} ${P(100 - lfp(L, c), 0)}'i işgücü dışında (ILO).`,
+    t: (L) => (L.sex === 'F' ? `Ücretli bir işe girmedin; evin ve ailenin bütün yükü senin omuzlarında.` : `Ücretli bir işin olmadı; ailenin yanında, gündelik yardımlarla geçiniyorsun.`) },
+  { id: 'issiz', st: '*', age: [18, 64], p: (L, c) => unempIn(c), if: (L) => !!L.job && !L.unemployed, gap: 2, max: 6, ic: '📉', hl: 1,
+    src: { d: 'unem', how: 'durağan durum: işsizlik u = s/(s+f), f = 0,75 → yıllık işini kaybetme s = 0,75·u/(1−u); işsizken gelir −0,35 sd', v: 'çıkış hızı ve gelir kaybı varsayım' },
+    stat: (L, c) => `${c.n}: işsizlik oranı ${P(c.unem)} (ILO modellenmiş tahmin).`,
+    t: `İşyeri küçülmeye gitti ve işini kaybettin. Sabahları aynı saatte uyanıp nereye gideceğini bilememek tuhaf.`, do: (L, c, api) => { api.loseJob(); }, fx: { j: -6 } },
+  { id: 'tanisma', st: '*', age: [17, 80], p: 1, if: (L) => L.lat.marry && !L.partner && !L.married && L.lat.mAge >= 18 && L.age >= L.lat.mAge - 1 && L.marriedAt == null, ic: '💘', hl: 1,
+    src: { d: 'smamM, smamF', how: 'ilk evlilik yaşı ~ Normal(ortalama ilk evlilik yaşı, 4); tanışma bir yıl önce', v: 'hiç evlenmeyenler %10 (UN World Marriage Data aralığı)' },
+    stat: (L, c) => `${c.n}: ortalama ilk evlilik yaşı kadınlarda ${N(c.smamF)}, erkeklerde ${N(c.smamM)} (UN World Marriage Data).`,
+    do: (L, c, api) => { api.meet(); }, t: [`{es} ile bir arkadaşının doğum gününde tanıştınız. Pastayı unuttunuz, sohbeti unutmadınız.`, `{es} ile otobüs durağında tanıştınız. Otobüs geldi, ikiniz de binmediniz.`, `{es} ile bir düğünde tanıştınız. Dansta yan yana düştünüz; gerisi tarih.`, `{es} ile ortak bir arkadaşınız sayesinde tanıştınız. İlk buluşmada yağmura yakalandınız.`], fx: { j: 3 } },
+  { id: 'evlilik', st: '*', age: [18, 80], p: 1, if: (L) => L.partner && !L.married && L.age >= L.lat.mAge, ic: '💍', def: 0, max: 6,
+    src: { d: 'smamM, smamF', how: 'gizli ilk evlilik yaşına gelince sorulur; "bekleyelim" 2 yıl erteler' },
+    stat: (L, c) => `${c.n}: ortalama ilk evlilik yaşı ${L.sex === 'M' ? `erkeklerde ${N(c.smamM)}` : `kadınlarda ${N(c.smamF)}`} (UN World Marriage Data).`,
+    t: `{es} ile ciddi konuşma vakti: evlenelim mi?`,
+    ch: [
+      { l: 'Evlenelim!', t: `{es} ile evlendiniz. Düğünde herkes ağladı; en çok da soğan doğrayan aşçı.`, hl: 2, fx: { j: 6 }, do: (L, c, api) => { api.marry(); } },
+      { l: 'Biraz daha bekleyelim', t: `Acele etmiyorsunuz. Bu da bir cevap.`, do: (L) => { L.lat.mAge = L.age + 2; } },
+      { l: 'Yollarımızı ayıralım', t: `Zor bir konuşmaydı. {es} ile vedalaştınız.`, fx: { j: -5 }, do: (L, c, api) => { api.breakUp(); L.lat.mAge = L.age + 2; } },
+    ] },
+  { id: 'cocuk-istegi', st: '*', age: [14, 44], p: 1, if: (L) => L.married && !L.flags.kidPlan, ic: '🍼', def: 1,
+    src: { d: 'tfr', how: 'seçim doğurganlığı ×1,3 / ×1 / ×0,4 değiştirir', v: 'çarpanlar varsayım (istenen doğurganlık gerçekleşeni öngörür ama tam belirlemez)' },
+    stat: (L, c) => `${c.n}: kadın başına ${N(c.tfr, 2)} çocuk (UN WPP).`,
+    pre: (L) => { L.flags.kidPlan = true; },
+    t: `{es} ile çocuk konusunu konuşuyorsunuz.`,
+    ch: [
+      { l: 'Kalabalık bir aile isteriz', t: `Evde ses, sofrada kalabalık istiyorsunuz.`, do: (L) => { L.mod.kids = 1.3; } },
+      { l: 'Ne olursa, akışına bırakalım', t: `Planı hayata bıraktınız.`, do: (L) => { L.mod.kids = 1; } },
+      { l: 'Şimdilik istemiyoruz', t: `Şimdilik ikiniz yeterlisiniz. Hayat planları dinler mi, göreceğiz.`, do: (L) => { L.mod.kids = 0.4; } },
+    ] },
+  { id: 'cocuk', st: '*', age: [14, 60], max: 15, p: (L, c, W) => W.fn.birthProb(c, L) * L.mod.kids, if: (L) => L.married && !!L.partner && L.kids.every((k) => L.age - k.born >= 1), ic: '👶', hl: (L) => (L.kids.length <= 1 ? 2 : 1),
+    src: { d: 'tfr, ado, smamF, mmr', how: 'yaşa özel doğurganlık (15–19: ergen doğurganlığı; 20–44: TFR × UN model şekli) × κ; κ, evli kadın başına beklenen doğum toplamı TFR olacak şekilde; doğumda anne ölümü = MMR/100 000', v: 'evliliğin sürme payı %90 varsayım' },
+    stat: (L, c) => `${c.n}: kadın başına ${N(c.tfr, 2)} çocuk; 15–19 yaş kızlarda binde ${N(c.ado, 0)} doğum; her 100 bin doğumda ${N(c.mmr, 0)} anne ölümü (UN WPP, WHO).`,
+    do: (L, c, api) => {
+      if (L.sex === 'F' && api.R.r() < c.mmr / 1e5) { api.die('dogum'); return false; }
+      api.addKid();
+    },
+    t: (L) => {
+      const k = L.kids.at(-1);
+      const n = L.kids.length;
+      return n === 1 ? `${k.sex === 'M' ? 'Oğlun' : 'Kızın'} ${k.name} dünyaya geldi. İlk gece kimse uyumadı; sonraki birkaç yıl da.` : `${n}. çocuğun ${k.name} doğdu. Ev biraz daha küçüldü, kalp biraz daha büyüdü.`;
+    }, fx: { j: 5 } },
+  { id: 'cocuk-kaybi', st: '*', age: [14, 70], p: 1, max: 15, if: (L) => L.kids.some((k) => !k.lost && k.lostAt === L.age), ic: '🕯️', hl: 3,
+    src: { d: 'imr, u5', how: 'her çocuk için 5 yaş altı ölüm hızı (ilk yıl payı bebek ölüm hızından)' },
+    stat: (L, c) => `${c.n}: her 1000 çocuktan ${N((c.u5[0] + c.u5[1]) / 2, 0)}'i beş yaşını göremiyor (UN IGME).`,
+    do: (L) => { const k = L.kids.find((x) => !x.lost && x.lostAt === L.age); k.lost = true; L.flags.lostKid = k.name; },
+    t: (L) => `Küçük ${L.flags.lostKid} çok erken, ilk yıllarında hayatını kaybetti. İstatistik artık sizin için bir isim.`, fx: { j: -20, h: -3 } },
+  { id: 'evlilik-krizi', st: '*', age: [18, 75], p: (L, c) => Math.min(0.3, divP(c) * 1.5), if: (L) => L.married, gap: 3, max: 4, ic: '🌩️',
+    src: { d: 'div', how: 'kaba boşanma hızı ÷ evli nüfus payı (0,5) = evli kişi başına yıllık boşanma; kriz bunun 1,5 katı, seçeneklerin ortalaması 2/3 boşanma', v: 'evli nüfus payı 0,5 varsayım; veri 45 ülkede var, gerisi bölge ortalaması' },
+    stat: (L, c) => `${c.n}: yılda bin kişide ${N(c.div)} boşanma${c.est?.includes('div') ? ' (bölge ortalamasından tahmini)' : ''} (BM / OECD, Our World in Data).`,
+    t: `{es} ile aranız açıldı. Evde sessizlik konuşmalardan daha yüksek.`,
+    ch: [
+      { l: 'Çift terapisine gidelim', odds: 0.6, win: { t: `Zor konuşmalar yaptınız ve yeniden birbirinizi duymaya başladınız.`, fx: { j: 3 } }, lose: { t: `Denediniz ama yollar ayrıldı. Boşandınız.`, hl: 2, fx: { j: -8 }, do: (L, c, api) => { api.breakUp(); } } },
+      { l: 'Boşanalım', t: `{es} ile boşandınız. Eşyalar ikiye, hatıralar sayısız parçaya bölündü.`, hl: 2, fx: { j: -6 }, do: (L, c, api) => { api.breakUp(); } },
+      { l: 'Zamanla geçer', odds: 0.4, win: { t: `Gerçekten geçti. Bazen sabır da bir cevap.`, fx: { j: 2 } }, lose: { t: `Geçmedi; sonunda boşanmaya karar verdiniz.`, hl: 2, fx: { j: -8 }, do: (L, c, api) => { api.breakUp(); } } },
+    ] },
+  { id: 'yeniden-evlilik', st: '*', age: [25, 65], p: 0.08, if: (L) => !L.partner && L.marriedAt != null, max: 2, ic: '💞', hl: 1,
+    src: { d: 'LIT', how: 'boşanmış/dul kişilerin yeniden evlenmesi yılda %8', v: 'oran varsayım' },
+    do: (L, c, api) => { api.meet(); api.marry(); }, t: `{es} ile yeniden evlendin. Bu kez düğün daha küçük, kahkahalar daha büyük.`, fx: { j: 5 } },
+  { id: 'goc', st: '*', age: [18, 45], p: (L, c, W) => Math.min(0.3, W.fn.emigrationRate(c) / 0.6), if: (L) => L.migrations.length === 0, ic: '🧳', def: 0,
+    src: { d: 'emi', how: 'yurt dışında yaşayan doğumluların payı E (UN DESA) → ömür boyu olasılık E/(1+E) → 28 yıla yıllık; fırsat bunun 1/0,6 katı, vize başarısı %60; hedef ülke göçmen stokuna (SM.POP.TOTL.ZS × nüfus) göre', v: 'vize başarısı %60 varsayım' },
+    stat: (L, c) => `${c.n}: bu ülkede doğanların ${P(c.emi)}'i yurt dışında yaşıyor (UN DESA International Migrant Stock).`,
+    t: `{ulkeden} ayrılıp başka bir ülkede yeni bir hayat kurma fırsatı çıktı. Vize, yol, borç… hepsi belirsiz.`,
+    ch: [
+      { l: 'Gidiyorum', odds: 0.6, win: { hl: 3, ic: '✈️', fx: { j: -3 }, do: (L, c, api) => { const to = api.pickDestination(); if (!to) return false; L.flags.oldCountry = c.n; api.migrate(to); }, t: `Bavulunu topladın ve {ulkeye} göç ettin. Yeni dil, yeni sokaklar, eski özlem.` },
+        lose: { t: `Vize reddedildi ve yol için ödediğin paranın bir kısmı battı. Şimdilik buradasın.`, fx: { j: -4, z: -0.15 } } },
+      { l: 'Kalıyorum', t: `Kökler ağır bastı. {ulkede} kalıp burada bir hayat kurmaya karar verdin.` },
+    ] },
+  { id: 'gurbet-donus', st: '*', age: [20, 80], p: 0.06, if: (L) => L.migrations.length === 1 && L.iso !== L.born && L.age - L.migrations[0].age >= 2 && L.age - L.migrations[0].age <= 8, ic: '🕰️', def: 0,
+    src: { d: 'LIT.returnMig', how: 'göçmenlerin %20–50\'si 5 yıl içinde döner (OECD); dönüş fırsatı yılda %6, karar oyuncunun' },
+    stat: () => `Göçmenlerin %20–50'si beş yıl içinde geri dönüyor ya da başka ülkeye gidiyor (OECD International Migration Outlook 2008).`,
+    t: (L) => `Memleket özlemi ağır basıyor. ${L.flags.oldCountry ?? 'Doğduğun ülke'} seni çağırıyor.`,
+    ch: [
+      { l: 'Kalıyorum, burası da memleketim', t: `Burada kök saldın. Özlem yazın bir haftalık ziyarete sığıyor.`, fx: { j: 1 } },
+      { l: 'Geri dönüyorum', t: `Bavullar yine toplandı. {ulkeye} döndün; sokaklar tanıdık ama sen değişmişsin.`, hl: 2, fx: { j: 3 }, do: (L, c, api) => { api.migrate(L.migrations[0].from); } },
+    ] },
+  { id: 'catisma', st: '*', age: [3, 90], p: (L, c) => Math.min(0.3, (c.war / 1e5) * 100), gap: 3, max: 4, ic: '⚠️', hl: 2,
+    src: { d: 'war', how: 'son 3 yılın çatışma ölümü (100 binde, UCDP) × 100 kişi etkilenen', v: 'ölüm başına 100 etkilenen varsayım; çatışma ölüm hızı 15 yılda söner' },
+    stat: (L, c) => `${c.n}: son yıllarda her 100 bin kişiden ${N(c.war, 2)}'i silahlı çatışmada öldü (UCDP).`,
+    t: [`Bölgende silahlı çatışmalar yoğunlaştı. Bir süre evden çıkamadınız; okullar ve dükkânlar kapandı.`, `Çatışmalar şehrinize yaklaştı; bir süre akrabalarının yanına sığınmak zorunda kaldınız.`], fx: { j: -8, h: -2, z: -0.2 } },
+  { id: 'afet', st: '*', age: [0, 100], p: (L, c) => c.disas / 100, max: 3, gap: 5, ic: '🌊', hl: 1,
+    src: { d: 'disas', how: 'kuraklık/sel/aşırı sıcaktan etkilenen nüfus payı (yıllık ortalama, 1990–2009) = P(etkilenir)', v: 'gelir etkisi (geçici −0,15 sd) varsayım' },
+    stat: (L, c) => `${c.n}: her yıl nüfusun ortalama ${P(c.disas, 2)}'i kuraklık, sel ya da aşırı sıcaktan etkileniyor (EM-DAT, Dünya Bankası).`,
+    t: (L) => (L.urban ? `Bölgende büyük bir sel oldu; evini su bastı. Eşyalar gitti, insanlar kaldı.` : `Uzun bir kuraklık geldi; ekin yandı, hayvanlar satıldı.`), fx: { j: -5, z: -0.15 } },
+  { id: 'trafik-kaza', st: '*', age: [12, 85], p: (L, c) => (c.road / 1e5) * 20 * L.mod.road, gap: 3, max: 3, ic: '🚑', hl: 1,
+    src: { d: 'road', how: 'trafik ölüm hızı × 20 = ağır yaralanma olasılığı (WHO: ölüm başına ≥20 yaralı)' },
+    stat: (L, c) => `${c.n}: her 100 bin kişiden ${N(c.road)}'i her yıl trafikte ölüyor; her ölüme ~20 ağır yaralı düşüyor (WHO).`,
+    t: `Bir trafik kazası geçirdin ve hastanelik oldun. Aylarca fizik tedavi gördün; ama yaşıyorsun.`, fx: { h: -10, j: -4 } },
+  { id: 'motosiklet', st: 'genc', p: (L, c) => (c.road > 12 ? 0.08 : 0.02), ic: '🏍️',
+    src: { d: 'road', how: 'seçim kişisel trafik riskini ×1,6 / ×0,4 değiştirir (ortalaması 1)', v: 'çarpanlar varsayım (motosiklet km başına çok daha riskli; WHO)' },
+    stat: (L, c) => `${c.n}: 100 binde ${N(c.road)} trafik ölümü (WHO). Dünyada trafik ölümlerinin ~%30'u iki-üç tekerlekli araç kullanıcıları.`,
+    t: `Ucuz bir motosiklet alabilirsin; işe gidiş bir saatten on beş dakikaya iner.`,
+    ch: [
+      { l: 'Alayım, kaskımı da takarım', t: `Artık rüzgâr senin. Kask her gün kafanda.`, fx: { j: 2 }, do: (L) => { L.mod.road *= 1.6; } },
+      { l: 'Otobüse devam', t: `Otobüste kitap okumaya devam. Yılda kırk kitap!`, fx: { j: 1 }, do: (L) => { L.mod.road *= 0.4; } },
+    ] },
+  { id: 'ev-arkadasi', st: 'genc', p: 0.06, fl: true, ic: '🍽️', t: `Ev arkadaşın bulaşıkları üç hafta biriktirdi. Lavabo artık bir ekosistem.`, fx: { j: -2 } },
+  { id: 'kredi-karti', st: 'genc', p: (L, c) => (c.gdp > 12000 ? 0.08 : 0.01), fl: true, ic: '💳', t: `İlk kredi kartın geldi. Limitin bir hedef olmadığını acı yoldan öğrendin.`, fx: { j: -1 } },
+  { id: 'sirt-cantasi', st: 'genc', p: (L) => (L.st.w > 70 ? 0.06 : 0.005), fl: true, ic: '🎒', t: `Sırt çantasıyla birkaç ülke gezdin. Kayboldun, buldun, kendini de biraz buldun.`, fx: { j: 3 } },
+  { id: 'yuksek-lisans', st: '*', age: [21, 30], p: 0.9, if: (L) => L.edu.level === 3 && !L.edu.inSchool && !L.flags.gradAsked, ic: '🔬', def: 0,
+    src: { d: 'msA, baA', how: 'yüksek lisans mezunu / lisans mezunu oranı (≤%50) = P(lisansüstüne devam)', v: '"başvururum" +%10 şans varsayım' },
+    stat: (L, c) => `${c.n}: 25 yaş üstünün ${P(c.baA, 0)}'i en az lisans, ${P(c.msA, 0)}'i en az yüksek lisans mezunu (UNESCO UIS).`,
+    pre: (L) => { L.flags.gradAsked = true; },
+    t: `Üniversite bitti. Yüksek lisans mı, iş hayatı mı?`,
+    ch: [
+      { l: 'Başvururum', do: (L, c, api) => { if (L.lat.edu.ms || api.R.r() < 0.1) { L.edu.inSchool = true; L.edu.plan = L.edu.yrs + 2; L.job = null; } }, t: (L) => (L.edu.inSchool ? `Yüksek lisansa kabul edildin. İki yıl daha kütüphane, kahve, panik.` : `Başvurun kabul edilmedi. İş hayatına atıldın.`) },
+      { l: 'Çalışmaya başlayayım', t: `Diploma çerçevelendi, özgeçmiş gönderildi.` },
+    ] },
+  { id: 'girisim', st: '*', age: [24, 55], p: 0.025, if: (L) => !!L.job, ic: '🚀', def: 1,
+    src: { d: 'LIT.bizSurvive', how: 'yeni işletmelerin ~%50\'si 5 yılı tamamlıyor (ABD BLS) = başarı şansı', v: 'teklif sıklığı (%2,5) ve gelir etkisi varsayım' },
+    stat: () => `Yeni kurulan işletmelerin yaklaşık yarısı beş yılı tamamlıyor (ABD Çalışma İstatistikleri Bürosu).`,
+    t: `Bir arkadaşın ortak iş kurmayı teklif ediyor. Birikimini koyman gerek.`,
+    ch: [
+      { l: 'Varım, kuralım!', odds: 0.5, win: { t: `İşler tuttu! Küçük ama sağlam bir şirketiniz var.`, hl: 2, fx: { j: 4 }, do: (L) => { L.job = 'şirket sahibi'; L.zP += 0.3; } }, lose: { t: `İki yıl uğraştınız, olmadı. Borçlar kaldı, dersler de.`, hl: 1, fx: { j: -5, z: -0.4 } } },
+      { l: 'Kibarca reddet', t: `Güvenli liman. Arkadaşın yine de yıllar sonra bunu anacak.` },
+    ] },
+  { id: 'spor-salonu', st: '*', age: [18, 55], p: 0.03, fl: true, ic: '🏋️', t: `Spor salonuna yazıldın. İlk hafta dört kez gittin; sonra salon sana hasret kaldı.`, fx: { j: 1 } },
+  { id: 'dugun-dans', st: 'genc', p: 0.08, fl: true, ic: '🪩', t: `Bir düğünde sabaha kadar dans ettin. Ertesi gün bacakların seni affetmedi.`, fx: { j: 3 } },
+  { id: 'red-mektubu', st: 'genc', p: 0.08, fl: true, ic: '📭', t: `Çok istediğin bir işe başvurdun, olumsuz yanıt geldi. Mektupta adın bile yanlış yazılmıştı.`, fx: { j: -2 } },
+  { id: 'kira', st: '*', age: [20, 45], p: (L) => (L.urban ? 0.04 : 0.005), max: 2, gap: 4, fl: true, ic: '🏚️', t: `Ev sahibi kirayı neredeyse ikiye katladı. Kutular yeniden toplandı.`, fx: { j: -2 } },
+  { id: 'dil-ogren', st: '*', age: [14, 60], p: 0.02, fl: true, ic: '🗺️', t: `Yeni bir dil öğrenmeye başladın. Şimdilik sadece "kütüphane nerede" diyebiliyorsun ama çok iyi diyorsun.`, fx: { j: 1 } },
+  { id: 'dernek', st: '*', age: [18, 70], p: 0.015, fl: true, ic: '🏘️', t: `Mahalle derneğine katıldın. Toplantılar uzun, kurabiyeler güzel.`, fx: { j: 2 } },
+  { id: 'ev-al', st: '*', age: [26, 60], p: (L) => (L.st.w > 60 ? 0.05 : L.st.w > 40 ? 0.01 : 0), if: (L) => !L.flags.home && !!L.job, fl: true, ic: '🏠', do: (L) => { L.flags.home = true; }, t: `Kendi evini aldın! Kredi yirmi yıl, anahtarı ilk çevirdiğin an ise sonsuz.`, fx: { j: 3 } },
+  { id: 'tv-arka-plan', st: '*', age: [16, 70], p: 0.008, fl: true, ic: '📺', t: `Bir haber programında arka planda göründün. Komşular yıllarca anlattı; sen sadece ekmek alıyordun.`, fx: { j: 2 } },
+  { id: 'ilk-araba', st: '*', age: [18, 40], p: (L, c) => (c.gdp > 15000 && L.st.w > 40 ? 0.05 : 0.005), fl: true, ic: '🚗', t: `İlk arabanı aldın. İkinci el, rengi "eski kırmızı", radyosu tek kanal çekiyor.`, fx: { j: 3 } },
+  { id: 'maas-gunu', st: 'genc', p: 0.15, if: (L) => !!L.job, fl: true, ic: '💵', t: `Maaş günü! Hesaba yatan para ile ayın sonu arasında küçük bir yarış başladı.`, fx: { j: 1 } },
+  { id: 'futbol-final', st: '*', age: [12, 80], p: 0.02, fl: true, ic: '🏟️', t: `Tuttuğun takım şampiyon oldu. Sokaklarda tanımadığın insanlarla sarıldın.`, fx: { j: 3 } },
+  { id: 'grip', st: '*', age: [5, 90], p: 0.03, fl: true, ic: '🤧', t: `Sıradan bir grip seni bir hafta yatağa bağladı. Çorba içmekten artık kaşığa bakamıyorsun.`, fx: { j: -1 } },
+
+  // ======================= YETİŞKİNLİK (30–44) =======================
+  { id: 'terfi', st: '*', age: [24, 62], p: 0.04, if: (L) => !!L.job, gap: 5, max: 3, fl: true, ic: '📈', t: [`Terfi aldın. Yeni unvanın kartvizite sığmadı.`, `Emeğin fark edildi; masana bir bitki ve yeni bir unvan geldi.`], fx: { j: 2 } },
+  { id: 'is-teklifi', st: '*', age: [26, 58], p: 0.03, if: (L) => !!L.job, gap: 8, max: 2, fl: true, ic: '📨', t: `Daha stresli ama daha prestijli bir iş teklifi aldın.`,
+    ch: [
+      { l: 'Kabul et', t: `Yeni işte uyku az, heyecan çok.`, fx: { j: 1 } },
+      { l: 'Kaldığım yerde mutluyum', t: `Tanıdık masa, tanıdık çay ocağı.`, fx: { j: 1 } },
+    ] },
+  { id: 'kariyer-degisimi', st: '*', age: [30, 50], p: 0.015, if: (L) => !!L.job, fl: true, ic: '🔄', t: `Yıllardır aynı işi yapıyorsun ve içini bir soru kemiriyor: baştan başlamak mı?`,
+    ch: [
+      { l: 'Hayalimin peşinden giderim', t: `Korkutucuydu ama yaptın; yeni işin seni sabahları uyandırıyor.`, fx: { j: 3 } },
+      { l: 'Güvenli olandan ayrılmam', t: `İçindeki ses biraz kısıldı ama faturalar ödendi.`, fx: { j: -1 } },
+    ] },
+  { id: 'cocuk-okula', st: '*', age: [20, 65], p: 0.5, max: 4, gap: 2, if: (L) => L.kids.some((k) => !k.lost && L.age - k.born === 6), fl: true, ic: '🎒', t: (L) => `${L.kids.find((k) => !k.lost && L.age - k.born === 6).name} okula başladı. Sen ilk gün ağladın, o hiç dönüp bakmadı.`, fx: { j: 2 } },
+  { id: 'tansiyon', st: '*', age: [30, 79], p: (L) => (L.flags.htn ? 0 : 0.33 / 50), ic: '🩺',
+    src: { d: 'LIT.hypertension', how: '30–79 yaşta %33 yaygınlık / 50 yıl = yıllık teşhis (küresel ortalama)', v: 'ülkeye özgü veri yok; WHO küresel oranı' },
+    stat: () => `Dünyada 30–79 yaş yetişkinlerin %33'ü yüksek tansiyonlu; yarısı bunu bilmiyor (WHO 2023).`,
+    do: (L) => { L.flags.htn = true; }, t: `Rutin bir ölçümde tansiyonun yüksek çıktı. Tuzluk mutfakta göz hapsinde.`, fx: { h: -3 } },
+  { id: 'diyabet', st: '*', age: [35, 79], p: (L, c) => c.diab / 100 / 40, if: (L) => !L.diabetic, ic: '🩸',
+    src: { d: 'diab', how: '20–79 yaş diyabet yaygınlığı / 40 yıl = yıllık teşhis; ölüm riski ×1,8 (ERFC 2011), nüfusa göre normalize' },
+    stat: (L, c) => `${c.n}: 20–79 yaş yetişkinlerin ${P(c.diab)}'i diyabetli (IDF). Diyabet ölüm riskini ~1,8 kat artırır (ERFC 2011).`,
+    do: (L) => { L.diabetic = true; }, t: `Şeker hastalığı teşhisi kondu. Tatlıyla aranda artık resmi bir mesafe var.`, fx: { h: -3, j: -2 } },
+  { id: 'saglik-kontrol', st: '*', age: [40, 75], p: 0.04, max: 2, gap: 10, ic: '🏥',
+    src: { d: 'LIT.checkRR', how: 'genel sağlık taramasının ölüme etkisi RR 1,00 → seçim ömrü değiştirmez', v: 'teklif sıklığı varsayım' },
+    stat: () => `Genel "check-up" taramaları toplam ölüm riskini değiştirmiyor: 250 binden fazla kişilik 17 çalışmada RR 1,00 (Krogsbøll vd. 2019, Cochrane).`,
+    t: `Doktorun kapsamlı bir sağlık kontrolü öneriyor. Masraflı ve zaman alıcı.`,
+    ch: [
+      { l: 'Yaptırayım', t: `Her şey neredeyse normal çıktı. İçine su serpildi.`, fx: { j: 2 } },
+      { l: 'Kendimi iyi hissediyorum, gerek yok', t: `Doktorun kaşları havada kaldı.` },
+    ] },
+  { id: 'kanser', st: '*', age: [30, 105], p: (L, c, W) => Math.min(0.3, (0.23 * W.fn.ncd(L, L.age + 1)) / (1 - W.fn.cancerSurvival(c))), max: 4, if: (L) => !L.fatal, ic: '🎗️', hl: 3, def: 0,
+    src: { d: 'dNcd, gdp', how: 'kanser teşhisi = kalibre edilmiş bulaşıcı olmayan hastalık tehlikesi × %23 kanser payı (WHO) ÷ (1 − 5 yıllık sağkalım); ölüm olasılığı = 1 − sağkalım', v: 'sağkalım %35–65 (gelire göre, CONCORD-3 aralığı); "ikinci görüş" ×0,95' },
+    stat: (L, c, W) => `Kanser, bulaşıcı olmayan hastalık ölümlerinin %23'ü (WHO). ${c.n} gelir düzeyinde 5 yıllık sağkalım ~${P(100 * W.fn.cancerSurvival(c), 0)} varsayıldı (CONCORD-3 aralığı).`,
+    t: (L) => (L.cnt.kanser > 1 ? `Kontrollerde yeni bir kanser bulgusu çıktı. Tedavi seçenekleri yeniden konuşuluyor.` : `Doktor odasına oturdun ve "kanser" kelimesini duydun. Tedavi seçenekleri konuşuluyor.`),
+    ch: [
+      { l: 'Önerilen tedaviye başla', do: (L, c, api) => { if (api.R.r() > api.world.fn.cancerSurvival(c)) api.fatal('kanser', api.R.int(3)); }, t: (L) => (L.fatal ? `Tedavi hastalığı tam durduramadı. Doktorlar zamanın kıymetini bilmeni söylüyor.` : `Zorlu aylar geçti. Kontroller temiz çıktı; zil çaldın.`), hl: 2, fx: { h: -8 } },
+      { l: 'İkinci bir görüş al, sonra başla', do: (L, c, api) => { if (api.R.r() > 1 - (1 - api.world.fn.cancerSurvival(c)) * 0.95) api.fatal('kanser', api.R.int(3)); }, t: (L) => (L.fatal ? `İkinci doktor da aynı şeyi söyledi; hastalık ilerlemişti.` : `İkinci görüş tedavi planını netleştirdi; tedavi başarılı oldu.`), hl: 2, fx: { h: -8 } },
+    ] },
+  { id: 'kalp-krizi', st: '*', age: [40, 105], p: (L, c, W) => Math.min(0.3, 0.44 * W.fn.ncd(L, L.age)), if: (L) => !L.flags.mi, ic: '💓', hl: 2, def: 1,
+    src: { d: 'dNcd', how: 'ölümcül olmayan kalp krizi ≈ kalp-damar ölüm tehlikesi (%44 × NCD); "hayatımı değiştiririm" kalp-damar ölümünü ×0,74 (Cochrane) ve sigarayı bıraktırır (×1,3 kalan risk, Jha vd. 2013)', v: 'ölümcül olmayan/ölümcül oranı 1 varsayım' },
+    stat: () => `Kalp-damar hastalıkları, bulaşıcı olmayan hastalık ölümlerinin %44'ü (WHO). Kalp rehabilitasyonu kalp-damar ölümünü ~%26 azaltıyor (Anderson vd. 2016, Cochrane).`,
+    pre: (L) => { L.flags.mi = true; },
+    t: `Göğsünde bir ağrıyla hastaneye kaldırıldın: hafif bir kalp krizi. Atlattın.`,
+    ch: [
+      { l: 'Hayatımı değiştiriyorum (rehabilitasyon, sigarayı bırak)', t: `Yürüyüş, sebze, erken uyku. Doktorun ilk kez gülümsedi.`, fx: { j: 1 }, do: (L) => { L.mod.cvd *= 0.74; L.mod.ncd *= 1 - 0.44 * 0.26; if (L.smoker) L.flags.quit = true; } },
+      { l: 'İlaçlarımı içerim, gerisi aynı', t: `Kalbin uyardı; sen kulak ardı ettin.` },
+    ] },
+  { id: 'tuberkuloz', st: '*', age: [15, 85], p: (L, c) => c.tb / 1e5, max: 1, ic: '🫁', src: { d: 'tb', how: 'tüberküloz insidansı (100 binde) / 100 000 = yıllık olasılık' },
+    stat: (L, c) => `${c.n}: her yıl 100 bin kişiden ${N(c.tb, 0)}'i tüberküloza yakalanıyor (WHO).`, t: `Tüberküloz teşhisi kondu. Altı ay boyunca her gün ilaç içtin; iyileştin.`, fx: { h: -8, j: -3 } },
+  { id: 'depresyon', st: '*', age: [15, 80], p: LITP('depression', 10), max: 2, gap: 10, ic: '🌧️',
+    src: { d: 'LIT.depression', how: 'yetişkinlerde %5 yaygınlık / ~10 yıl = yıllık başlangıç (küresel)', v: 'ülkeye özgü veri yok; WHO küresel oranı; seçimler sadece Keyif\'i değiştirir' },
+    stat: () => `Dünyada yetişkinlerin ~%5'i depresyon yaşıyor; düşük ve orta gelirli ülkelerde çoğu hiç tedavi almıyor (WHO 2023).`,
+    t: `Uzun, gri bir dönemden geçiyorsun. Sabahları yataktan kalkmak bile ağır geliyor.`,
+    ch: [
+      { l: 'Yardım iste (doktor, terapi)', t: `Yardım istemek cesaret istedi. Yavaş yavaş renkler geri geldi.`, fx: { j: 8 } },
+      { l: 'Yakınlarıma anlatırım', t: `Dertleştikçe yük hafifledi.`, fx: { j: 5 } },
+      { l: 'Kendi kendime atlatırım', t: `Uzun sürdü; sis yavaş dağıldı.`, fx: { j: -4 } },
+    ] },
+  { id: 'ekonomik-kriz', st: '*', age: [16, 90], p: LITP('crisis'), gap: 5, max: 4, ic: '📉', hl: 1,
+    src: { d: 'LIT.crisis', how: 'ülke başına yılda ~%2 sistemik bankacılık krizi (Laeven & Valencia 2018, IMF)', v: 'gelir etkisi (geçici −0,15 sd) varsayım' },
+    stat: () => `1970–2017 arasında dünyada 151 sistemik bankacılık krizi yaşandı: bir ülkede ortalama ~50 yılda bir (Laeven & Valencia 2018, IMF).`,
+    t: `Ülkede ekonomik kriz patladı. Fiyatlar her hafta yeni bir zirve yapıyor.`, fx: { j: -4, z: -0.15 } },
+  { id: 'birikim', st: '*', age: [28, 60], p: 0.04, if: (L) => L.st.w > 40, max: 2, gap: 8, ic: '🐖',
+    src: { d: 'LIT', how: 'seçenekler ortalamada nötr: garanti ±0, riskli %50 +0,15 / %50 −0,15 sd', v: 'teklif sıklığı ve etki büyüklüğü varsayım' },
+    t: `Bir kenarda biraz birikmiş paran var. Ne yapalım?`,
+    ch: [
+      { l: 'Garanti yatırım (mevduat, altın)', t: `Paran yavaş ama emin adımlarla korundu.` },
+      { l: 'Riskli yatırım (borsa, kripto)', odds: 0.5, win: { t: `Talih yüzüne güldü; birikimin büyüdü. Artık herkese yatırım tavsiyesi veriyorsun (lütfen verme).`, fx: { j: 3, z: 0.15 } }, lose: { t: `Grafikler aşağı, moral yerlerde.`, fx: { j: -3, z: -0.15 } } },
+      { l: 'Ailecek güzel bir tatil', t: `Hayat bu, bir de tatil fotoğrafları. Pişman değilsin.`, fx: { j: 4 } },
+    ] },
+  { id: 'mikrokredi', st: '*', age: [20, 55], p: (L, c) => (L.st.w < 30 && c.gdp < 12000 ? 0.04 : 0), max: 1, ic: '🏪', def: 1,
+    src: { d: 'LIT.microcredit', how: 'mikrokredinin gelire ortalama etkisi küçük (Banerjee vd. 2015): %50 +0,1 / %50 −0,1 sd', v: 'teklif sıklığı varsayım' },
+    stat: () => `Altı ülkedeki randomize çalışmalar: mikrokredi ortalamada "olumlu ama dönüştürücü değil" (Banerjee, Karlan & Zinman 2015).`,
+    t: `Bir kooperatif küçük bir kredi teklif ediyor: kendi dükkânını açabilirsin.`,
+    ch: [
+      { l: 'Kredi al, dükkânı aç', odds: 0.5, win: { t: `Dükkân tuttu! Müşteriler seni adınla selamlıyor.`, hl: 1, fx: { j: 3, z: 0.1 }, do: (L) => { L.job = 'dükkân sahibi'; } }, lose: { t: `Satışlar yetmedi; dükkânı kapatıp borcu ödemeye başladın.`, fx: { j: -3, z: -0.1 } } },
+      { l: 'Borç almayayım', t: `Bildiğin işe devam ediyorsun.` },
+    ] },
+  { id: 'ebeveyn-vefat', st: '*', age: [0, 90], p: (L, c, W) => (L.parents.mom ? W.fn.qAt(L.born, L.age + 27, 'F') : 0) + (L.parents.dad ? W.fn.qAt(L.born, L.age + 31, 'M') : 0), if: (L) => L.parents.mom || L.parents.dad, max: 2, ic: '🖤', hl: (L) => (L.age < 18 ? 3 : 2),
+    src: { d: 'le, imr, u5, dCom, dInj', how: 'doğulan ülkenin kalibre hayat tablosundan, annenin (+27) ve babanın (+31) yaşındaki ölüm olasılığı (UN WPP ortalama doğurma yaşı)' },
+    stat: (L, c, W) => { const b = W.byIso.get(L.born); return `${b.n}: doğumda beklenen ömür kadınlarda ${N(b.le[1])}, erkeklerde ${N(b.le[0])} yıl (UN WPP).`; },
+    do: (L, c, api) => { const who = L.parents.dad && (!L.parents.mom || api.R.r() < 0.6) ? 'dad' : 'mom'; L.parents[who] = false; L.flags.lostParent = who; },
+    t: (L) => (L.age < 18
+      ? (L.flags.lostParent === 'dad' ? `Babanı kaybettin. Çok erken; evdeki sessizlik uzun süre geçmedi.` : `Anneni kaybettin. Çok erken; kimse bunun için hazır değildi.`)
+      : (L.flags.lostParent === 'dad' ? `Babanı kaybettin. Çay bardağı hâlâ dolapta, aynı yerde.` : `Anneni kaybettin. Mutfaktan gelen sesleri artık hafızan çalıyor.`)), fx: { j: -12 } },
+  { id: 'cocuk-hastalik', st: '*', age: [18, 60], p: (L, c) => ((c.u5[0] + c.u5[1]) / 2000) * 3, if: (L) => L.kids.some((k) => !k.lost && L.age - k.born < 10), gap: 3, max: 3, ic: '🌡️',
+    src: { d: 'u5', how: '5 yaş altı ölüm hızı × 3 = ağır çocukluk hastalığı (atlatılan)', v: '×3 oranı varsayım' },
+    stat: (L, c) => `${c.n}: her 1000 çocuktan ${N((c.u5[0] + c.u5[1]) / 2, 0)}'i beş yaşını göremiyor (UN IGME).`, t: `{cocuk} ağır bir hastalık geçirdi. Uykusuz geceler uzun sürdü ama iyileşti.`, fx: { j: -4 } },
+  { id: 'kayinvalide', st: '*', age: [25, 60], p: 0.03, if: (L) => L.married, fl: true, ic: '🧳', t: `Kayınvalidenle bir haftalık tatile çıktınız. Herkes sağ salim döndü; bu bir başarı.`, fx: { j: 1 } },
+  { id: 'borc', st: '*', age: [22, 70], p: (L) => (L.st.w < 30 ? 0.04 : 0.005), gap: 4, max: 3, fl: true, ic: '🧾', t: `Faturaları hangi sırayla ödeyeceğine her ay yeniden karar veriyorsun.`, fx: { j: -2 } },
+  { id: 'piyango', st: '*', age: [18, 90], p: 0.003, fl: true, ic: '🎟️', t: `Piyangodan amorti çıktı. Bileti yıkanan pantolondan son anda kurtardın.`, fx: { j: 2 } },
+  { id: 'dolandirici', st: '*', age: [25, 90], p: 0.01, fl: true, ic: '☎️', t: `Telefonda kendini avukat olarak tanıtan biri "acil" para istedi.`,
+    ch: [
+      { l: 'Kapat, bankayla konuş', t: `Dolandırıcı olduğu anlaşıldı. Bir başkasını da uyardın.`, fx: { j: 1 } },
+      { l: 'Ne istediğini dinle', t: `Sorular arttıkça kandırmaca belli oldu; telefonu kapattın.`, fx: { j: -1 } },
+    ] },
+  { id: 'eksi-maya', st: '*', age: [28, 70], p: 0.015, fl: true, ic: '🍞', t: `Ekşi maya yapmaya başladın. Maya artık ailenin bir üyesi; tatilde ona bakıcı arıyorsunuz.`, fx: { j: 2 } },
+  { id: 'matkap-komsu', st: '*', age: [20, 90], p: 0.015, fl: true, ic: '🔨', t: `Yeni komşun kendini her pazar sabahı matkapla tanıtıyor.`, fx: { j: -1 } },
+  { id: 'veli-toplantisi', st: '*', age: [28, 55], p: 0.03, if: (L) => hasKids(L), fl: true, ic: '🧑‍🏫', t: `Veli toplantısında okul aile birliği başkanı seçildin. Kaçmak için çok geçti.`, fx: { j: -1 } },
+  { id: 'salgin', st: '*', age: [0, 100], p: 0.006, max: 2, gap: 15, fl: true, ic: '😷', t: `Bir salgın dalgası geldi. Aylarca evden az çıktın; ekmek yapmayı ve sabrı öğrendin.`, fx: { j: -3 } },
+  { id: 'yildonumu', st: '*', age: [25, 90], p: 0.04, if: (L) => L.married, fl: true, ic: '🌹', t: `Evlilik yıl dönümünüzü unuttun. Ertesi gün aldığın çiçekler durumu yarı yarıya kurtardı.`, fx: { j: -1 } },
+  { id: 'tasinma', st: '*', age: [20, 70], p: 0.02, fl: true, ic: '📦', t: `Yeni bir eve taşındın. Koliler üç yıldır "sonra açarız" bekliyor.`, fx: { j: 1 } },
+
+  // ======================= ORTA YAŞ (45–64) =======================
+  { id: 'torun', st: '*', age: [36, 105], p: (L, c) => Math.min(0.6, adultKids(L) * (c.tfr / 20)), max: 15, if: (L) => adultKids(L) > 0, ic: '🍼', hl: (L) => (L.grandkids === 0 ? 2 : 0),
+    src: { d: 'tfr', how: 'yetişkin çocuk başına yıllık doğum ≈ TFR / 20 yıl' },
+    stat: (L, c) => `${c.n}: kadın başına ${N(c.tfr, 2)} çocuk (UN WPP).`,
+    do: (L) => { L.grandkids++; }, t: (L) => (L.grandkids === 1 ? `İlk torunun doğdu! Artık bütün fotoğraflar telefonunda; herkese gösteriyorsun.` : `${L.grandkids}. torunun doğdu. İsimleri karıştırmaya başladın, kimse alınmıyor.`), fx: { j: 5 } },
+  { id: 'bos-yuva', st: 'orta', p: 0.3, if: (L) => hasKids(L) && L.kids.filter((k) => !k.lost).every((k) => L.age - k.born >= 20), fl: true, ic: '🪺', t: `Çocuklar evden ayrıldı. Ev hem huzurlu hem fazla sessiz.`, fx: { j: -2 } },
+  { id: 'orta-yas-krizi', st: 'orta', age: [42, 55], p: 0.04, fl: true, ic: '🏎️', t: `Aynada beyaz bir saç teli. İçinde bir şeyler kıpırdadı.`,
+    ch: [
+      { l: 'Maratona hazırlan', t: `İlk maratonunu bitirdin. Son beş kilometreyi hatırlamıyorsun ama madalya duvarda.`, fx: { j: 3 } },
+      { l: 'Gitar dersi al', t: `Üç akor öğrendin; bütün şarkıları bu üç akorla çalıyorsun.`, fx: { j: 3 } },
+      { l: 'Kırmızı bir spor araba bak', t: `Fiyatını gördün, galeriden sessizce çıktın.`, fx: { j: -1 } },
+    ] },
+  { id: 'is-kazasi', st: '*', age: [16, 64], p: (L, c) => (L.job && L.jobLevel === 0 ? (c.road / 1e5) * 20 * 0.5 : 0), ic: '🦺',
+    src: { d: 'road', how: 'el işlerinde yaralanma ölçeği olarak trafik yaralanma hızının yarısı', v: 'ülkeye özgü iş kazası verisi alınamadı; ölçek varsayım' },
+    stat: (L, c) => `ILO: dünyada her yıl ~395 milyon iş kazası yaralanması oluyor. ${c.n} için ölçek trafik yaralanma hızından türetildi.`,
+    t: `İş kazası geçirdin. Haftalarca çalışamadın; o haftaların parasını kimse ödemedi.`, fx: { h: -6, j: -3 } },
+  { id: 'telefon', st: '*', age: [10, 50], p: (L, c) => (c.net < 70 ? 0.06 : 0), fl: true, ic: '📱', t: `İlk cep telefonun oldu. İlk haftada oyun oynamaktan şarj aleti kadar ısındın.`, fx: { j: 2 } },
+  { id: 'yemek-tarifi', st: '*', age: [22, 70], p: 0.02, fl: true, ic: '🍲', t: `Annenin tarifini birebir uyguladın. Tadı "yakın" oldu; bir şeyi hep eksik söylemiş.`, fx: { j: 1 } },
+  { id: 'sokak-kedisi', st: '*', age: [40, 95], p: 0.02, fl: true, ic: '🐾', t: `Bir sokak kedisi seni sahiplendi. Ona "Paşa" dedin; o sana hiçbir şey demedi.`, fx: { j: 3 } },
+  { id: 'vatandaslik', st: '*', age: [20, 90], p: 0.15, if: (L) => L.migrations.length > 0 && L.iso !== L.born && L.age - L.migrations.at(-1).age >= 5, fl: true, ic: '🪪', t: `Yeni ülkenin vatandaşlık belgesini aldın. Törende marşı yarı ezbere söyledin.`, fx: { j: 3 } },
+  { id: 'dil-gaf', st: '*', age: [18, 70], p: 0.4, if: (L) => L.migrations.length > 0 && L.iso !== L.born && L.age - L.migrations.at(-1).age <= 2, fl: true, ic: '🥖', t: `Yeni dilde fırıncıdan ekmek yerine "sevgi" istedin. Fırıncı ikisinden de verdi.`, fx: { j: 2 } },
+  { id: 'yarim-asir', st: 'orta', age: [50, 50], p: 1, fl: true, ic: '🎉', t: `Elli yaşına girdin. Yarım asır! Pastadaki mumlar yangın alarmını çalıştırdı.`, fx: { j: 2 } },
+  { id: 'yakin-gozluk', st: 'orta', age: [45, 60], p: 0.1, fl: true, ic: '🔍', t: `Yakın gözlüğü kullanmaya başladın. Menüyü kolunun uzunluğu kadar uzaktan okuyorsun.`, fx: { j: -1 } },
+  { id: 'emeklilik', st: '*', age: [55, 80], p: (L, c) => (L.age >= retireAge(c) ? 0.8 : 0), if: (L) => !!L.job && !L.retired, gap: 3, max: 4, ic: '🌅', def: 0,
+    src: { d: 'gdp, LIT.replacement', how: 'yasal emeklilik yaşı gelire göre 60/62/65; emeklilikte gelir ikame oranı %60 (OECD)', v: 'ülkeye özgü emeklilik yaşı verisi yok; gelir eşiği varsayım' },
+    stat: () => `OECD ülkelerinde emeklilik geliri, çalışırken kazanılanın ortalama %50–60'ı (Pensions at a Glance 2023).`,
+    t: (L, c) => (c.gdp > 10000 ? `Emeklilik yaşın geldi. Veda pastası mı, birkaç yıl daha mı?` : `Bedenin yoruluyor. Çalışmayı bırakmayı düşünüyorsun ama emekli maaşı yok denecek kadar az.`),
+    ch: [
+      { l: 'Emekli oluyorum', t: `Emekli oldun! Ertesi sabah yine aynı saatte uyandın ve kalkmadın.`, hl: 1, fx: { j: 4 }, do: (L) => { L.retired = true; L.job = null; } },
+      { l: 'Birkaç yıl daha çalışırım', t: `İşe devam. Gençlere tecrübe, kendine amaç.`, fx: { j: 1 } },
+    ] },
+
+  // ======================= YAŞLILIK (65+) =======================
+  { id: 'es-vefat', st: '*', age: [16, 115], p: (L, c, W) => W.fn.qAt(L.iso, L.age + (L.partner.sex === L.sex ? 0 : L.sex === 'M' ? -3 : 3), L.partner.sex), if: (L) => L.married && L.partner?.alive, ic: '🕯️', hl: 3,
+    src: { d: 'le, dCom, dInj', how: 'eşin yaşı (±3, UN World Marriage Data) ve cinsiyetine göre kalibre hayat tablosundan yıllık ölüm olasılığı' },
+    stat: (L, c) => `${c.n}: doğumda beklenen ömür kadınlarda ${N(c.le[1])}, erkeklerde ${N(c.le[0])} yıl (UN WPP).`,
+    do: (L) => { L.flags.lostPartner = L.partner.name; L.partner = null; L.married = false; L.flags.widowed = true; }, t: (L) => `${L.flags.lostPartner} hayatını kaybetti. Yıllarca paylaştığınız sofrada bir sandalye artık hep boş.`, fx: { j: -18, h: -3 } },
+  { id: 'dusme', st: 'yasli', age: [70, 115], p: 0.01, max: 2, ic: '🦯',
+    src: { d: 'LIT', how: '70 yaş üstü kalça kırığı yılda ~%1', v: 'küresel yaklaşık oran (WHO yaşlılarda düşme raporu aralığı)' },
+    stat: () => `65 yaş üstündekilerin yaklaşık üçte biri her yıl düşüyor; kalça kırığı en ağır sonuç (WHO).`,
+    t: `Banyoda düştün, kalçan kırıldı. İyileşme uzun sürdü; artık bir bastonun var ve adı "Cemil".`, fx: { h: -8, j: -3 } },
+  { id: 'bahce', st: 'yasli', p: 0.08, fl: true, ic: '🍅', t: `Bahçeyle uğraşmaya başladın. Domateslerin isimleri var; en büyüğü "Başkan".`, fx: { j: 3 } },
+  { id: 'torun-bakimi', st: 'yasli', p: 0.12, if: (L) => L.grandkids > 0, max: 2, gap: 4, fl: true, ic: '🧸', t: `Torunlarına bakıyorsun. Masal stoğun tükendi; artık uyduruyorsun ve hepsi daha çok beğeniyor.`, fx: { j: 3 } },
+  { id: 'yalnizlik', st: 'yasli', p: 0.08, if: (L) => !L.partner, max: 3, gap: 5, fl: true, ic: '🪑', t: `Günler uzun geçiyor. Komşunun getirdiği çay iyi geliyor; sohbeti daha da iyi.`, fx: { j: -2 } },
+  { id: 'gec-ask', st: 'yasli', age: [65, 90], p: 0.03, if: (L) => !L.partner && L.flags.widowed, fl: true, ic: '♟️', do: (L, c, api) => { api.meet(); }, t: `Parkta tanıştığın {es} ile her gün satranç oynuyorsunuz. Kimin kazandığı önemli değil; sanırım bu bir aşk.`, fx: { j: 3 } },
+  { id: 'unutkanlik', st: 'yasli', age: [70, 115], p: 0.05, max: 3, gap: 4, fl: true, ic: '🔑', t: `Anahtarlarını buzdolabında buldun. Gözlüğün ise kafandaymış.`, fx: { j: -1 } },
+  { id: 'goruntulu-arama', st: 'yasli', p: (L, c) => (c.net / 100) * 0.1, if: (L) => L.grandkids > 0 || hasKids(L), fl: true, ic: '📞', t: `Torunun sana görüntülü aramayı öğretti. Artık herkesi alnından yakın çekimle arıyorsun.`, fx: { j: 3 } },
+  { id: 'aniler', st: 'yasli', p: 0.03, fl: true, ic: '✍️', t: `Anılarını yazmaya başladın. Üçüncü bölümde herkesin isimlerini değiştirmeye karar verdin.`, fx: { j: 3 } },
+  { id: 'yuz-yas', st: 'yasli', age: [100, 100], p: 1, fl: true, ic: '💯', hl: 3, t: `Yüz yaşına girdin! Pastaya mum sığmadı.`, fx: { j: 3 } },
+  { id: 'mahalle-bilgesi', st: 'yasli', p: 0.04, fl: true, ic: '🦉', t: `Mahallede herkes sana akıl danışmaya geliyor. Çoğu zaman "biraz bekle, geçer" diyorsun ve genelde haklı çıkıyorsun.`, fx: { j: 3 } },
+  { id: 'seksen', st: 'yasli', age: [80, 80], p: 1, fl: true, ic: '🎂', t: `Seksen yaşına girdin. Herkes uzun ömrün sırrını sordu; "inat" dedin.`, fx: { j: 2 } },
+  { id: 'huzurevi', st: 'yasli', age: [78, 115], p: (L, c) => (c.gdp > 20000 && !L.partner ? 0.05 : 0.004), max: 1, fl: true, ic: '🏡', t: `Bakımevine taşınmak gündemde.`,
+    ch: [
+      { l: 'Taşınayım, yalnız kalmayayım', t: `Bakımevinde tavla turnuvasının yenilmezi oldun.`, fx: { j: 2 } },
+      { l: 'Evimde kalırım', t: `Komşular ve akrabalar sırayla uğruyor. Evinin kokusu seninle.`, fx: { j: 2 } },
+    ] },
+  { id: 'emekli-gezisi', st: 'yasli', age: [62, 80], p: (L) => (L.retired ? 0.06 : 0), max: 1, fl: true, ic: '🚌', t: `Emekliler derneğiyle bir geziye çıktın. Otobüste en çok sen şarkı söyledin.`, fx: { j: 3 } },
+  { id: 'dijital', st: 'yasli', p: (L, c) => (c.net / 100) * 0.04, fl: true, ic: '💬', t: `Aile mesaj grubuna her sabah "günaydın" çiçekleri göndermeye başladın. Kimse itiraz edemiyor.`, fx: { j: 2 } },
+  { id: 'eski-dost', st: '*', age: [45, 90], p: 0.02, if: (L) => !!L.flags.friend, max: 1, fl: true, ic: '☕', t: `Yıllar sonra çocukluk arkadaşın {arkadas} ile karşılaştınız. Sanki hiç ara vermemişsiniz gibi konuştunuz.`, fx: { j: 3 } },
+  { id: 'gunluk-yuruyus', st: '*', age: [55, 95], p: 0.03, max: 1, fl: true, ic: '🚶', t: `Her sabah yürüyüşe çıkmaya başladın. Simitçi saatini sana göre ayarlıyor.`, fx: { j: 2 } },
+  { id: 'kus-gozlem', st: 'yasli', p: 0.02, fl: true, ic: '🐦', t: `Balkonda kuş gözlemine başladın. Güvercinlerin hepsine isim verdin, hepsi "Hüsnü".`, fx: { j: 2 } },
+];
+
+// Evre aralığı verilmemiş olaylara evrenin yaşlarını ver; kimlik tekilliğini doğrula.
+const seen = new Set();
+for (const ev of EVENTS) {
+  if (seen.has(ev.id)) throw new Error(`Yinelenen olay kimliği: ${ev.id}`);
+  seen.add(ev.id);
+  if (!ev.age) ev.age = STAGES.find((s) => s.id === ev.st).age;
+}

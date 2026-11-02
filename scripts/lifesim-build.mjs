@@ -1,6 +1,8 @@
 // 🎲 Doğum Piyangosu — çevrimdışı veri derleme adımı.
 // Açık veri setlerini indirir ve public/data/lifesim.json dosyasını yazar (oyun çalışırken internete çıkmaz).
 //   node scripts/lifesim-build.mjs
+// Not: Bazı alanlarda (sıtma, çocuk işçiliği, bodurluk, çocuk evliliği) yüksek gelirli/endemik olmayan ülkeler ölçülmez;
+// bunlar bölge ortalaması yerine 0 / küçük sabit alır (aşağıda).
 // Kaynaklar (hepsi atıf ister; oyundaki "Kaynaklar" ekranında listelenir):
 //   - World Bank, World Development Indicators (CC BY 4.0) — api.worldbank.org
 //     (WDI'nin kendisi UN WPP, UN IGME, WHO, UNESCO UIS, UNODC, ITU gibi kaynaklardan derlenir)
@@ -33,12 +35,49 @@ const WDI = {
   hom: 'VC.IHR.PSRC.P5', // kasten öldürme (100 binde)
   road: 'SH.STA.TRAF.P5', // trafik ölümü (100 binde)
   net: 'IT.NET.USER.ZS', // internet kullanan (%)
+  // --- olay olasılıkları için (her olayın "src" alanı bunlardan birine dayanır) ---
+  unem: 'SL.UEM.TOTL.ZS', // işsizlik oranı (ILO modellenmiş, %)
+  lfpM: 'SL.TLF.CACT.MA.ZS', // işgücüne katılım, erkek (ILO, %)
+  lfpF: 'SL.TLF.CACT.FE.ZS', // işgücüne katılım, kadın (ILO, %)
+  smkM: 'SH.PRV.SMOK.MA', // tütün kullanımı, erkek (WHO, %)
+  smkF: 'SH.PRV.SMOK.FE', // tütün kullanımı, kadın (WHO, %)
+  m18: 'SP.M18.2024.FE.ZS', // 18'inden önce evlenen kadınlar (20–24 yaş, UNICEF, %)
+  smamM: 'SP.DYN.SMAM.MA', // ilk evlilik ortalama yaşı, erkek (UN)
+  smamF: 'SP.DYN.SMAM.FE', // ilk evlilik ortalama yaşı, kadın (UN)
+  ado: 'SP.ADO.TFRT', // ergen doğurganlığı (15–19 yaş, binde)
+  oos: 'SE.PRM.UNER.ZS', // ilkokul çağında okul dışı çocuk (%)
+  cmpP: 'SE.PRM.CMPT.ZS', // ilkokul tamamlama (brüt, %)
+  cmpL: 'SE.SEC.CMPT.LO.ZS', // ortaokul tamamlama (brüt, %)
+  upE: 'SE.SEC.ENRR.UP', // lise brüt okullaşma (%)
+  baA: 'SE.TER.CUAT.BA.ZS', // en az lisans mezunu (25+, %)
+  msA: 'SE.TER.CUAT.MS.ZS', // en az yüksek lisans mezunu (25+, %)
+  stunt: 'SH.STA.STNT.ZS', // 5 yaş altı bodurluk (%)
+  diab: 'SH.STA.DIAB.ZS', // diyabet yaygınlığı (20–79, %)
+  mal: 'SH.MLR.INCD.P3', // sıtma insidansı (risk altındaki binde)
+  tb: 'SH.TBS.INCD', // tüberküloz insidansı (100 binde)
+  dpt: 'SH.IMM.IDPT', // DTP3 aşılama (12–23 ay, %)
+  meas: 'SH.IMM.MEAS', // kızamık aşılama (12–23 ay, %)
+  elecR: 'EG.ELC.ACCS.RU.ZS', // kırsalda elektriğe erişim (%)
+  waterR: 'SH.H2O.BASW.RU.ZS', // kırsalda temel içme suyu (%)
+  suiM: 'SH.STA.SUIC.MA.P5', // intihar, erkek (100 binde)
+  suiF: 'SH.STA.SUIC.FE.P5', // intihar, kadın (100 binde)
+  // Ölüm nedeni payları: 2019 (COVID-19 öncesi; 2021 değerleri salgın ölümleriyle şişkin)
+  dCom: 'SH.DTH.COMM.ZS@2019', // ölüm nedeni: bulaşıcı, anne, perinatal, beslenme (% tüm ölümler, WHO GHE)
+  dNcd: 'SH.DTH.NCOM.ZS@2019', // ölüm nedeni: bulaşıcı olmayan hastalıklar (%)
+  dInj: 'SH.DTH.INJR.ZS@2019', // ölüm nedeni: yaralanmalar (%)
+  grow: 'SP.POP.GROW', // nüfus artış hızı (%) → ölüm nedeni paylarını yaş yapısıyla tartmak için (durağan nüfus yaklaşımı)
+  disas: 'EN.CLC.MDAT.ZS', // kuraklık/sel/aşırı sıcaktan etkilenen nüfus (yıllık ort. 1990–2009, %)
+  clab: 'SL.TLF.0714.ZS', // çalışan çocuklar (7–14 yaş, %)
+  netm: 'SM.POP.NETM', // net göç (kişi/yıl)
+  imm: 'SM.POP.TOTL.ZS', // uluslararası göçmen stoku (nüfusun %)
 };
 
 // alan → OWID grapher CSV (son yıl alınır; çatışma için son 3 yılın ortalaması)
 const OWID = {
   mys: { slug: 'mean-years-of-schooling-long-run', col: 'mf_youth_and_adults__15_64_years__average_years_of_education' },
   sat: { slug: 'happiness-cantril-ladder', col: 'cantril_ladder_score' },
+  emi: { slug: 'migrant-populations', q: '&metric=emigrants&unit=share', col: 'emigrants_share_of_total_population' }, // yurt dışında yaşayan doğumlular (UN DESA, %)
+  div: { slug: 'divorces-per-1000-people', col: 'value__gender_both__indicator_divorce_rate' }, // kaba boşanma hızı (binde)
   war: { slug: 'deaths-in-armed-conflicts-by-country', col: 'number_deaths_ongoing_conflicts__conflict_type_all', avgYears: 3, beforeYear: new Date().getFullYear() },
 };
 
@@ -97,15 +136,16 @@ function parseCsv(text) {
   return rows;
 }
 
-async function wdi(code) {
-  const j = await getJson(`${WB}/country/all/indicator/${code}?format=json&per_page=400&mrnev=1`);
+async function wdi(spec) {
+  const [code, date] = spec.split('@');
+  const j = await getJson(`${WB}/country/all/indicator/${code}?format=json&per_page=400&${date ? `date=${date}` : 'mrnev=1'}`);
   const out = {};
   for (const r of j[1] ?? []) if (r.value != null && r.countryiso3code) out[r.countryiso3code] = { v: r.value, y: Number(r.date) };
   return out;
 }
 
-async function owid({ slug, col, avgYears = 1, beforeYear = Infinity }) {
-  const rows = parseCsv(await getText(`https://ourworldindata.org/grapher/${slug}.csv?v=1&csvType=full&useColumnShortNames=true`));
+async function owid({ slug, col, q = '', avgYears = 1, beforeYear = Infinity }) {
+  const rows = parseCsv(await getText(`https://ourworldindata.org/grapher/${slug}.csv?v=1&csvType=full&useColumnShortNames=true${q}`));
   const head = rows[0];
   const ci = head.indexOf('code');
   const yi = head.indexOf('year');
@@ -157,12 +197,19 @@ async function main() {
     c.pop = Math.round(pop);
     c.le = [round(raw.leM[iso].v), round(raw.leF[iso].v)];
     c._v = {};
-    for (const key of ['imrM', 'imrF', 'u5M', 'u5F', 'gdp', 'gini', 'eys', 'ter', 'urb', 'tfr', 'mmr', 'hom', 'road', 'net', 'mys', 'sat', 'war']) {
+    for (const key of Object.keys({ ...WDI, ...OWID }).filter((k) => !['pop', 'cbr', 'leM', 'leF'].includes(k))) {
       const v = raw[key][iso]?.v;
       c._v[key] = v == null || Number.isNaN(v) ? null : v;
     }
     // Çatışma ölümleri: sayı → 100 binde; kaynakta olmayan ülke = 0 (UCDP kaydı yok), tahmin sayılmaz
     c._v.war = ((c._v.war ?? 0) / pop) * 1e5;
+    // Sıtma: kaynakta olmayan ülke endemik değil → 0 (tahmin sayılmaz)
+    if (c._v.mal == null) c._v.mal = 0;
+    // Net göç: kişi → binde oran
+    if (c._v.netm != null) c._v.netm = (c._v.netm / pop) * 1000;
+    // Çocuk işçiliği: yüksek gelirli ülkelerde ölçülmez → 0
+    if (c._v.clab == null && (c._v.gdp ?? 0) > 25000) c._v.clab = 0;
+    if (c._v.stunt == null && (c._v.gdp ?? 0) > 25000) c._v.stunt = 3; // yüksek gelirli ülkeler: WHO referans dağılımı ~%2–3
     countries.push(c);
   }
 
@@ -180,16 +227,19 @@ async function main() {
   }
   for (const c of countries) {
     const est = [];
-    for (const f of fields) if (c._v[f] == null) { c._v[f] = regionAvg[c.r][f]; est.push(f); }
+    for (const f of fields) if (c._v[f] == null) {
+      // Çocuk evliliği yüksek gelirli ülkelerde neredeyse yok ve UNICEF ölçmüyor: bölge ortalaması yerine %1 (tahmini)
+      c._v[f] = f === 'm18' && c._v.gdp > 25000 ? 1 : regionAvg[c.r][f];
+      est.push(f);
+    }
     // Cinsiyete göre bebek ölümü yoksa (nadiren) toplam yerine bölge ortalaması zaten girdi
     const v = c._v;
     c.imr = [round(v.imrM), round(v.imrF)];
     c.u5 = [round(v.u5M), round(v.u5F)];
-    Object.assign(c, {
-      gdp: Math.round(v.gdp), gini: round(v.gini), mys: round(v.mys), eys: round(v.eys), ter: round(v.ter),
-      urb: round(v.urb), tfr: round(v.tfr, 2), mmr: Math.round(v.mmr), hom: round(v.hom), road: round(v.road),
-      net: round(v.net), sat: round(v.sat, 2), war: round(v.war, 2),
-    });
+    for (const [k, x] of Object.entries(v)) {
+      if (/^(imr|u5)[MF]$/.test(k)) continue;
+      c[k] = k === 'gdp' || k === 'mmr' ? Math.round(x) : k === 'tfr' || k === 'sat' || k === 'war' || k === 'netm' || k === 'div' ? round(x, 2) : round(x);
+    }
     const estKeys = new Set(est.map((f) => f.replace(/[MF]$/, '')));
     if (estKeys.size) c.est = [...estKeys];
     delete c._v;
@@ -204,6 +254,7 @@ async function main() {
     v: 1,
     built: new Date().toISOString().slice(0, 10),
     regions: REGIONS,
+    codes: { ...WDI, ...Object.fromEntries(Object.entries(OWID).map(([k, o]) => [k, `OWID:${o.slug}`])) },
     years: Object.fromEntries(Object.keys({ ...WDI, ...OWID }).map((k) => [k, years(k)])),
     countries,
   };
