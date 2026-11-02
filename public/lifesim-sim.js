@@ -314,15 +314,32 @@ export function qAt(world, iso, age, sex) {
 }
 
 // Bulaşıcı olmayan hastalık riski: kişisel çarpan, nüfus ortalaması 1 olacak şekilde normalize
-export function ncdRR(L, c, x) {
+// Normalizasyon hayatta kalanlara göre yapılır: sigara içenler daha erken öldüğü için yaşlı yaşlarda payları düşer.
+// p_x = p·e^{−(RR−1)·Hn(x)} / (p·e^{−(RR−1)·Hn(x)} + 1 − p), Hn = 30 yaştan itibaren birikimli NCD tehlikesi.
+function riskNorm(t, c, sex, x) {
+  const key = `${sex}:${x}`;
+  t.norm ??= new Map();
+  let z = t.norm.get(key);
+  if (z) return z;
+  let Hn = 0;
+  for (let a = 30; a < x; a++) Hn += senRaw(t, a) * (1 - t.phi);
+  const p = (sex === 'M' ? c.smkM : c.smkF) / 100;
+  const RR = LIT.smokeRR.v;
+  const ps = (p * Math.exp(-(RR - 1) * Hn)) / (p * Math.exp(-(RR - 1) * Hn) + 1 - p);
+  const d0 = (c.diab / 100) * clamp((x - 35) / 40, 0, 1);
+  const DR = LIT.diabRR.v;
+  const pd = (d0 * Math.exp(-(DR - 1) * Hn * 0.5)) / (d0 * Math.exp(-(DR - 1) * Hn * 0.5) + 1 - d0);
+  z = { s: 1 + ps * (RR - 1), d: 1 + pd * (DR - 1) };
+  t.norm.set(key, z);
+  return z;
+}
+
+export function ncdRR(world, L, c, x) {
   let rr = L.mod.ncd;
-  if (x >= 30) {
-    const p = (L.sex === 'M' ? c.smkM : c.smkF) / 100;
-    const RR = LIT.smokeRR.v;
-    rr *= (L.smoker ? (L.flags.quit ? LIT.quitRR.v : RR) : 1) / (1 + p * (RR - 1));
-  }
-  const f = (c.diab / 100) * clamp((x - 35) / 40, 0, 1);
-  rr *= (L.diabetic ? LIT.diabRR.v : 1) / (1 + f * (LIT.diabRR.v - 1));
+  const t = lifeTable(world, L.iso, L.sex);
+  const z = riskNorm(t, c, L.sex, Math.min(x, MAX_AGE));
+  if (x >= 30) rr *= (L.smoker ? (L.flags.quit ? LIT.quitRR.v : LIT.smokeRR.v) : 1) / z.s;
+  rr *= (L.diabetic ? LIT.diabRR.v : 1) / z.d;
   return rr;
 }
 
@@ -331,7 +348,7 @@ const senRaw = (t, x) => (t.B / t.gamma) * (Math.exp(t.gamma * (x + 1)) - Math.e
 export const ncdHazard = (world, L, x) => {
   const t = lifeTable(world, L.iso, L.sex);
   const c = world.byIso.get(L.iso);
-  return senRaw(t, x) * (1 - t.phi) * ncdRR(L, c, x);
+  return senRaw(t, x) * (1 - t.phi) * ncdRR(world, L, c, x);
 };
 
 export const cancerSurvival = (c) => clamp(0.35 + 0.3 * (Math.log(c.gdp) - Math.log(2000)) / (Math.log(50000) - Math.log(2000)), 0.35, 0.65);
@@ -605,7 +622,7 @@ function derive(world, L) {
   if (L.retired) z += Math.log(LIT.replacement.v) / c.sigma;
   L.st.w = clamp(100 * phi(z), 0.5, 99.5);
   // Sağlık: yaş/ülke beklentisi − kişisel risk + geçici hastalık izleri
-  const rr = a >= 5 ? ncdRR(L, c, Math.max(a, 30)) : 1;
+  const rr = a >= 5 ? ncdRR(world, L, c, Math.max(a, 30)) : 1;
   const fatalPull = L.fatal ? 25 : 0;
   L.st.h = clamp(healthTarget(c, a) - 15 * Math.log(rr) + L.tr.h - fatalPull, 1, 100);
   // Bilgi: okul yılı + yaşla biriken deneyim
