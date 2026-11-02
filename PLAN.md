@@ -633,3 +633,47 @@ Her biri başlamadan önce bu bölüm, aynı ayrıntıda kural + kabul kriteriyl
 - Her oyun için en az: tam bir oyun akışı (botlarla), rol/gizli bilgi sızıntı testi, yeniden bağlanma testi,
   geçersiz eylem testi (yanlış faz, yanlış oyuncu, tekrar oy), eş zamanlı eylem testi.
 - Hata raporu formatı: **adımlar → beklenen → gerçekleşen → kanıt (log/ekran görüntüsü yolu) → önem (kritik/yüksek/orta/düşük)**.
+
+### 4.10 🎲 Doğum Piyangosu (tek oyunculu, istatistiksel hayat simülasyonu) — 2026-11-02
+
+"Dünyada şu an doğan bir bebek olsaydın, kim olurdun?" Tamamen istemci tarafında (sunucu kodu yok; server.js'e sadece `.json` MIME eklendi).
+Kendi tasarımımız: metinler, stat seti, olay kütüphanesi ve arayüz bize ait.
+
+**Veri** (`scripts/lifesim-build.mjs` → `public/data/lifesim.json`, ~135 KB, 195 ülke, `codes` alanında her alanın kaynağı):
+Dünya Bankası WDI (CC BY 4.0; içinde UN WPP, UN IGME, WHO, UNESCO UIS, ILO, UNICEF, UNODC, IDF, ITU serileri) + Our World in Data
+(CC BY 4.0: Lee & Lee eğitim yılı, Cantril, UN DESA göçmen stoku/yurt dışındaki doğumlular, UCDP çatışma ölümleri, boşanma hızı).
+Ölüm nedeni payları WHO GHE **2019** (2021 değerleri COVID ile şişkin). Eksikler Dünya Bankası bölge ortalaması → ülkenin `est` listesi
+("tahmini"). Ölçülmeyen ama anlamı belli olanlar: sıtma yoksa 0, yüksek gelirli ülkelerde çocuk işçiliği 0, çocuk evliliği %1, bodurluk %3.
+
+**İlke**: her olasılık ya bir veriden (`src: { d, how, v? }`) ya da `LIT` tablosundaki yayımlanmış bir ortalamadan gelir; doğrudan dayanağı
+olmayan küçük etkiler `v` / `varsayim` ile işaretli ve Kaynaklar ekranında görünür. Renk olayları (`fl: true`) sonuçları değiştirmez (sadece Keyif ±3).
+Seçimler olasılığı değiştirir: ya `def` (verideki "olağan" seçenek, RR 1) vardır, ya da seçeneklerin ortalaması veriye eşittir.
+
+**Ölüm modeli** (`lifeTable`): 0 yaş = bebek ölüm hızı, 1–4 = 5 yaş altından kalan (85/10/5 bulaşıcı/doğumsal/yaralanma), 5+ Gompertz–Makeham:
+genç-yetişkin bulaşıcı tabanı C (çocuk ölümüyle ölçekli), yaşlılık tehlikesinin φ kadarı bulaşıcı (zatürre vb.), trafik/cinayet/çatışma/intihar
+verisi + diğer kaza Io, kalan B·e^{γx} bulaşıcı olmayan. γ = 0,11 + 0,0012·(LE−70). (k→C,φ), Io ve B birlikte çözülür: doğumda beklenen
+yaşam tam, WHO neden payları durağan nüfus ağırlığıyla (e^{−r·x}, r = nüfus artışı) 390 tablonun ~%93'ünde ±2 puan (Körfez, Ukrayna,
+Baltık, Rusya, Suriye gibi yaş yapısı/çatışma nedeniyle tutmayanlar var). Çatışma ölüm hızı 15 yılda söner (varsayım).
+Kişisel risk (sigara RR 2, bırakınca 1,3; diyabet 1,8; kalp rehabilitasyonu kalp-damar ×0,74) **hayatta kalanlardaki** yaygınlığa göre
+normalize: ortalama ömür değişmez. Kanser ayrı yol: teşhis = %23 × NCD tehlikesi ÷ (1 − 5 yıllık sağkalım), ölümcül olanlar 0–2 yıl içinde.
+Ölüm nedeni, o yılın tehlike bileşenlerinden çekilir; NCD alt nedenleri WHO payları (kalp %44, solunum %10, diyabet %5, diğer %18).
+
+**Hayat akışı**: gizli değişkenler doğumda çekilir (eğitim yüzdeliği ebeveyn varlığıyla 0,42 korelasyonlu → okul dışı / ilkokul / ortaokul /
+lise / üniversite / yüksek lisans oranlarına eşlenir; ilk evlilik yaşı N(SMAM, 4) + çocuk evliliği payı; işgücüne katılım; sigara eşiği).
+Doğurganlık: κ·ASFR (15–19 ergen doğurganlığı, 20–44 TFR × model şekli), κ evli kadın başına beklenen doğumu TFR yapar. Göç: UN DESA yurt dışı
+payı → yıllık olasılık; hedef ülke göçmen stokuna göre; gelir yeni ülkenin dağılımına %25 göçmen farkıyla yerleşir. Gelir (Varlık):
+0,5·ebeveyn + %9/okul yılı (varyans 1'de tutulur), işsizlik, emeklilik (%60 ikame), kriz/afet geçici şokları.
+Statlar gösterimdir (sonuç belirlemez): Sağlık = yaş/ülke beklentisi − 15·ln(kişisel risk) + geçici hastalık izleri; Bilgi okul yılından;
+Keyif Cantril + varlık + yakınlar.
+
+**İstemci** (`public/games/lifesim.js`, `public/games/lifesim.css`, saf çekirdek `public/lifesim-sim.js` + `public/lifesim-events.js`):
+giriş → doğum kartı (bayrak, gerçek doğum payı, beklenen ömür, 📊) → ad (🎲 bölgeye göre rastgele) → yıl yıl akış (2,5 sn/yıl, 1×/2×/4×,
+⏸, ⏭ sonraki olay; sekme gizlenince durur) → seçim kartı (saati durdurur) → Hayat Karnesi (ömür/ülke/Türkiye karşılaştırması,
+"dünyanın en zengin %X'i", önemli anlar, kitabe, 📊 veriler, 1080×1350 PNG paylaşım kartı) → geçmiş (son 20 hayat, localStorage
+`tss:lifesim-history`, try/catch). Bayraklar için Google Fonts Noto Color Emoji (Windows'ta bayrak emojisi yok). prefers-reduced-motion:
+animasyon yok. Test kancası: `localStorage['tss:lifesim-seed']` sabit tohum.
+
+**Kabul**: `tests/unit/lifesim.test.mjs` (12): veri bütünlüğü, 20 bin doğumda ki-kare + 105:100, 390 hayat tablosu, TUR/NGA/JPN/IND'de
+ortalama ömür ±2 yıl ve ölüm nedeni payları ±3 puan, üniversite ±5 puan, kadın ilk evlilik yaşı ±1,5, kadın başına çocuk ±%15,
+göç ±1,5 puan, sigara ±3 puan; determinizm; NaN yok; yaş aralığı dışı olay yok; ≥120 olay, kaynak/renk kuralları; Türkçe ekler.
+`tests/e2e/lifesim.test.mjs` (2): 360×800 telefon, doğ → seçim → 4× + ⏭ → karne → PNG indirme → geçmiş; kaynaklar ve 📊.

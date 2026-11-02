@@ -175,3 +175,16 @@ Açık küçük notlar:
 - Testler: tests/unit/vampir-bots.test.mjs (sanal saatle 40 tam bot oyunu), tests/swarm/vampir-bots.test.mjs (7),
   tests/e2e/vampir-bots.test.mjs (tek telefon + 4 bot, bir gece; ekranlar test-results/vampir-bots/).
 - Kullanıcı denemeli: tek telefon + 4–11 bot; gündüzü hızlandırmak için "🌙 Geceye geç". Botlar konuşmaz, oyları rastgele.
+
+## 🎲 Doğum Piyangosu — game/lifesim dalında (main'e BİRLEŞTİRİLMEDİ, 2026-11-02)
+
+- Tek oyunculu "dünyada bir yerde doğ, gerçek istatistiklerle yaşa" simülasyonu. Tamamen istemci tarafı. Kurallar/model PLAN.md §4.10.
+- Kullanıcı şartı: her olasılık gerçek veriden (olayların `src` alanı) ya da yayımlanmış araştırmadan (`LIT`); dayanaksız küçük etkiler
+  "varsayım" işaretli; renk olayları sonuç değiştirmez. 142 olay (56 veriye dayalı, 86 renk; 26 seçimli).
+- Veri: `node scripts/lifesim-build.mjs` → `public/data/lifesim.json` (195 ülke, ~135 KB; `.gitignore`'a `!public/data/` eklendi).
+- Dosyalar: public/lifesim-sim.js, public/lifesim-events.js, public/games/lifesim.js, public/games/lifesim.css, scripts/lifesim-build.mjs;
+  ortak dosyalarda küçük eklemeler: public/games.js (kayıt), public/index.html (`#game-lifesim`), server.js (`.json` MIME).
+- Testler: tests/unit/lifesim.test.mjs (12), tests/e2e/lifesim.test.mjs (2; ekranlar test-results/lifesim/).
+- Kullanıcı denemeli: hız (2,5 sn/yıl) ve seçim sıklığı, ağır olayların tonu, telefonda bayrak yazı tipi yüklemesi, paylaşım kartı (iOS share).
+- Açık: boşanma verisi sadece 45 ülkede (gerisi bölge ortalaması); emeklilik yaşı ve kanser sağkalımı gelir eşiğinden (varsayım);
+  ülkeler arası göç hedefi göçmen stokuna göre (ikili göç koridoru verisi yok); Tayvan veride yok (Dünya Bankası kapsamı).
