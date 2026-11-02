@@ -7,6 +7,8 @@
 //
 // Three.js public/vendor/three/ altında (r187, MIT); sadece 3D açıkken ve WebGL2 varken tembel yüklenir.
 
+import { deathStyle, DAWN_REVEAL, VERDICT_REVEAL } from './vampir-flow.js';
+
 const THREE_URL = '../vendor/three/three.module.min.js';
 const LS_KEY = 'tss:vampir-3d';
 const FPS = 30;
@@ -48,24 +50,36 @@ export function lookOf(id) {
 }
 
 // ui.cardOpen: rol kartı açık mı. Kart kapalıyken rol türevli hiçbir alan doldurulmaz.
+// narr: sunucunun herkese aynı anlatımı (view.narration) + ölüm animasyonu türü (oyun+gece tohumundan).
 export function describe(view, ui = {}) {
   const phase = view.phase;
   const night = phase === 'night';
+  const dark = night || phase === 'dusk'; // akşam anlatımında güneş batar, köy uyur
   const me = view.me;
   const open = !!(ui.cardOpen && me && me.alive && night);
   const chosen = open ? me.nightPick ?? null : null;
   const allyTargets = open ? Object.values(me.allyPicks ?? {}) : [];
   const nominee = phase === 'day' ? view.nomination?.targetId ?? null : null;
-  const accused = phase === 'trial' || phase === 'trialVote' ? view.trial?.targetId ?? null : null;
+  const n = view.narration ?? null;
+  const accused = phase === 'trial' || phase === 'trialVote' ? view.trial?.targetId ?? null
+    : phase === 'verdict' ? n?.trial?.targetId ?? null : null;
   return {
     phase,
-    sky: night ? 'night' : 'day',
+    sky: dark ? 'night' : 'day',
     spotlight: accused,
+    narr: n && {
+      kind: n.kind,
+      deadId: n.deadId ?? null,
+      trial: n.trial ?? null,
+      startedAt: n.startedAt,
+      endsAt: n.endsAt ?? null,
+      style: n.kind === 'dawn' && n.deadId ? deathStyle(view.gameKey, n.night) : null,
+    },
     chars: view.players.map((p) => ({
       id: p.id,
       name: p.name,
       alive: !!p.alive,
-      sleeping: night && !!p.alive,
+      sleeping: dark && !!p.alive,
       ring: chosen === p.id,
       allies: allyTargets.filter((t) => t === p.id).length,
       nominee: nominee === p.id,
@@ -149,7 +163,8 @@ export function createStage({ onTap } = {}) {
       if (disposed) return;
       const desc = describe(view, ui);
       const meIndex = view.players.findIndex((p) => p.id === ctx.playerId && view.me);
-      last = { desc, meIndex };
+      // serverOffset: animasyonlar sunucu saatine göre (her telefonda aynı an); tarife (data-state) girmez.
+      last = { desc, meIndex, serverOffset: ctx.serverOffset ?? 0 };
       // Test/hata ayıklama için: kamera dışındaki her şey. Kart kapalıyken herkeste aynı olmalı.
       el.dataset.phase = desc.phase;
       el.dataset.sky = desc.sky;
@@ -500,6 +515,81 @@ function buildWorld(T, host, { onTap, onLost, onDetached }) {
     };
   }
 
+  // --- Aşama 2: ölüm / sürgün efektleri ---
+  // Zaman saniye; t=0 anlatıcının açıklama satırı (sunucu saati, her telefonda aynı an). tombAt: mezar taşı "pop",
+  // ghostAt: hayalet çıkar, end: animasyon biter (sonrası Aşama 1'deki hayalet + mezar taşı). Azaltılmış harekette
+  // animasyon yok: açıklama anında doğrudan hayalet.
+  const FX = reduce
+    ? { bats: { end: 0, ghostAt: 0, tombAt: 0 }, tomb: { end: 0, ghostAt: 0, tombAt: 0 }, coffin: { end: 0, ghostAt: 0, tombAt: 0 },
+      catapult: { end: 0, ghostAt: 0, tombAt: 0 }, relief: { end: 0 } }
+    : { bats: { end: 3.4, ghostAt: 2.5, tombAt: 2.3 }, tomb: { end: 3.0, ghostAt: 2.1, tombAt: 1.4 },
+      coffin: { end: 3.6, ghostAt: 2.9, tombAt: 2.6 }, catapult: { end: 4.4, ghostAt: 3.7, tombAt: 3.6 }, relief: { end: 2.2 } };
+  const fxRoot = new T.Group();
+  scene.add(fxRoot);
+  const fxObjs = []; // her karede önce hepsi gizlenir, oynayan efekt açar
+  const fxAdd = (o, parent = fxRoot) => { o.visible = false; parent.add(o); fxObjs.push(o); return o; };
+  const batSprites = Array.from({ length: 7 }, () => fxAdd(sprite(emojiTex('🦇'), 0.7, 0.35)));
+  const dustMat = basic({ color: '#d9ccb2', transparent: true, opacity: 0, depthWrite: false });
+  const dustGeo = new T.IcosahedronGeometry(0.14, 0);
+  const dust = Array.from({ length: 9 }, () => fxAdd(mesh(dustGeo, dustMat)));
+  const twinkle = fxAdd(sprite(emojiTex('✨'), 1.4, 0.7));
+  const sigh = fxAdd(sprite(emojiTex('😮‍💨'), 1.0, 0.5));
+  const wood = lam('#8a5a34');
+  const darkWood = lam('#5a3620');
+  // Tabut: içi boş kutu + menteşeli kapak (karakter içinde görünsün)
+  const coffin = fxAdd(new T.Group());
+  const box = (w, h, d, mat, x, y, z) => mesh(new T.BoxGeometry(w, h, d), mat, x, y, z);
+  coffin.add(box(0.86, 1.95, 0.06, darkWood, 0, 0.98, -0.26), box(0.06, 1.95, 0.56, darkWood, -0.43, 0.98, 0),
+    box(0.06, 1.95, 0.56, darkWood, 0.43, 0.98, 0), box(0.86, 0.06, 0.56, darkWood, 0, 1.95, 0), box(0.86, 0.06, 0.56, darkWood, 0, 0.03, 0));
+  const lid = new T.Group();
+  lid.position.set(-0.43, 0, 0.28);
+  lid.add(box(0.86, 1.95, 0.06, wood, 0.43, 0.98, 0), box(0.08, 0.7, 0.03, lam('#e6c35c'), 0.43, 1.25, 0.04),
+    box(0.4, 0.08, 0.03, lam('#e6c35c'), 0.43, 1.38, 0.04));
+  coffin.add(lid);
+  // Mancınık: kaide + tekerlek + kol (pivot) + kova. Kol +z yönünde; rotation.x eksiye dönünce kova yukarı-geriye savrulur.
+  const catapult = fxAdd(new T.Group());
+  catapult.add(box(0.9, 0.18, 1.2, wood, 0, 0.3, 0));
+  const wheelGeo = new T.CylinderGeometry(0.22, 0.22, 0.1, 10).rotateZ(Math.PI / 2);
+  for (const [x, z] of [[-0.5, -0.4], [0.5, -0.4], [-0.5, 0.4], [0.5, 0.4]]) catapult.add(mesh(wheelGeo, darkWood, x, 0.22, z));
+  catapult.add(box(0.1, 0.7, 0.1, darkWood, -0.3, 0.65, 0), box(0.1, 0.7, 0.1, darkWood, 0.3, 0.65, 0), box(0.7, 0.1, 0.1, darkWood, 0, 0.95, 0));
+  const arm = new T.Group();
+  arm.position.set(0, 0.85, 0);
+  const ARM_L = 1.2;
+  arm.add(box(0.12, 0.12, ARM_L, wood, 0, 0, ARM_L / 2), mesh(new T.CylinderGeometry(0.3, 0.2, 0.22, 10), darkWood, 0, 0.12, ARM_L));
+  catapult.add(arm);
+  const CAT_Z = -1.1; // mancınık sanığın arkasında (kök yerel ekseninde)
+  const bucketAt = (a, out) => out.set(0, 0.85 - ARM_L * Math.sin(a) + 0.2, CAT_Z + ARM_L * Math.cos(a));
+  const PROPS = ['🔥', '🔱'];
+  const PALE = C('#e9edf6');
+  const easeOutBack = (x) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * (x - 1) ** 3 + c1 * (x - 1) ** 2; };
+  const clamp01 = (x) => Math.min(1, Math.max(0, x));
+  let serverOffset = 0;
+  const serverNow = () => Date.now() + serverOffset;
+
+  // Bu karakter için oynayan efekt (sadece herkese açık anlatımdan): { type, t, cfg } | null
+  function fxFor(id) {
+    const n = desc?.narr;
+    if (!n || !n.endsAt) return null;
+    let type = null;
+    let reveal = 0;
+    if (n.kind === 'dawn' && n.deadId === id) { type = n.style || 'tomb'; reveal = DAWN_REVEAL; }
+    else if (n.kind === 'verdict' && n.trial?.targetId === id) { type = n.trial.hanged ? 'catapult' : 'relief'; reveal = VERDICT_REVEAL; }
+    if (!type) return null;
+    const start = n.startedAt + (n.endsAt - n.startedAt) * reveal;
+    return { type, t: (serverNow() - start) / 1000, cfg: FX[type] };
+  }
+
+  function puff(center, k) {
+    dust.forEach((d, i) => {
+      const a = (i / dust.length) * TAU;
+      const r = 0.25 + 0.9 * k;
+      d.visible = true;
+      d.position.set(center.x + Math.sin(a) * r, 0.12 + 0.35 * k + 0.1 * Math.sin(i * 7), center.z + Math.cos(a) * r);
+      d.scale.setScalar(1 + 1.4 * k);
+    });
+    dustMat.opacity = 0.75 * (1 - k);
+  }
+
   function setGhost(ch, ghost) {
     const m = ghost ? M.ghost : ch.bodyMat;
     ch.body.material = m;
@@ -517,8 +607,9 @@ function buildWorld(T, host, { onTap, onLost, onDetached }) {
   let first = true;
   let spotOn = 0;
 
-  function apply({ desc: d, meIndex }) {
+  function apply({ desc: d, meIndex, serverOffset: off }) {
     desc = d;
+    serverOffset = off ?? 0;
     const meId = meIndex >= 0 ? d.chars[meIndex]?.id : null;
     const n = d.chars.length;
     const newR = Math.max(2.1, 0.62 + n * 0.2);
@@ -532,9 +623,7 @@ function buildWorld(T, host, { onTap, onLost, onDetached }) {
       ch.state = c;
       ch.angleTarget = ((i - base) / n) * TAU;
       if (first || ch.alive === null) ch.angle = ch.angleTarget;
-      if (ch.alive !== c.alive) { setGhost(ch, !c.alive); ch.alive = c.alive; }
-      const lk = `${c.name}|${c.alive}`;
-      if (ch.labelKey !== lk) { ch.labelKey = lk; ch.label.material.map = labelTex(c.name, c.alive); ch.label.material.needsUpdate = true; }
+      ch.alive = c.alive;
       const mk = c.nominee ? '!' : c.allies ? `🧛${c.allies > 1 ? c.allies : ''}` : '';
       if (mk && ch.markKey !== mk) {
         ch.mark.material.map = mk === '!' ? bangTex() : emojiTex(mk);
@@ -564,6 +653,14 @@ function buildWorld(T, host, { onTap, onLost, onDetached }) {
   // --- Kamera ve boyut ---
   let width = 0;
   let height = 0;
+  const camBase = new T.Vector3();
+  const camLook = new T.Vector3(0, 0.6, -0.4);
+  const camFocus = new T.Vector3(0, 0.6, -0.4);
+  const camTmp = new T.Vector3();
+  const camTmp2 = new T.Vector3();
+  let camW = 0; // odak (ölen / sanık)
+  let camPB = 0; // akşam geri çekilme
+  let gather = 1; // oyun sonu: herkes ateşe yaklaşır
   function resize() {
     const w = host.clientWidth;
     const h = host.clientHeight;
@@ -576,8 +673,10 @@ function buildWorld(T, host, { onTap, onLost, onDetached }) {
     const tanH = Math.tan((camera.fov * Math.PI) / 360) * aspect;
     const dist = Math.max(7, half / tanH + 1.2);
     const pitch = (30 * Math.PI) / 180;
-    camera.position.set(0, 0.6 + dist * Math.sin(pitch), dist * Math.cos(pitch) - 0.4);
-    camera.lookAt(0, 0.6, -0.4);
+    camBase.set(0, 0.6 + dist * Math.sin(pitch), dist * Math.cos(pitch) - 0.4);
+    camLook.set(0, 0.6, -0.4);
+    camera.position.copy(camBase);
+    camera.lookAt(camLook);
     camera.updateProjectionMatrix();
     fog.near = dist + 1;
     fog.far = dist + 20;
@@ -697,12 +796,40 @@ function buildWorld(T, host, { onTap, onLost, onDetached }) {
       spot.target.position.set(p.x, 0, p.z);
       beam.position.set(p.x, 0, p.z);
     }
+    // kamera: akşam yavaşça geri çekil, sabah ölene / kararda sanığa yaklaş, sonra normale dön
+    const n = desc?.narr;
+    let wantW = 0;
+    let wantPB = 0;
+    if (!reduce && n && n.endsAt) {
+      const frac = (serverNow() - n.startedAt) / Math.max(1, n.endsAt - n.startedAt);
+      let focusId = null;
+      if (n.kind === 'dusk' && frac < 0.92) wantPB = 1;
+      if (n.kind === 'dawn' && n.deadId && frac >= DAWN_REVEAL - 0.05 && frac < 0.88) focusId = n.deadId;
+      if (n.kind === 'verdict' && n.trial && frac < 0.9) focusId = n.trial.targetId;
+      const fc = focusId ? chars.get(focusId) : null;
+      if (fc) { wantW = 1; camFocus.set(fc.root.position.x, 0.8, fc.root.position.z); }
+    }
+    camW = approach(camW, wantW, dt / 1.1);
+    camPB = approach(camPB, wantPB, dt / 2.5);
+    if (width) {
+      const w = smooth(camW);
+      camTmp.copy(camLook).lerp(camFocus, 0.8 * w);
+      camTmp2.copy(camBase).sub(camLook).multiplyScalar(1 + 0.22 * smooth(camPB)).add(camLook);
+      camTmp2.lerp(camFocus, 0.32 * w);
+      camera.position.copy(camTmp2);
+      camera.lookAt(camTmp);
+    }
+    gather = approach(gather, desc?.phase === 'over' ? 0.8 : 1, dt / 2);
+    for (const o of fxObjs) o.visible = false;
     // karakterler
+    const verdict = n?.kind === 'verdict' && n.trial?.hanged && n.endsAt ? fxFor(n.trial.targetId) : null;
+    const torches = verdict && !reduce && verdict.t > -0.2 && verdict.t < 3.8 ? clamp01(Math.min((verdict.t + 0.2) / 0.5, (3.8 - verdict.t) / 0.5)) : 0;
+    let propI = 0;
     for (const ch of chars.values()) {
       const c = ch.state;
       ch.angle = angleLerp(ch.angle, ch.angleTarget, Math.min(1, dt * 4));
-      const x = Math.sin(ch.angle) * R;
-      const z = Math.cos(ch.angle) * R;
+      const x = Math.sin(ch.angle) * R * gather;
+      const z = Math.cos(ch.angle) * R * gather;
       ch.root.position.set(x, 0, z);
       let yawTarget = Math.atan2(-x, -z);
       if (c.look === 'accused' && accused) {
@@ -712,7 +839,23 @@ function buildWorld(T, host, { onTap, onLost, onDetached }) {
       ch.yaw = angleLerp(ch.yaw, yawTarget, Math.min(1, dt * 3));
       ch.root.rotation.y = ch.yaw;
       const s = ch.look.seed * TAU;
-      if (!c.alive) {
+      const fx = fxFor(ch.id);
+      const running = fx && fx.t < fx.cfg.end;
+      // Ölü ama açıklama/animasyon henüz o noktaya gelmediyse canlı görünür (sabah herkes aynı anda öğrenir).
+      const ghostVis = !c.alive && !(fx && fx.cfg.ghostAt != null && fx.t < fx.cfg.ghostAt);
+      if (ghostVis !== ch.ghostVis) { setGhost(ch, ghostVis); ch.ghostVis = ghostVis; }
+      const lk = `${c.name}|${!ghostVis}`;
+      if (ch.labelKey !== lk) { ch.labelKey = lk; ch.label.material.map = labelTex(c.name, !ghostVis); ch.label.material.needsUpdate = true; }
+      if (ch.paled && !(running && fx.type === 'bats')) { ch.paled = false; if (!ghostVis) setGhost(ch, false); }
+      ch.rig.visible = true;
+      ch.rig.rotation.z = 0;
+      ch.tomb.scale.setScalar(1);
+      if (ch.prop) ch.prop.visible = false;
+      if (running && fx.t >= 0 && fx.type !== 'relief') {
+        animateDeath(ch, fx, t, s);
+        continue;
+      }
+      if (ghostVis) {
         ch.rig.position.set(0, 0.35 + 0.08 * MOTION * Math.sin(t * 1.5 + s), -0.1);
         ch.rig.rotation.x = 0;
         ch.head.rotation.set(0, 0, 0);
@@ -722,7 +865,7 @@ function buildWorld(T, host, { onTap, onLost, onDetached }) {
       }
       ch.label.position.y = 2.25;
       ch.rig.position.set(0, 0, 0);
-      ch.sleep = approach(ch.sleep, c.sleeping ? 1 : 0, dt / (DUR * 0.8));
+      ch.sleep = approach(ch.sleep, c.sleeping ? 1 : 0, dt / (DUR * (desc?.phase === 'dusk' ? 1.4 : 0.8)));
       const sl = smooth(ch.sleep);
       ch.head.rotation.x = sl * 0.75;
       ch.head.rotation.y = (1 - sl) * 0.28 * MOTION * Math.sin(t * 0.55 + s * 3);
@@ -735,8 +878,28 @@ function buildWorld(T, host, { onTap, onLost, onDetached }) {
       }
       ch.body.scale.set(1, 1 + breathe * MOTION + 0.08 * stretchK, 1);
       ch.head.position.y = 1.28 + 0.06 * stretchK + breathe * 0.4 * MOTION;
-      ch.arms[0].rotation.z = -0.25 - 2.4 * stretchK;
-      ch.arms[1].rotation.z = 0.25 + 2.4 * stretchK;
+      let armUp = 2.4 * stretchK;
+      // Sürgün: köylüler meşale / yaba kaldırır
+      if (torches && c.alive && c.id !== n.trial.targetId) {
+        armUp = Math.max(armUp, torches * (2.5 + 0.25 * Math.sin(t * 9 + s * 5)));
+        if (!ch.prop) { ch.prop = sprite(emojiTex(PROPS[propI % 2]), 0.8, 0.4); ch.root.add(ch.prop); ch.propKind = propI % 2; }
+        ch.prop.visible = true;
+        ch.prop.position.set(0.42, 1.25 + 0.75 * torches, 0.05);
+        ch.prop.material.opacity = torches;
+        propI++;
+      }
+      ch.arms[0].rotation.z = -0.25 - armUp;
+      ch.arms[1].rotation.z = 0.25 + armUp;
+      // Kurtulan sanık: rahatlama zıplaması + 😮‍💨
+      if (running && fx.type === 'relief' && fx.t >= 0) {
+        ch.rig.position.y = fx.t < 1.2 ? 0.35 * Math.abs(Math.sin(fx.t * Math.PI * 2.5)) : 0;
+        if (fx.t > 0.2) {
+          sigh.visible = true;
+          ch.root.updateMatrixWorld();
+          sigh.position.set(0.15, 2.0 + 0.2 * clamp01(fx.t - 0.2), 0.2).applyMatrix4(ch.root.matrixWorld);
+          sigh.material.opacity = clamp01((fx.cfg.end - fx.t) / 0.4);
+        }
+      }
       // göz: uykuda kapalı, gündüz arada bir kırp
       const blink = ((t + s * 4) % 4.2) < 0.12 ? 0.15 : 1;
       const eyeY = sl > 0.5 ? 0.18 : blink;
@@ -749,6 +912,117 @@ function buildWorld(T, host, { onTap, onLost, onDetached }) {
       }
       if (ch.ring.visible) ch.ring.scale.setScalar(1 + 0.06 * MOTION * Math.sin(t * 4));
       if (ch.mark.visible) ch.mark.position.y = 2.7 + 0.08 * MOTION * Math.sin(t * 3);
+    }
+  }
+
+  const fxV = new T.Vector3();
+  const fxW = new T.Vector3();
+  // Ölüm / sürgün animasyonu (t ≥ 0). Bittiğinde normal hayalet + mezar taşı döngüsü devralır.
+  function animateDeath(ch, fx, now, s) {
+    const { type, t, cfg } = fx;
+    const pos = ch.root.position;
+    ch.zzz.visible = false;
+    ch.label.position.y = 2.25;
+    ch.head.rotation.set(0, 0, 0);
+    ch.rig.rotation.set(0, 0, 0);
+    ch.rig.position.set(0, 0, 0);
+    ch.body.scale.set(1, 1, 1);
+    ch.head.position.y = 1.28;
+    ch.eyes.forEach((e) => { e.scale.y = 1; });
+    ch.arms[0].rotation.z = -0.25;
+    ch.arms[1].rotation.z = 0.25;
+    // mezar taşı "pop" (hayalet görünümü açılınca setGhost taşı gösterir; öncesinde biz)
+    if (t >= cfg.tombAt) {
+      ch.tomb.visible = true;
+      ch.tomb.scale.setScalar(Math.max(0.01, easeOutBack(clamp01((t - cfg.tombAt) / 0.45))));
+      const dk = (t - cfg.tombAt) / 0.8;
+      if (dk < 1) puff(pos, dk);
+    } else ch.tomb.visible = false;
+    if (t >= cfg.ghostAt) {
+      // hayalet yükselir
+      const k = smooth(clamp01((t - cfg.ghostAt) / 0.8));
+      ch.rig.position.set(0, 0.35 * k + 0.08 * Math.sin(now * 1.5 + s) * k, -0.1 * k);
+      ch.label.position.y = 2.25 + 0.3 * k;
+      return;
+    }
+    if (type === 'bats') {
+      const k = smooth(clamp01((t - 0.3) / 1.1));
+      if (!ch.paled) { ch.paleMat ??= ch.bodyMat.clone(); ch.paled = true; for (const m of [ch.body, ch.headMesh, ...ch.arms]) m.material = ch.paleMat; }
+      ch.paleMat.color.copy(ch.bodyMat.color).lerp(PALE, k);
+      ch.arms[0].rotation.z = -0.25 - 2.2 * clamp01(t / 0.4) * (t < 1.4 ? 1 : 0);
+      ch.arms[1].rotation.z = 0.25 + 2.2 * clamp01(t / 0.4) * (t < 1.4 ? 1 : 0);
+      const fall = smooth(clamp01((t - 1.4) / 0.55));
+      ch.rig.rotation.z = fall * 1.45;
+      ch.eyes.forEach((e) => { e.scale.y = fall > 0.5 ? 0.15 : 1; });
+      if (t < 2.4) {
+        const out = smooth(clamp01((t - 1.7) / 0.7));
+        batSprites.forEach((b, i) => {
+          const a = t * 4.2 + (i / batSprites.length) * TAU;
+          const r = 0.75 + 0.12 * Math.sin(t * 5 + i) + 3 * out;
+          b.visible = true;
+          b.position.set(pos.x + Math.sin(a) * r, 1.0 + 0.35 * Math.sin(t * 3 + i * 1.7) + 3 * out, pos.z + Math.cos(a) * r);
+          b.material.opacity = 1 - out;
+        });
+      }
+    } else if (type === 'tomb') {
+      if (t < 0.6) ch.rig.rotation.z = 0.18 * Math.sin(t * 20) * (1 - t / 0.6);
+      else {
+        const k = clamp01((t - 0.6) / 0.5);
+        ch.rig.rotation.z = -1.5 * k * k + (k >= 1 ? 0.06 * Math.sin((t - 1.1) * 14) * Math.max(0, 1 - (t - 1.1) * 3) : 0);
+        ch.eyes.forEach((e) => { e.scale.y = 0.15; });
+      }
+    } else if (type === 'coffin') {
+      coffin.visible = true;
+      if (coffin.parent !== ch.root) ch.root.add(coffin);
+      let y = 0;
+      if (t < 0.7) y = 5 * (1 - (t / 0.7) ** 2);
+      else if (t < 0.9) y = 0.15 * Math.sin((Math.PI * (t - 0.7)) / 0.2);
+      else if (t > 1.5) y = -2.2 * smooth(clamp01((t - 1.5) / 1.0));
+      coffin.position.set(0, y, 0);
+      lid.rotation.y = t < 0.95 ? -1.9 : -1.9 * (1 - clamp01((t - 0.95) / 0.3) ** 2);
+      if (t < 0.95) { ch.arms[0].rotation.z = -2.5; ch.arms[1].rotation.z = 2.5; } // çığlık
+      ch.rig.visible = t < 1.25;
+      coffin.visible = t < 2.5;
+      if (t >= 1.25 && t < 2.05) puff(pos, (t - 1.25) / 0.8);
+    } else if (type === 'catapult') {
+      ch.root.rotation.y = 0; // herkes için aynı yön: kameradan uzağa, evlerin üstünden
+      catapult.visible = t < cfg.tombAt;
+      if (catapult.parent !== ch.root) ch.root.add(catapult);
+      catapult.position.set(0, 0, CAT_Z);
+      catapult.scale.setScalar(easeOutBack(clamp01(t / 0.5)));
+      const REST = 0.45;
+      const TOP = -2.3;
+      let a = REST;
+      if (t >= 1.5) a = REST + (TOP - REST) * clamp01((t - 1.5) / 0.3) ** 2;
+      arm.rotation.x = a;
+      if (t < 1.0) {
+        ch.arms[0].rotation.z = -0.25 - 0.4 * Math.sin(t * 12); // telaş
+        ch.arms[1].rotation.z = 0.25 + 0.4 * Math.sin(t * 12 + 1);
+      } else if (t < 1.8) {
+        bucketAt(a, fxV);
+        const hop = clamp01((t - 1.0) / 0.35);
+        ch.rig.position.set(0, fxV.y * hop + 0.4 * Math.sin(Math.PI * hop), fxV.z * hop);
+        ch.arms[0].rotation.z = -2.6; ch.arms[1].rotation.z = 2.6;
+      } else {
+        bucketAt(TOP, fxV);
+        const tau = t - 1.8;
+        ch.rig.position.set(0, fxV.y + 7 * tau - 4 * tau * tau, fxV.z - 7 * tau);
+        ch.rig.rotation.x = -tau * 11;
+        ch.arms[0].rotation.z = -2.6; ch.arms[1].rotation.z = 2.6;
+        ch.label.position.y = -50; // ad uçmasın
+        if (tau > 1.5) {
+          ch.rig.visible = false;
+          const tk = (tau - 1.5) / 0.6;
+          if (tk < 1) {
+            ch.root.updateMatrixWorld();
+            fxW.set(0, fxV.y + 10.5 - 9, fxV.z - 10.5).applyMatrix4(ch.root.matrixWorld);
+            twinkle.visible = true;
+            twinkle.position.copy(fxW);
+            twinkle.scale.set(1.4 * (1 + Math.sin(Math.PI * tk)), 0.7 * (1 + Math.sin(Math.PI * tk)), 1);
+            twinkle.material.opacity = 1 - tk;
+          }
+        }
+      }
     }
   }
 
@@ -780,6 +1054,9 @@ function buildWorld(T, host, { onTap, onLost, onDetached }) {
         if (o.geometry) geos.add(o.geometry);
         if (o.material) ms.add(o.material);
       });
+      [coffin, catapult].forEach((o) => o.traverse((x) => { if (x.geometry) geos.add(x.geometry); }));
+      for (const ch of chars.values()) if (ch.paleMat) ms.add(ch.paleMat);
+      [dustGeo, wheelGeo].forEach((g) => geos.add(g));
       [...Object.values(G), ...Object.values(hatGeo).filter((x) => x.isBufferGeometry),
         wallGeo, roofGeo, doorGeo, winGeo, chimGeo, trunkGeo, pineGeo, pineTopGeo, roundGeo].forEach((g) => geos.add(g));
       [...Object.values(M), ...mats.values(), ...Object.values(hatGeo).filter((x) => x.isMaterial)].forEach((m) => ms.add(m));

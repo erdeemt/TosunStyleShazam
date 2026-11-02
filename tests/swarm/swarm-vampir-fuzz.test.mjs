@@ -88,7 +88,7 @@ class Harness {
 }
 
 test('vampir fuzz: her eylem tipi × alan × düşmanca değer, doğal fazında ve ölüyken — çökme/iç hata yok, durum değişmez', async () => {
-  const srv = await startProbedServer({ timeScale: 1, seed: 61 });
+  const srv = await startProbedServer({ timeScale: 0.25, seed: 61 }); // anlatıcı ara fazları kısa kalsın; gece 30 sn, oylama 7.5 sn yine yeterli
   const h = new Harness(srv);
   let count = 0;
   try {
@@ -168,7 +168,7 @@ test('vampir fuzz: lobi ayarları — her alan × düşmanca değer; ayarlar hep
     }
     // sonunda oyun bu ayarlarla başlatılabilmeli
     host.send({ t: 'start' });
-    await Promise.all(bots.map((b) => b.waitView((v) => v.phase === 'night')));
+    await Promise.all(bots.map((b) => b.waitView((v) => v.phase === 'night', { timeout: 15_000 }))); // açılış anlatımı 6 sn
     assert.deepEqual(bad, []);
     assert.ok(await srv.alive());
   } finally {

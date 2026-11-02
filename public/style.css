@@ -916,3 +916,42 @@ body.hx-live { overflow: hidden; }
 .player-list li.flash { animation: v3d-flash 1.2s ease-out; }
 @keyframes v3d-flash { 0% { box-shadow: 0 0 0 3px var(--accent2); } 100% { box-shadow: 0 0 0 0 transparent; } }
 @media (prefers-reduced-motion: reduce) { .player-list li.flash { animation-duration: .3s; } }
+
+/* 🧛 Anlatıcı (public/games/vampir-flow.js). 3D sahne görünürken onun üst kısmına biner (sıfır yükseklikli kap),
+   3D kapalı/yoksa akışta normal bir kart olur. Telefonu kol mesafesinden okumaya göre büyük yazı. */
+.vnar[hidden] { display: none; }
+.vnar { position: relative; text-align: center; }
+.vnar-box, .vnar-cue {
+  border-radius: var(--radius); background: rgba(22, 12, 42, .82); color: #fff;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .35); border: 1px solid rgba(255, 255, 255, .14);
+}
+.vnar-box { display: none; padding: 12px 14px 10px; }
+.vnar.active .vnar-box { display: block; }
+.vnar-cue { display: none; padding: 8px 12px; }
+.vnar.cueing .vnar-cue { display: block; }
+.vnar-emoji { font-size: 46px; line-height: 1.1; }
+.vnar-title { font-size: 23px; font-weight: 900; line-height: 1.2; margin-top: 2px; overflow-wrap: anywhere; }
+.vnar-sub { font-size: 16px; opacity: .88; margin-top: 4px; line-height: 1.3; }
+.vnar-bar { height: 4px; border-radius: 4px; background: rgba(255, 255, 255, .15); margin-top: 10px; overflow: hidden; }
+.vnar-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width .2s linear; }
+.vnar-box[data-tone="dark"] { background: rgba(70, 8, 24, .86); }
+.vnar-box[data-tone="good"] { background: rgba(14, 70, 50, .86); }
+.vnar-box[data-tone="win"] { background: linear-gradient(135deg, rgba(255, 77, 141, .9), rgba(255, 181, 71, .9)); }
+.vnar-cue b { display: block; font-size: 18px; }
+.vnar-cue small { display: block; font-size: 14px; opacity: .85; margin-top: 2px; }
+.vnar-box.in, .vnar-cue.in { animation: vnar-in .55s cubic-bezier(.2, .9, .3, 1.25); }
+@keyframes vnar-in { 0% { opacity: 0; transform: translateY(-14px) scale(.94); } 100% { opacity: 1; transform: none; } }
+/* 3D sahne açıkken: sahnenin üst kısmına bindir (sağ üstteki 3D düğmesinin altından başlar) */
+.v3d:not(.off):not([hidden]) + .vnar { height: 0; margin-bottom: -16px; z-index: 2; pointer-events: none; } /* .stack aralığı 16px */
+.v3d:not(.off):not([hidden]) + .vnar > * {
+  position: absolute; left: 10px; right: 10px; bottom: calc(min(48vh, 420px) - 30px);
+  transform: translateY(100%);
+}
+.v3d:not(.off):not([hidden]) + .vnar .vnar-box.in, .v3d:not(.off):not([hidden]) + .vnar .vnar-cue.in { animation-name: vnar-in-over; }
+@keyframes vnar-in-over { 0% { opacity: 0; transform: translateY(calc(100% - 14px)) scale(.94); } 100% { opacity: 1; transform: translateY(100%); } }
+.big-timer.hurry { color: var(--bad); animation: vnar-pulse 1s ease-in-out infinite; }
+@keyframes vnar-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+@media (prefers-reduced-motion: reduce) {
+  .vnar-box.in, .vnar-cue.in { animation: none; }
+  .big-timer.hurry { animation: none; }
+}

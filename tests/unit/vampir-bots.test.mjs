@@ -80,6 +80,9 @@ const base = (overrides = {}) => {
   const ctx = { now: 0, rng, hostId: 'a', timeScale: 1, setTimer: (ms) => ms, clearTimer() {}, log() {} };
   const players = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((id) => ({ id, name: id }));
   const state = vampir.setup({ players, settings: vampir.validateSettings({ ...vampir.defaultSettings, vampires: 2, ...overrides }), rng, ctx });
+  assert.equal(state.phase, 'dusk'); // açılış anlatımı
+  for (const id of ['a', 'b', 'c']) assert.equal(vampir.bots.plan(state, id, bctx()), null, 'anlatım sırasında bot bir şey planlamaz');
+  vampir.tick(state, ctx); // → 1. gece
   return { state, ctx };
 };
 const bctx = (now = 0) => ({ mem: {}, rng: createRng(9), now });

@@ -7,6 +7,12 @@ import { GameError, num, str } from '../errors.js';
 const NOMINATION_MS = 30_000; // destek gelmezse aday bu süre sonra düşer
 const TRIAL_VOTE_MS = 30_000;
 
+// Anlatıcı ara fazları (PLAN.md §4.3): kısa, herkeste eş zamanlı "sinema" anları. Bu sırada oyun eylemi kabul edilmez;
+// gece/gündüz/savunma süreleri bunlardan yemez. Süreler lobideki TIME_SCALE ile ölçeklenir (setTimer).
+export const NARRATION_MS = { intro: 6000, dusk: 5000, dawn: 8000, verdict: 7000 };
+export const INTERMISSIONS = ['dusk', 'dawn', 'verdict'];
+const inIntermission = (state) => INTERMISSIONS.includes(state.phase);
+
 export const ROLES = {
   vampir: { name: 'Vampir', icon: '🧛', team: 'vampires' },
   koylu: { name: 'Köylü', icon: '🧑‍🌾', team: 'town' },
@@ -34,9 +40,40 @@ const alivePlayer = (state, id) => {
 
 // ---------- Faz geçişleri ----------
 
+// Ara faza geç. narration herkese aynı gider (view): sadece zaten açık bilgiler (ölen, oy sayısı), rol/seçim/oy yok.
+function narrate(state, ctx, phase, kind, extra = {}) {
+  const ms = NARRATION_MS[kind];
+  state.phase = phase;
+  state.endsAt = ctx.setTimer(ms);
+  state.narration = {
+    kind,
+    night: state.night,
+    deadId: null,
+    trial: null,
+    ...extra,
+    startedAt: state.endsAt - Math.round(ms * (ctx.timeScale ?? 1)),
+    endsAt: state.endsAt,
+  };
+}
+
+// Gün bitti (süre, host ya da asılma): akşam anlatımı, sonra gece.
+function startDusk(state, ctx, kind = 'dusk') {
+  state.nomination = null;
+  state.trial = null;
+  ctx.clearTimer('nomination');
+  narrate(state, ctx, 'dusk', kind, { night: state.night + 1 }); // gelecek gecenin numarası
+}
+
+function startDay(state, ctx) {
+  state.phase = 'day';
+  state.narration = null;
+  state.endsAt = ctx.setTimer(state.settings.dayMinutes * 60_000);
+}
+
 function startNight(state, ctx) {
   state.night += 1;
   state.phase = 'night';
+  state.narration = null;
   state.nightPicks = {}; // playerId -> targetId (rolüne göre anlamı farklı)
   state.nomination = null;
   state.trial = null;
@@ -66,9 +103,26 @@ function resolveNight(state, ctx) {
   if (victimId) kill(state, victimId, 'night');
   state.announcement = { night: state.night, deadId: victimId };
   state.lastTrial = null; // dünün oylama sonucu yeni güne taşınmasın (asılma bilgisi gece boyunca kalır)
+  // Önce sabah anlatımı (ölüm animasyonu); kazanma kontrolü anlatım bitince (finishDawn). Süre her durumda aynı.
+  narrate(state, ctx, 'dawn', 'dawn', { deadId: victimId });
+}
+
+function finishDawn(state, ctx) {
   if (checkWin(state, ctx)) return;
-  state.phase = 'day';
-  state.endsAt = ctx.setTimer(state.settings.dayMinutes * 60_000);
+  startDay(state, ctx);
+}
+
+// Asılan deli: karar anlatımı bitince (ya da bu sırada biri ayrılırsa) deli kazanır.
+function pendingJester(state) {
+  const lt = state.lastTrial;
+  return state.phase === 'verdict' && lt?.hanged && player(state, lt.targetId)?.role === 'deli';
+}
+
+function finishVerdict(state, ctx) {
+  if (!state.lastTrial?.hanged) return resumeDay(state, ctx);
+  if (pendingJester(state)) return endGame(state, ctx, 'jester');
+  if (checkWin(state, ctx)) return;
+  startDusk(state, ctx);
 }
 
 function kill(state, id, cause) {
@@ -98,6 +152,8 @@ function endGame(state, ctx, winner) {
   state.winnerIds = state.players
     .filter((p) => (winner === 'jester' ? p.role === 'deli' : ROLES[p.role].team === winner))
     .map((p) => p.id);
+  // Kısa kapanış anlatımı (istemci kazananı view.result'tan duyurur; bitiş saati yok).
+  state.narration = { kind: 'over', night: state.night, deadId: null, trial: null, startedAt: ctx.now ?? Date.now(), endsAt: null };
 }
 
 function nominationActive(state, now) {
@@ -105,10 +161,10 @@ function nominationActive(state, now) {
   return n && now < n.expiresAt ? n : null;
 }
 
-function startTrial(state, ctx, targetId) {
+function startTrial(state, ctx, targetId, supportById) {
   state.dayRemainingMs = Math.max(0, state.endsAt - ctx.now);
   state.phase = 'trial';
-  state.trial = { targetId, votes: {} };
+  state.trial = { targetId, votes: {}, supportById: supportById ?? null };
   state.nomination = null;
   ctx.clearTimer('nomination');
   state.endsAt = ctx.setTimer(state.settings.defenseSeconds * 1000);
@@ -122,6 +178,7 @@ function startTrialVote(state, ctx) {
 function resumeDay(state, ctx) {
   state.phase = 'day';
   state.trial = null;
+  state.narration = null;
   // Kalan süre gerçek ms; setTimer ölçekli süre bekler.
   state.endsAt = ctx.setTimer(Math.max(1000, state.dayRemainingMs ?? 0) / ctx.timeScale);
   state.dayRemainingMs = null;
@@ -136,15 +193,13 @@ function resolveTrial(state, ctx) {
   const yes = voters.filter((p) => state.trial.votes[p.id] === true).length;
   const target = alivePlayer(state, state.trial.targetId);
   state.log.push({ night: state.night, trial: state.trial.targetId, yes, voters: voters.length, votes: { ...state.trial.votes } });
-  if (!target || yes * 2 <= voters.length) {
-    state.lastTrial = { targetId: state.trial.targetId, hanged: false, yes, voters: voters.length };
-    return resumeDay(state, ctx);
-  }
-  kill(state, target.id, 'hanged');
-  state.lastTrial = { targetId: target.id, hanged: true, yes, voters: voters.length };
-  if (target.role === 'deli') return endGame(state, ctx, 'jester');
-  if (checkWin(state, ctx)) return;
-  startNight(state, ctx);
+  const hanged = !!target && yes * 2 > voters.length;
+  if (hanged) kill(state, target.id, 'hanged');
+  state.lastTrial = { targetId: state.trial.targetId, hanged, yes, voters: voters.length };
+  state.trial = null;
+  // Karar anlatımı: sadece zaten açık olan sonuç (Evet sayısı / oy hakkı), kimin ne oy verdiği yok.
+  // Sonra: asılmadıysa gündüz kaldığı yerden, asıldıysa (deli → deli kazanır) kazanma kontrolü ya da akşam.
+  narrate(state, ctx, 'verdict', 'verdict', { trial: { ...state.lastTrial } });
 }
 
 function maybeEndNight(state, ctx) {
@@ -205,8 +260,9 @@ export default {
       players: shuffled.map((p, i) => ({ id: p.id, name: p.name, role: roles[i], alive: true, death: null }))
         .sort((a, b) => players.findIndex((x) => x.id === a.id) - players.findIndex((x) => x.id === b.id)),
       roleCounts: roles.reduce((acc, r) => ({ ...acc, [r]: (acc[r] ?? 0) + 1 }), {}),
-      phase: 'night',
+      phase: 'dusk',
       night: 0,
+      narration: null,
       endsAt: null,
       nightPicks: {},
       lastProtected: null,
@@ -222,18 +278,19 @@ export default {
       winnerIds: [],
       gameKey: randomInt(1e9), // RNG'den üretilmez (iç durumu sızdırırdı)
     };
-    startNight(state, ctx);
+    startDusk(state, ctx, 'intro'); // "Köye hoş geldiniz…" → 1. gece
     return state;
   },
 
   action(state, playerId, action, ctx) {
     if (state.phase === 'over') throw new GameError('Oyun bitti.');
+    if (inIntermission(state)) throw new GameError('Anlatıcı konuşuyor, az bekle… 🎙️');
     // Oda sahibi ölmüş olsa da tartışmayı bitirebilir (yönetim düğmesi, oyun eylemi değil).
     if (action.type === 'endDay') {
       if (state.phase !== 'day') throw new GameError('Şu an gündüz tartışması yok.');
       if (playerId !== ctx.hostId) throw new GameError('Geceye oda sahibi geçirir.');
       if (nominationActive(state, ctx.now)) throw new GameError('Bekleyen bir aday var; önce destek süresi dolsun.');
-      return startNight(state, ctx);
+      return startDusk(state, ctx);
     }
     const me = alivePlayer(state, playerId);
     if (!me) throw new GameError('Ölüler konuşmaz. 🤫');
@@ -267,7 +324,7 @@ export default {
         const nom = nominationActive(state, ctx.now);
         if (!nom) throw new GameError('Destekleyecek aday yok.');
         if (me.id === nom.byId || me.id === nom.targetId) throw new GameError('Bu adayı sen destekleyemezsin.');
-        return startTrial(state, ctx, nom.targetId);
+        return startTrial(state, ctx, nom.targetId, me.id);
       }
       case 'endDefense': {
         if (state.phase !== 'trial') throw new GameError('Şu an savunma yok.');
@@ -288,8 +345,11 @@ export default {
 
   tick(state, ctx, name = 'main') {
     if (name === 'nomination') { state.nomination = null; return; }
-    if (state.phase === 'night') resolveNight(state, ctx);
-    else if (state.phase === 'day') startNight(state, ctx); // süre bitti, kimse asılmadı
+    if (state.phase === 'dusk') startNight(state, ctx);
+    else if (state.phase === 'night') resolveNight(state, ctx);
+    else if (state.phase === 'dawn') finishDawn(state, ctx);
+    else if (state.phase === 'verdict') finishVerdict(state, ctx);
+    else if (state.phase === 'day') startDusk(state, ctx); // süre bitti, kimse asılmadı
     else if (state.phase === 'trial') startTrialVote(state, ctx);
     else if (state.phase === 'trialVote') resolveTrial(state, ctx);
   },
@@ -305,6 +365,7 @@ export default {
       if (target === playerId && player(state, id)?.role !== 'gozcu') delete state.nightPicks[id];
     }
     if (state.nomination && (state.nomination.byId === playerId || state.nomination.targetId === playerId)) state.nomination = null;
+    if (pendingJester(state)) return endGame(state, ctx, 'jester'); // deli zaten asıldı; ayrılan biri bunu değiştirmez
     if (checkWin(state, ctx)) return;
     if (state.phase === 'night') return maybeEndNight(state, ctx);
     if (state.trial) {
@@ -320,7 +381,7 @@ export default {
     // Şu an yapacak bir şey varsa { key, delayMs }. Aynı key bekliyorken gecikme sıfırlanmaz.
     plan(state, botId, { mem, rng, now }) {
       const me = alivePlayer(state, botId);
-      if (!me || state.phase === 'over') return null; // ölüler bir şey yapmaz
+      if (!me || state.phase === 'over' || inIntermission(state)) return null; // ölüler ve anlatıcı konuşurken kimse bir şey yapmaz
       const between = (lo, hi) => lo + Math.floor(rng.next() * (hi - lo));
       const stage = `${state.night}:${state.log.length}`; // aynı gün içindeki her yargılama ayrı
       switch (state.phase) {
@@ -352,7 +413,7 @@ export default {
     // Zamanı gelince güncel duruma göre eylem.
     act(state, botId, { rng, now }) {
       const me = alivePlayer(state, botId);
-      if (!me) return null;
+      if (!me || inIntermission(state)) return null;
       switch (state.phase) {
         case 'night': {
           const targets = nightTargets(state, me);
@@ -397,9 +458,12 @@ export default {
       roleCounts: state.roleCounts,
       announcement: state.announcement,
       lastTrial: state.lastTrial,
+      // Anlatıcı (ara fazlar + oyun sonu): herkese birebir aynı, sadece açık bilgi.
+      narration: inIntermission(state) || over ? state.narration ?? null : null,
       nomination: nom && { byId: nom.byId, targetId: nom.targetId, expiresAt: nom.expiresAt },
       trial: state.trial && {
         targetId: state.trial.targetId,
+        supportById: state.trial.supportById ?? null,
         votedCount: Object.keys(state.trial.votes).length,
         voterCount: trialVoters(state).length,
         myVote: state.trial.votes[playerId] ?? null,

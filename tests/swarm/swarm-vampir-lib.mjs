@@ -7,21 +7,26 @@ import { sleep } from '../lib/bot.js';
 
 export const ROLE_IDS = ['vampir', 'koylu', 'doktor', 'gozcu', 'deli'];
 const TEAM = { vampir: 'vampires', koylu: 'town', doktor: 'town', gozcu: 'town', deli: 'jester' };
-const PHASES = ['night', 'day', 'trial', 'trialVote', 'over'];
+const PHASES = ['dusk', 'night', 'dawn', 'day', 'trial', 'trialVote', 'verdict', 'over'];
+const INTER = ['dusk', 'dawn', 'verdict']; // anlatıcı ara fazları (PLAN §4.3)
 // Aynı gece numarasında izinli geçişler; '+night' = gece numarası 1 artarak gece.
 const NEXT_OK = {
-  night: ['night', 'day', 'over'],
-  day: ['day', 'trial', '+night', 'over'],
+  dusk: ['dusk', '+night', 'over'],
+  night: ['night', 'dawn', 'over'],
+  dawn: ['dawn', 'day', 'over'],
+  day: ['day', 'trial', 'dusk', 'over'],
   trial: ['trial', 'trialVote', 'day', 'over'],
-  trialVote: ['trialVote', 'day', '+night', 'over'],
+  trialVote: ['trialVote', 'verdict', 'day', 'over'],
+  verdict: ['verdict', 'day', 'dusk', 'over'],
   over: ['over'],
 };
-const VIEW_KEYS = ['gameKey', 'phase', 'night', 'endsAt', 'players', 'roleCounts', 'announcement', 'lastTrial', 'nomination', 'trial', 'nightProgress', 'me', 'result'];
+const VIEW_KEYS = ['gameKey', 'phase', 'night', 'endsAt', 'players', 'roleCounts', 'announcement', 'lastTrial', 'narration', 'nomination', 'trial', 'nightProgress', 'me', 'result'];
 const PLAYER_KEYS = ['id', 'name', 'alive', 'death'];
 const ANN_KEYS = ['night', 'deadId'];
 const LAST_TRIAL_KEYS = ['targetId', 'hanged', 'yes', 'voters'];
 const NOM_KEYS = ['byId', 'targetId', 'expiresAt'];
-const TRIAL_KEYS = ['targetId', 'votedCount', 'voterCount', 'myVote'];
+const TRIAL_KEYS = ['targetId', 'supportById', 'votedCount', 'voterCount', 'myVote'];
+const NARR_KEYS = ['kind', 'night', 'deadId', 'trial', 'startedAt', 'endsAt'];
 const RESULT_KEYS = ['winner', 'winnerIds', 'roles', 'seerResults', 'log'];
 // Sahibinden başkasına asla gitmemesi gereken anahtar adları (ham metin taraması).
 const SECRET_KEYS_ALL = ['"vampireTally"', '"doctorPick"', '"savedId"', '"log"', '"votes"', '"nightPicks"', '"winnerIds"', '"roles"', '"role":"', '"seerResults"', '"isVampire"', '"lastProtected"', '"allies"', '"allyPicks"'];
@@ -156,6 +161,21 @@ export class VampirReferee {
         if (t.targetId === bot.playerId && t.myVote != null) this.fail(bot, 'aday kendi yargılamasına oy vermiş', t);
       }
     } else if (['trial', 'trialVote'].includes(v.phase)) this.fail(bot, `${v.phase} fazında trial yok`);
+    // Anlatım: sadece ara fazlarda ve oyun sonunda; yalnızca açık bilgi (ölen, karar sonucu)
+    if (INTER.includes(v.phase) || over) {
+      const n = v.narration;
+      if (!n || !sameKeys(n, NARR_KEYS)) this.fail(bot, 'anlatım alanları', n);
+      else {
+        const kinds = { dusk: ['intro', 'dusk'], dawn: ['dawn'], verdict: ['verdict'], over: ['over'] }[v.phase];
+        if (!kinds.includes(n.kind)) this.fail(bot, `${v.phase} fazında anlatım türü ${n.kind}`);
+        if (!over && n.endsAt !== v.endsAt) this.fail(bot, 'anlatım bitişi faz bitişiyle aynı değil', { n, endsAt: v.endsAt });
+        if (n.deadId && (isAlive(n.deadId) || !['night', 'left'].includes(v.players.find((p) => p.id === n.deadId)?.death?.cause))) this.fail(bot, 'sabah anlatımındaki ölü tutarsız', n);
+        if (n.trial) {
+          if (!sameKeys(n.trial, LAST_TRIAL_KEYS)) this.fail(bot, 'anlatım trial alanları', n.trial);
+          if (v.phase === 'verdict' && JSON.stringify(n.trial) !== JSON.stringify(v.lastTrial)) this.fail(bot, 'karar anlatımı lastTrial ile aynı değil', { n, lt: v.lastTrial });
+        }
+      }
+    } else if (v.narration !== null) this.fail(bot, `${v.phase} fazında anlatım`, v.narration);
     if ((v.phase === 'night') !== Boolean(v.nightProgress)) this.fail(bot, 'nightProgress yalnızca gece olmalı', { phase: v.phase });
     if (v.nightProgress) {
       const np = v.nightProgress;
@@ -227,19 +247,27 @@ export class VampirReferee {
       const legal = (sameNight && ok.includes(v.phase)) || (v.phase === 'night' && v.night === prev.night + 1 && ok.includes('+night'));
       if (!legal) this.fail(bot, `geçersiz faz geçişi ${prev.phase}#${prev.night} → ${v.phase}#${v.night}`);
       if (prev.phase === 'day' && v.phase === 'trial') st.remaining = prev.endsAt - msg.serverNow;
-      if (['trial', 'trialVote'].includes(prev.phase) && v.phase === 'day' && st.remaining != null && prevMsg) {
+      if (['trial', 'trialVote', 'verdict'].includes(prev.phase) && v.phase === 'day' && st.remaining != null && prevMsg) {
         const want = Math.max(1000, st.remaining);
         const got = v.endsAt - msg.serverNow;
         this.stats.clockChecks++;
         if (Math.abs(got - want) > this.clockTolerance) this.fail(bot, `başarısız yargılamadan sonra gün saati kaldığı yerden sürmedi: beklenen ~${Math.round(want)} ms, kalan ${Math.round(got)} ms`);
         st.remaining = null;
       }
+      if (prev.phase === 'verdict' && ['day', 'dusk'].includes(v.phase) && prev.narration?.trial) {
+        const hanged = prev.narration.trial.hanged;
+        if ((v.phase === 'dusk') !== hanged) this.fail(bot, `karardan sonra ${v.phase} ama asıldı=${hanged}`, prev.narration.trial);
+      }
       if (prev.phase === 'trialVote' && v.phase !== 'trialVote' && v.phase !== 'over') {
         // oylama çözüldü: geceye geçildiyse sanık asılmış, gündüz sürüyorsa bu sanık için "asılmadı" sonucu (veya sanık ayrıldı)
         const tid = prev.trial.targetId;
         const t = v.players.find((p) => p.id === tid);
-        if (v.phase === 'night' && t?.death?.cause !== 'hanged') this.fail(bot, 'oylama sonrası geceye geçildi ama sanık asılmadı', { t, lastTrial: v.lastTrial, seq: [prevMsg?.seq, msg.seq] });
-        if (v.phase === 'day' && !(v.lastTrial?.targetId === tid && v.lastTrial.hanged === false) && t?.death?.cause !== 'left') this.fail(bot, 'oylama sonrası gündüz sürüyor ama sonuç "asılmadı" değil', { lastTrial: v.lastTrial, seq: [prevMsg?.seq, msg.seq] });
+        // oylama çözülünce önce karar anlatımı; doğrudan gündüze dönüş sadece sanık ayrıldıysa
+        if (v.phase === 'verdict') {
+          const nt = v.narration?.trial;
+          if (nt?.targetId !== tid) this.fail(bot, 'karar anlatımı başka sanık için', { nt, tid });
+          else if (nt.hanged !== (t?.death?.cause === 'hanged')) this.fail(bot, 'karar anlatımı asılma durumuyla uyuşmuyor', { nt, t });
+        } else if (v.phase === 'day' && t?.death?.cause !== 'left') this.fail(bot, 'oylama sonrası karar anlatımı olmadan gündüze dönüldü', { lastTrial: v.lastTrial, seq: [prevMsg?.seq, msg.seq] });
       }
     }
     if (!over) g.views.push({ bot, v });
@@ -285,9 +313,10 @@ export class VampirReferee {
       const lv = pv.players.filter((p) => p.alive && roles[p.id] === 'vampir').length;
       const lo = pv.players.filter((p) => p.alive && roles[p.id] !== 'vampir').length;
       const key = JSON.stringify(pv.players.map((p) => p.alive));
-      if (!seenSeq.has(key) && (lv === 0 || lv >= lo)) this.fail(b, `kazanma koşulu sağlandığı halde oyun sürdü (${pv.phase}#${pv.night}, vampir=${lv}, diğer=${lo})`);
+      // sabah / karar anlatımı sırasında kazanma kontrolü bilerek bekletilir (anlatım bitince over)
+      if (!INTER.includes(pv.phase) && !seenSeq.has(key) && (lv === 0 || lv >= lo)) this.fail(b, `kazanma koşulu sağlandığı halde oyun sürdü (${pv.phase}#${pv.night}, vampir=${lv}, diğer=${lo})`);
       seenSeq.add(key);
-      if (pv.players.some((p) => roles[p.id] === 'deli' && p.death?.cause === 'hanged')) this.fail(b, 'deli asıldı ama oyun bitmedi');
+      if (pv.phase !== 'verdict' && pv.players.some((p) => roles[p.id] === 'deli' && p.death?.cause === 'hanged')) this.fail(b, 'deli asıldı ama oyun bitmedi');
       this.scanLeak(b, pv, roles, vamps);
     }
 
@@ -385,7 +414,9 @@ export class VampirReferee {
     const neutral = { ...me, nightTargets: 0, nightPick: 0, seerResults: 0, lastProtected: 0, role: 0 };
     if (myRole === 'vampir') { neutral.allies = 0; neutral.allyPicks = 0; }
     const t = pv.trial;
-    const strip = JSON.stringify({ ...rest, players: 0, announcement: 0, lastTrial: 0, nomination: 0, trial: t && { ...t, targetId: 0 }, me: me ? neutral : null });
+    const nr = pv.narration;
+    const strip = JSON.stringify({ ...rest, players: 0, announcement: 0, lastTrial: 0, nomination: 0, trial: t && { ...t, targetId: 0, supportById: 0 },
+      narration: nr && { ...nr, deadId: 0, trial: nr.trial && { ...nr.trial, targetId: 0 } }, me: me ? neutral : null });
     for (const [id, role] of Object.entries(roles)) {
       if (id === self || role === 'koylu') continue;
       if (myRole === 'vampir' && role === 'vampir') continue;
@@ -486,7 +517,8 @@ export async function setupVampir(wsUrl, makeRoom, n, settings = {}, prefix = 'V
   room.host.send({ t: 'settings', settings: s });
   await room.host.waitRoom((r) => Object.entries(s).every(([k, v]) => r.settings[k] === v));
   room.host.send({ t: 'start' });
-  await Promise.all(room.bots.map((b) => b.waitView((v) => v.phase === 'night' && v.night === 1)));
+  // açılış anlatımı (6 sn × TIME_SCALE) sonra 1. gece
+  await Promise.all(room.bots.map((b) => b.waitView((v) => v.phase === 'night' && v.night === 1, { timeout: 15_000 })));
   const by = (role) => room.bots.filter((b) => b.view.me?.role === role);
   return { ...room, ref, by, vamps: by('vampir'), roleOf: (b) => b.view.me.role };
 }
@@ -526,7 +558,8 @@ export async function playNight(g, { victim, protect, picks = new Map() } = {}) 
     b.action({ type: 'nightPick', targetId: t });
   }
   const watchers = g.bots.filter((b) => b.isOpen && b.room);
-  await Promise.all(watchers.map((b) => b.waitView((v) => v.phase !== 'night' || v.night > night)));
+  // gece → sabah anlatımı → gündüz / oyun sonu
+  await Promise.all(watchers.map((b) => b.waitView((v) => !['night', 'dawn'].includes(v.phase) || v.night > night, { timeout: 15_000 })));
   return observerOf(g).view;
 }
 
