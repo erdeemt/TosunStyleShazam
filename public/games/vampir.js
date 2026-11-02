@@ -4,6 +4,7 @@
 import { mountLobby } from '../lobby.js';
 import { $, el, countdown, toast } from '../ui.js';
 import { createStage } from './vampir-3d.js';
+import { createNarrator, cuesBetween, INTERMISSIONS } from './vampir-flow.js';
 
 const ROLES = {
   vampir: { name: 'Vampir', icon: '🧛', desc: 'Her gece diğer vampirlerle bir kurban seç. Gündüz köylü gibi davran.', night: 'Kurbanını seç.' },
@@ -23,6 +24,8 @@ let cardOpen = false;
 let cardKey = '';
 let stage = null; // 3D köy meydanı: oyun boyunca tek tuval, her çizimde aynı öğe yeniden yerleştirilir
 let current = null; // { view, ctx } — sahnedeki dokunuşlar en son görünümle çalışsın
+let narrator = null; // anlatıcı kutusu (vampir-flow.js): 3D sahnenin üstünde ya da 3D kapalıyken kart olarak
+let prevView = null; // ipuçları için bir önceki görünüm
 
 function settingsUI(s, { editable, change, playerCount }) {
   const select = (key, options, label) => el('label', {},
@@ -91,6 +94,16 @@ function stageEl(view, ctx) {
   return stage.el;
 }
 
+// Anlatıcı: ara fazlarda büyük kutu, oyun içi olaylarda küçük ipucu. Her çizimde aynı öğe, sahnenin hemen altına.
+function narratorEl(view, ctx) {
+  if (!narrator) narrator = createNarrator();
+  const name = (id) => nameOf(view, id);
+  narrator.update(view, ctx, name);
+  for (const [icon, text, small] of cuesBetween(prevView, view, name)) narrator.cue(icon, text, small);
+  prevView = view;
+  return narrator.el;
+}
+
 function roleCard(view) {
   syncCard(view);
   if (!view.me) return null;
@@ -127,11 +140,14 @@ function headline(view, ctx) {
     day: `☀️ ${view.night}. gün`,
     trial: '⚖️ Savunma',
     trialVote: '🗳️ Oylama',
+    dusk: view.narration?.kind === 'intro' ? '🏡 Köye hoş geldiniz' : '🌇 Akşam oluyor',
+    dawn: `🌅 ${view.night}. sabah`,
+    verdict: '⚖️ Karar',
     over: '🏁 Oyun bitti',
   };
   return el('div', { class: 'game-head' },
     el('div', { class: 'round' }, titles[view.phase]),
-    view.endsAt ? el('div', { class: 'big-timer' }, countdown(view.endsAt, ctx.serverOffset)) : null);
+    view.endsAt && !INTERMISSIONS.includes(view.phase) ? el('div', { class: 'big-timer' }, countdown(view.endsAt, ctx.serverOffset)) : null);
 }
 
 function announcement(view) {
@@ -271,8 +287,15 @@ function overScreen(view, ctx) {
 function renderGame(view, ctx) {
   syncCard(view);
   current = { view, ctx };
-  if (view.phase === 'over') return el('div', { class: 'stack' }, headline(view, ctx), stageEl(view, ctx), overScreen(view, ctx));
-  const parts = [headline(view, ctx), stageEl(view, ctx)];
+  if (view.phase === 'over') return el('div', { class: 'stack' }, headline(view, ctx), stageEl(view, ctx), narratorEl(view, ctx), overScreen(view, ctx));
+  const parts = [headline(view, ctx), stageEl(view, ctx), narratorEl(view, ctx)];
+  // Ara fazlar (akşam / sabah / karar): anlatıcı konuşur; ölüm sabah anlatımında herkese aynı anda açıklansın diye
+  // oyuncu listesi ve ölü uyarısı bu sırada gösterilmez.
+  if (INTERMISSIONS.includes(view.phase)) {
+    parts.push(roleCard(view));
+    if (view.phase === 'dusk') parts.push(el('section', { class: 'card' }, el('h2', {}, '👥 Köy'), playerList(view, ctx)));
+    return el('div', { class: 'stack' }, parts);
+  }
   if (view.me && !view.me.alive) parts.push(el('section', { class: 'card warn center' }, '💀 Öldün. Ölüler konuşmaz — oyun bitene kadar sessizce izle.'));
   parts.push(roleCard(view));
   if (view.phase === 'night') parts.push(nightScreen(view, ctx));
@@ -293,6 +316,9 @@ export function enter() {
   lobby?.unmount();
   stage?.dispose();
   stage = null;
+  narrator?.dispose();
+  narrator = null;
+  prevView = null;
   lobby = mountLobby($('game-vampir'), {
     id: 'vampir',
     name: 'Vampir Köylü',
@@ -315,5 +341,8 @@ export function leave() {
   lobby = null;
   stage?.dispose();
   stage = null;
+  narrator?.dispose();
+  narrator = null;
+  prevView = null;
   current = null;
 }

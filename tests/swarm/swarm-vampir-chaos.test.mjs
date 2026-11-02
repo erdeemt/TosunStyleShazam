@@ -340,7 +340,7 @@ test('yarış: oylama süresi dolarken oylar gelir → tek sonuç; Evet sayısı
   for (const b of voters) b.action({ type: 'trialVote', yes: true });
   const v = await g.host.waitView((x) => x.phase !== 'trialVote');
   await sleep(150);
-  const rejected = voters.filter((b) => b.errors.slice(marks.get(b)).some((e) => /oylama yok|zaten/.test(e.message))).length;
+  const rejected = voters.filter((b) => b.errors.slice(marks.get(b)).some((e) => /oylama yok|zaten|Anlatıcı/.test(e.message))).length;
   console.log(`oylama/süre yarışı: kabul=${voters.length - rejected}, reddedilen=${rejected}, sonuç=${JSON.stringify(v.lastTrial)}`);
   assert.equal(v.lastTrial.yes, voters.length - rejected, 'Evet sayısı = kabul edilen oylar');
   const resolutions = new Set(g.host.messages.filter((m) => m.t === 'view' && m.view.lastTrial).map((m) => JSON.stringify(m.view.lastTrial)));
@@ -369,7 +369,7 @@ test('yarış: geceye geç + destek aynı ms\'de → bekleyen aday varken gün b
   await g.host.waitView((v) => v.phase === 'night');
   await sleep(150);
   assert.equal(g.host.view.night, 2, 'gece tam 1 artmalı');
-  assert.equal(g.host.errors.filter((e) => /gündüz tartışması yok/.test(e.message)).length >= 9, true);
+  assert.equal(g.host.errors.filter((e) => /gündüz tartışması yok|Anlatıcı/.test(e.message)).length >= 9, true); // akşam anlatımı sırasında reddedilir
   assertClean(g);
 });
 
@@ -384,7 +384,7 @@ test('yarış: gece son seçim + bir oyuncunun ayrılması aynı ms\'de; savunma
     b.action({ type: 'nightPick', targetId: t });
   }
   leaver.leave();
-  const day = await g.host.waitView((v) => v.phase !== 'night');
+  const day = await g.host.waitView((v) => v.phase !== 'night' && v.phase !== 'dawn');
   assert.equal(day.phase, 'day');
   assert.equal(day.announcement.deadId, victim.playerId);
   // savunma süresi (60 sn × 0.05 = 3 sn) dolarken sanık bitirir

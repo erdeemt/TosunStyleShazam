@@ -292,6 +292,22 @@ Tek telefonla çok kişilik oyun denemek için. Sadece kancayı tanımlayan oyun
   oylar gizli (sadece "x/y oy" görünür, herkes kendi oyunu görür); oy vermeyen Hayır sayılır; **oy hakkı olanların yarısından fazlası Evet** derse asılır ve gece başlar; değilse tartışma kaldığı yerden sürer.
 - Tartışma süresi biterse o gün kimse asılmaz, gece başlar.
 
+**Anlatıcı ara fazları (2026-11-02, game/vampir-flow dalı)** — geçişler anlık olmasın, akış takip edilsin
+- Faz sırası: `dusk` (açılışta `intro` 6 sn "Köye hoş geldiniz… roller dağıtıldı", sonra her gece öncesi `dusk` 5 sn
+  "Akşam oldu, köy uykuya dalıyor") → `night` → `dawn` (8 sn: "Sabah oldu…" → %45'te ölen / "kimse ölmedi") → `day`
+  → (`trial` → `trialVote` → `verdict` 7 sn: "Oylama: 4/6 Evet" → %35'te fırlatıldı / kurtuldu) → `dusk` / `day`.
+- Süreler sabit (`NARRATION_MS` server/games/vampir.js; testlerde TIME_SCALE ile ölçeklenir) ve sonuçtan bağımsız; gece/gündüz/
+  savunma süreleri değişmez, karar anlatımı gündüz saatinden yemez. Ara fazlarda oyun eylemi (host "Geceye geç" dahil) reddedilir
+  ("Anlatıcı konuşuyor"); botlar plan yapmaz.
+- Gece ya da karar oyunu bitirirse önce dawn/verdict oynar, kazanma kontrolü anlatım bitince (`over` + kısa `over` anlatımı).
+  Asılan deli: karar anlatımı sırasında biri ayrılsa da deli kazanır.
+- `view.narration = { kind: intro|dusk|dawn|verdict|over, night, deadId, trial: {targetId, yes, voters, hanged}|null, startedAt,
+  endsAt }` — herkese birebir aynı; sadece zaten açık bilgi (ölen, Evet sayısı). Rol, saldırılan/kurtarılan, kimin ne oy verdiği yok.
+  Yargılamada `trial.supportById` (destekleyen, açık eylem) ipucu için görünür.
+- İstemci (`public/games/vampir-flow.js`): anlatıcı satırları sunucu saatine göre (startedAt + serverOffset) — geç bağlanan da
+  doğru satırı görür. 3D açıkken sahnenin üstünde şerit, kapalıyken kart. Oyun içi küçük ipuçları: aday, destek → yargılama,
+  oylama başladı, aday düştü; son 10 sn sayaç nabzı. Ölüm animasyonu türü `deathStyle(gameKey, night)` (yarasa / mezar taşı / tabut).
+
 **Kazanma** (her ölümden sonra kontrol)
 - 🤡 Deli gündüz **asılırsa** tek başına kazanır, oyun biter (gece öldürülürse kazanamaz).
 - Tüm vampirler ölürse köy kazanır.
@@ -316,7 +332,9 @@ Tek telefonla çok kişilik oyun denemek için. Sadece kancayı tanımlayan oyun
 - **Gizlilik kuralı:** sahne sadece `describe(view, {cardOpen})` tarifinden çizilir; rol türevli alanlar (seçim halkası, müttefik
   işareti) sadece kart açıkken. Kart kapalıyken herkesin tarifi (`.v3d[data-state]`) birebir aynı; tek fark kamera (herkes kendini
   önde görür, kendi adı gizli). Gece dokunuşu düğmeyle aynı kapıdan geçer (`tapTarget`: kart kapalıysa sadece uyarı).
-- Aşamalar: 1 = sahne, gece/gündüz, uyku, aday ❗, yargılama spotu, hayalet + mezar taşı (bitti) · 2 = ölüm/asılma animasyonları ·
+- Aşamalar: 1 = sahne, gece/gündüz, uyku, aday ❗, yargılama spotu, hayalet + mezar taşı (bitti) · 2 = anlatıcı akışı + ölüm/sürgün
+  animasyonları (game/vampir-flow: yarasa sürüsü / mezar taşı pop / tabut; asılan mancınıkla fırlatılır, kurtulan zıplar; akşam kamera
+  geri çekilir, sabah ölene, kararda sanığa yaklaşır; reduced-motion: metin + zamanlama kalır, kamera/parçacık yok) ·
   3 = kart açıkken rol efektleri, oyun sonu rol açılışı + dans, sesler + sessiz düğmesi.
 
 ### 4.4 🎵 Tosun Shazam — Online (lobili) mod — kullanıcı ile netleşti (2026-10-23)

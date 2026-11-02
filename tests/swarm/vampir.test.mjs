@@ -34,7 +34,8 @@ async function playNight(g, { victim, protect, peek } = {}) {
     if (role === 'gozcu' && peek) target = peek.playerId;
     b.action({ type: 'nightPick', targetId: target });
   }
-  await Promise.all(g.bots.map((b) => b.waitView((v) => v.phase !== 'night' || v.night > night)));
+  // gece → sabah anlatımı (dawn) → gündüz ya da oyun sonu
+  await Promise.all(g.bots.map((b) => b.waitView((v) => v.phase === 'over' || (v.phase === 'day' && v.night === night) || v.night > night)));
   return g.host.view;
 }
 
@@ -47,7 +48,8 @@ async function hang(g, target, { yes = true } = {}) {
   target.action({ type: 'endDefense' });
   await g.host.waitView((v) => v.phase === 'trialVote');
   for (const v of voters) v.action({ type: 'trialVote', yes });
-  return g.host.waitView((v) => v.phase !== 'trialVote');
+  // oylama → karar anlatımı (verdict) → gündüz / akşam → gece / oyun sonu
+  return g.host.waitView((v) => ['day', 'night', 'over'].includes(v.phase));
 }
 
 // Oyun bitmeden: kimse kendi rolü dışında rol görmemeli (vampirler birbirini görür).
@@ -285,4 +287,37 @@ test('destek almayan aday süre dolunca düşer ve herkese yayınlanır; sonra y
   assert.equal(cleared.nomination, null);
   await c.act({ type: 'nominate', targetId: a.playerId });
   assert.equal(c.view.nomination.byId, c.playerId);
+});
+
+test('anlatıcı: açılış/sabah/karar anlatımı herkese birebir aynı, rol/doktor/gözcü bilgisi yok; bu sırada eylem reddedilir', async () => {
+  const g = await setup(8);
+  const narrs = (phase) => g.bots.map((b) => b.messages.filter((m) => m.t === 'view' && m.view.phase === phase).map((m) => JSON.stringify(m.view.narration)));
+  const SECRET = /vampir|koylu|doktor|gozcu|deli|role|savedId|doctorPick|seer|votes|isVampire|allies/;
+  const intro = narrs('dusk');
+  assert.ok(intro[0].length >= 1);
+  assert.equal(new Set(intro.map((x) => x.join('|'))).size, 1, 'açılış anlatımı herkeste aynı');
+  assert.match(intro[0][0], /"kind":"intro"/);
+  // sabah: doktor kurbanı korusa da korumasa da anlatımda sadece deadId
+  const victim = g.by('koylu')[0];
+  const doc = g.by('doktor')[0];
+  const nightP = playNight(g, { victim, protect: victim });
+  const dawn = await g.host.waitView((v) => v.phase === 'dawn');
+  // anlatıcı konuşurken eylem: herkese aynı genel hata
+  // (sabah 8 sn × 0.01 = 80 ms: yanıt gündüze denk gelebilir; ret kuralı birim testte kesin)
+  const err = await doc.expectError({ type: 'nightPick', targetId: victim.playerId });
+  assert.match(err.message, /Anlatıcı|gece değil/);
+  await nightP;
+  assert.equal(dawn.narration.deadId, null);
+  const dawns = narrs('dawn');
+  assert.equal(new Set(dawns.map((x) => x.join('|'))).size, 1, 'sabah anlatımı herkeste aynı');
+  for (const t of dawns.flat()) assert.doesNotMatch(t, SECRET);
+  // karar: Evet sayısı açık, kimin ne oy verdiği yok
+  const target = living(g).find((b) => b.view.me.role === 'koylu' && b !== victim);
+  await hang(g, target, { yes: false });
+  const verdicts = narrs('verdict');
+  assert.equal(new Set(verdicts.map((x) => x.join('|'))).size, 1, 'karar anlatımı herkeste aynı');
+  const vt = JSON.parse(verdicts[0][0]);
+  assert.deepEqual(Object.keys(vt.trial).sort(), ['hanged', 'targetId', 'voters', 'yes']);
+  for (const t of verdicts.flat()) assert.doesNotMatch(t, SECRET);
+  assertSecrets(g);
 });
