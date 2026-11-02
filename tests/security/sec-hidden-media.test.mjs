@@ -14,7 +14,7 @@ import { secret, fetchMedia, decodePng, countBlobs, parseWav, estimateFreq, hasK
 import { hexToRgb } from '../../public/recall-math.js';
 import { TESTS, trackLanding, tempoExpected, splitValue } from '../../public/perceptle-math.js';
 
-const DAY = '2026-11-02';
+const DAY = '2027-03-15'; // gerçek bugünden farklı bir gün olmalı (son test bunu varsayar)
 const TS = 0.02;
 process.env.TEST_GAMES = '1';
 process.env.RECALL_SALT = 'test-salt';
