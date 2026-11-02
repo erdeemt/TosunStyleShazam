@@ -390,8 +390,10 @@ export function eduProbs(c) {
   const pUni = Math.min(clamp(c.ter / 100, 0.005, 0.85), pUp);
   const pMs = pUni * clamp(c.msA / Math.max(c.baA, 1), 0, 0.5);
   const someP = 1 - pNone - pPrim; // okula başlayıp ilkokulu bitiremeyen
-  const meanYrs = someP * 3 + (pPrim - pLow) * 6 + (pLow - pUp) * 9 + (pUp - pUni) * 12 + (pUni - pMs) * 16 + pMs * 18;
-  return { pNone, pPrim, pLow, pUp, pUni, pMs, meanYrs };
+  const dist = [[0, pNone], [3, someP], [6, pPrim - pLow], [9, pLow - pUp], [12, pUp - pUni], [16, pUni - pMs], [18, pMs]];
+  const meanYrs = dist.reduce((a, [y, p]) => a + y * p, 0);
+  const sdYrs = Math.sqrt(dist.reduce((a, [y, p]) => a + p * (y - meanYrs) ** 2, 0));
+  return { pNone, pPrim, pLow, pUp, pUni, pMs, meanYrs, sdYrs };
 }
 
 // pe: gizli eğitim yüzdeliği (0–1). Döner: hedef yıl ve üniversite/yüksek lisans "kaderi" (seçimler değiştirebilir)
@@ -604,8 +606,10 @@ function zAdult(world, L) {
   const beta = LIT.mincer.v;
   const ige = LIT.ige.v;
   const eduZ = (beta * (yrs - p.meanYrs)) / c.sigma;
-  const s = Math.sqrt(Math.max(0.2, 1 - ige * ige - ((beta * 3.5) / c.sigma) ** 2));
-  return ige * L.zW + eduZ + s * L.lat.shock;
+  // Varyans 1'de kalsın: ebeveyn + eğitim bileşenleri en fazla %80 açıklasın (Gini'si düşük ülkelerde σ küçük, eğitim z'si büyür)
+  const sys = ige * ige + ((beta * p.sdYrs) / c.sigma) ** 2;
+  const k = Math.min(1, Math.sqrt(0.8 / sys));
+  return k * (ige * L.zW + eduZ) + Math.sqrt(Math.max(0, 1 - k * k * sys)) * L.lat.shock;
 }
 
 function derive(world, L) {
@@ -626,7 +630,7 @@ function derive(world, L) {
   const fatalPull = L.fatal ? 25 : 0;
   L.st.h = clamp(healthTarget(c, a) - 15 * Math.log(rr) + L.tr.h - fatalPull, 1, 100);
   // Bilgi: okul yılı + yaşla biriken deneyim
-  L.st.k = clamp(4 + L.edu.yrs * 4.6 + Math.min(a, 60) * 0.35 + (a < 6 ? a * 1.5 : 0) - Math.max(0, a - 75) * 0.6, 0, 100);
+  L.st.k = clamp(4 + L.edu.yrs * 4 + Math.min(a, 60) * 0.3 + (a < 6 ? a * 1.5 : 0) - Math.max(0, a - 75) * 0.6, 0, 100);
   // Keyif: ülkenin yaşam memnuniyeti (Cantril) + varlık + yakınlar + geçici olaylar
   const live = L.kids.some((k) => !k.lost);
   L.st.j = clamp(c.sat * 10 + 8 + 4 * (z - 0) + (L.partner ? 3 : 0) + (live ? 2 : 0) + L.jOff + L.tr.j, 1, 100);

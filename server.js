@@ -24,6 +24,7 @@ const MIME = {
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.ico': 'image/x-icon',
+  '.json': 'application/json; charset=utf-8',
 };
 
 // ---------- Spotify (embed sayfası, giriş gerektirmez) ----------

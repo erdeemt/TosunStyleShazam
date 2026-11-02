@@ -114,7 +114,7 @@ export const EVENTS = [
       { l: 'Okula devam etmek istiyorum', odds: 0.15, win: { t: `Ailen fedakârlık yapıp okumana izin verdi. Okula devam ediyorsun.`, fx: { j: 3 }, do: (L) => { L.edu.plan = Math.min(12, L.edu.plan + 3); } }, lose: { t: `İstedin ama olmadı; para yetmedi. Okulu bırakmak zorunda kalacaksın.`, fx: { j: -3 } } },
       { l: 'Çalışıp aileme destek olayım', t: `Okulu bırakıp çalışmaya karar verdin. Eve ilk parayı getirdiğin gün annen ağladı.`, fx: { j: -1 } },
     ] },
-  { id: 'okul-bitti', st: '*', age: [7, 30], p: 1, if: (L) => L.edu.inSchool && L.edu.yrs >= L.edu.plan, ic: '🎓', hl: (L) => (L.edu.uni ? 2 : 1),
+  { id: 'okul-bitti', st: '*', age: [7, 30], p: 1, max: 4, if: (L) => L.edu.inSchool && L.edu.yrs >= L.edu.plan, ic: '🎓', hl: (L) => (L.edu.uni ? 2 : 1),
     src: { d: 'oos, cmpP, cmpL, upE, ter, msA/baA', how: 'okulda kalınan yıl: tamamlama/okullaşma oranlarına göre gizli eğitim yüzdeliğinden (ebeveyn varlığıyla 0,42 korelasyon, Hertz vd. 2007)' },
     stat: (L, c) => `${c.n}: ilkokulu ${P(Math.min(100, c.cmpP), 0)}, ortaokulu ${P(Math.min(100, c.cmpL), 0)} tamamlıyor; lise okullaşması ${P(Math.min(100, c.upE), 0)}, üniversite ${P(Math.min(100, c.ter), 0)} (UNESCO UIS).`,
     do: (L) => {
@@ -172,12 +172,12 @@ export const EVENTS = [
   { id: 'kamp', st: 'ergen', age: [12, 16], p: 0.05, fl: true, ic: '⛺', t: `İlk kez çadırda kamp yaptın. Gece duyduğun sesin bir kirpi olduğu sabah anlaşıldı.`, fx: { j: 3 } },
 
   // ======================= GENÇLİK (18–29) =======================
-  { id: 'is-bul', st: '*', age: [12, 70], p: (L) => (L.unemployed ? 0.75 : 0.9), if: (L) => !L.job && !L.edu.inSchool && !L.retired && L.lat.lf && (L.age >= 15 || L.cnt['cocuk-isci']), ic: '💼', hl: (L) => (L.cnt['is-bul'] ? 0 : 1),
+  { id: 'is-bul', st: '*', age: [12, 70], p: (L) => (L.unemployed ? 0.75 : 0.9), if: (L) => !L.job && !L.edu.inSchool && !L.retired && L.lat.lf && (L.age >= 15 || L.cnt['cocuk-isci']) && (L.edu.yrs < 12 || L.flags.examDone || L.age > 23), ic: '💼', hl: (L) => (L.cnt['is-bul'] ? 0 : 1),
     src: { d: 'lfpM, lfpF, unem', how: 'cinsiyete göre işgücüne katılım = P(iş arar); işsizlikten çıkış yılda %75', v: 'çıkış hızı %75 varsayım (ortalama işsizlik 3–18 ay, ILO)' },
     stat: (L, c) => `${c.n}: ${L.sex === 'M' ? 'erkeklerin' : 'kadınların'} ${P(lfp(L, c), 0)}'i işgücünde; işsizlik ${P(c.unem)} (ILO).`,
     do: (L, c, api) => { api.getJob(); },
     t: (L) => (L.cnt['is-bul'] > 1 ? `Yeni bir işe girdin: {is}.` : L.age < 15 ? `Henüz {yas} yaşındayken düzenli çalışmaya başladın: {is}.` : `İlk işin: {is}. İlk maaşla ailene küçük bir hediye aldın.`), fx: { j: 2 } },
-  { id: 'ev-isleri', st: '*', age: [16, 30], p: 1, if: (L) => !L.lat.lf && !L.edu.inSchool, ic: '🏠', src: { d: 'lfpM, lfpF', how: '1 − işgücüne katılım oranı = P(ücretli iş dışında kalır)' },
+  { id: 'ev-isleri', st: '*', age: [16, 30], p: 1, if: (L) => !L.lat.lf && !L.edu.inSchool && (L.edu.yrs < 12 || L.flags.examDone || L.age > 23), ic: '🏠', src: { d: 'lfpM, lfpF', how: '1 − işgücüne katılım oranı = P(ücretli iş dışında kalır)' },
     stat: (L, c) => `${c.n}: ${L.sex === 'M' ? 'erkeklerin' : 'kadınların'} ${P(100 - lfp(L, c), 0)}'i işgücü dışında (ILO).`,
     t: (L) => (L.sex === 'F' ? `Ücretli bir işe girmedin; evin ve ailenin bütün yükü senin omuzlarında.` : `Ücretli bir işin olmadı; ailenin yanında, gündelik yardımlarla geçiniyorsun.`) },
   { id: 'issiz', st: '*', age: [18, 64], p: (L, c) => unempIn(c), if: (L) => !!L.job && !L.unemployed, gap: 2, max: 6, ic: '📉', hl: 1,
