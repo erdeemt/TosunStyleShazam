@@ -291,7 +291,7 @@ async function fileInfos(titles) {
         title: p.title,
         mime: ii.mime, width: ii.width, height: ii.height, thumb: ii.thumburl, page: ii.descriptionurl,
         date: em.DateTimeOriginal?.value ?? '', license: stripHtml(em.LicenseShortName?.value), licenseUrl: stripHtml(em.LicenseUrl?.value),
-        artist: stripHtml(em.Artist?.value).slice(0, 120), desc: stripHtml(em.ImageDescription?.value).slice(0, 400),
+        artist: stripHtml(em.Artist?.value).replace(/^(.+?) $/, '$1').slice(0, 120), desc: stripHtml(em.ImageDescription?.value).slice(0, 400),
         cats: `${stripHtml(em.Categories?.value)} ${(p.categories ?? []).map((c) => c.title).join(' ')}`,
         coord: p.coordinates?.[0] ? { lat: p.coordinates[0].lat, lon: p.coordinates[0].lon } : null,
       });
