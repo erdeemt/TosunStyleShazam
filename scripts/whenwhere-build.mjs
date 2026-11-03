@@ -182,7 +182,7 @@ const BAD = new RegExp([
   'gravure', 'etching', 'woodcut', 'artwork', 'postage', 'stamp', 'coin', 'banknote', 'logo', 'poster', 'document', 'letter', 'manuscript',
   'newspaper', 'book', 'cover', 'page', 'portrait', 'corpse', 'dead', 'death', 'execut', 'hanged', 'hanging', 'massacre', 'killed', 'victim',
   'wounded', 'casualt', 'atrocit', 'genocide', 'funeral', 'burial', 'cemetery', 'grave', 'model', 'medal', 'seal\\b', 'signature', 'ticket',
-  'squad', '\\bteam\\b', 'group photo', 'group portrait', 'delegation', 'gazete', 'cumhuriyet \\d', 'piano', 'interior of a', 'award',
+  'holy land photographed', 'ETH-BIB-.*Dia', 'prisoner', 'blindfold', '\\bspy\\b', 'barren tree', 'expedition \\(', 'travel center', 'squad', '\\bteam\\b', 'group photo', 'group portrait', 'delegation', 'gazete', 'cumhuriyet \\d', 'piano', 'interior of a', 'award',
   'advert', 'menu', 'text', 'inscription', 'tughra', 'calligraph', 'blueprint', 'elevation', 'section', 'facsimile', 'nude', 'naked', 'x-ray',
   'microscop', 'specimen', 'scan of', 'leaflet', 'brochure', 'stereo', 'mugshot', 'icon', 'mosaic', 'fresco', 'relief', 'sculpture\\b',
 ].join('|'), 'i');
