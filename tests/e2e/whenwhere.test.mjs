@@ -90,7 +90,7 @@ test('Günlük: 5 fotoğraf, iğne + yıl, açıklama haritası ve künye, final
     await p.page.click('.ww-lock');
     await p.page.waitForSelector('.ww-big-score');
     await p.page.waitForSelector('[data-testid=ww-reveal-map] .ww-pin-truth');
-    await p.page.waitForSelector('[data-testid=ww-reveal-map] .leaflet-overlay-pane path');
+    await p.page.waitForSelector('[data-testid=ww-reveal-map] .leaflet-overlay-pane path', { state: 'attached' }); // yatay çizginin yüksekliği 0 olabilir
     const credit = await p.page.locator('.ww-credit').textContent();
     assert.ok(credit.includes(truths[i].title) && credit.includes('Test Yazar') && credit.includes('CC BY-SA 4.0'));
     assert.match(await p.page.locator('.ww-miss').textContent(), /(km|m) \/ .*şaştın/);
