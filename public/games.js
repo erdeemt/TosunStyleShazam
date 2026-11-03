@@ -72,4 +72,12 @@ export const GAMES = [
     categories: ['multi'],
     load: () => import('./games/vampir.js'),
   },
+  {
+    id: 'lifesim',
+    name: 'Doğum Piyangosu',
+    icon: '🎲',
+    desc: 'Dünyada bir yerde doğ, gerçek istatistiklerle yaşa',
+    categories: ['single'],
+    load: () => import('./games/lifesim.js'),
+  },
 ];
