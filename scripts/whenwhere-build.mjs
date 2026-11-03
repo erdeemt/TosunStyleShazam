@@ -408,7 +408,7 @@ function captionOf(place, seed, year, coord) {
   const where = [place?.cityTr && place.cityTr !== name ? place.cityTr : null, TR_COUNTRY_FIX[place?.countryTr] ?? place?.countryTr].filter(Boolean);
   const loc = inIstanbul(coord) && !where.includes('İstanbul') ? ['İstanbul', ...where.filter((w) => w !== 'Türkiye')] : where;
   const desc = place?.desc && !seed.city ? ` — ${place.desc.replace(/\.$/, '')}` : '';
-  const title = seed.city ? `${name}, ${year}` : name;
+  const title = name;
   const caption = `${name}${loc.length ? ` (${loc.join(', ')})` : ''}${desc}. Fotoğraf ${year} yılından.`;
   return { title, caption };
 }

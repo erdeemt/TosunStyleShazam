@@ -17,7 +17,10 @@ export const VIEWS = {
 // Animasyon sürerken kaldırılan harita Leaflet'te geç gelen transitionend ile hata atar: önce durdur, olayları kes.
 function safeRemove(map) {
   if (!map) return;
-  try { map.stop(); map.off(); map.remove(); } catch { /* zaten kaldırıldı */ }
+  try { map.stop(); map.off(); } catch { /* yok say */ }
+  // Süren yakınlaştırma geçişinin transitionend'i panolar hâlâ yerindeyken gelsin (Leaflet 1.9 _leaflet_pos hatası):
+  // kaldırmayı geçişten (250 ms) sonraya bırak.
+  setTimeout(() => { try { map.remove(); } catch { /* zaten kaldırıldı */ } }, 600);
 }
 
 let loading = null;
