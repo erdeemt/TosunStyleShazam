@@ -1,5 +1,5 @@
 // 📸 Ne Zaman Nerede? birim testleri: puan matematiği, tahmin temizliği, üst veri silme (JPEG/PNG), günlük belirlenimcilik,
-// açık vekil koruması ve gerçek fotoğraf havuzunun (content/whenwhere/photos.json) şeması. Kurallar: PLAN.md §4.10.
+// açık vekil koruması ve gerçek fotoğraf havuzunun (content/whenwhere/photos.json) şeması. Kurallar: PLAN.md §4.11.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readFileSync } from 'node:fs';

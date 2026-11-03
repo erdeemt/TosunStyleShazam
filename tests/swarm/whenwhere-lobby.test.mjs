@@ -1,6 +1,6 @@
 // 📸 Ne Zaman Nerede? lobi sürü testleri: tam oyun, puan = scoreRound, tur kapanmadan cevap/başkasının tahmini sızmaz,
 // süre dolunca tahminsiz 0, görsel jetonu sahibine + odaya bağlı, yeniden bağlanma, izleyici, ayar temizliği, host geçişi.
-// Kurallar: PLAN.md §4.10 "Çok oyunculu".
+// Kurallar: PLAN.md §4.11 "Çok oyunculu".
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

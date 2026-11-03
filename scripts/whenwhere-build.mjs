@@ -7,7 +7,7 @@
 // Wikimedia Commons API (kategori ağacı "X by year" / "X in 1925" / "History of X" / "X in the 1920s"; dosya tarihi,
 // lisansı, yazarı, kendi koordinatı). Yıl: kategori adındaki kesin yıl (en güvenilir) ya da dosyanın "Date" alanı;
 // ikisi çelişirse dosya atılır. Lisans: sadece kamu malı / CC0 / CC BY / CC BY-SA / "No restrictions".
-// Ayrıntı ve süzgeçler: PLAN.md §4.10.
+// Ayrıntı ve süzgeçler: PLAN.md §4.11.
 //
 // Ağ nazik: tek istek, aralarda bekleme, 429'da geri çekilme, yanıtlar WW_CACHE klasöründe saklanır (tekrar çalıştırma ucuz).
 import { createHash, randomBytes } from 'node:crypto';
