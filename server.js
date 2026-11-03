@@ -7,6 +7,7 @@ import { attachLobby, resolveIdentity, verifyIdentity, stats as lobbyStats, _tes
 import * as wordle from './server/wordle.js';
 import * as recall from './server/recall.js';
 import * as perceptle from './server/perceptle.js';
+import * as whenwhere from './server/whenwhere.js';
 import { GameError } from './server/errors.js';
 import { serveMedia, mediaStats } from './server/media-tokens.js';
 import { clientIp, httpLimiter, upstreamLimiter } from './server/limits.js';
@@ -25,6 +26,7 @@ const MIME = {
   '.png': 'image/png',
   '.ico': 'image/x-icon',
   '.json': 'application/json; charset=utf-8',
+  '.jpg': 'image/jpeg',
 };
 
 // ---------- Spotify (embed sayfası, giriş gerektirmez) ----------
@@ -336,6 +338,18 @@ async function handleApi(url, res, req) {
     if (endpoint === 'submit') return sendJson(res, 200, perceptle.submitAnswer(identity, mode, body.gameId, body.index, body.answer));
     return sendJson(res, 200, perceptle.leaderboard(perceptle.todayIstanbul(), identity.id));
   }
+  // 📸 Ne Zaman Nerede?: /api/whenwhere/<uç>
+  const whenwhereRoute = url.pathname.match(/^\/api\/whenwhere\/(start|round|guess|leaderboard)$/);
+  if (whenwhereRoute) {
+    const endpoint = whenwhereRoute[1];
+    const body = await readJson(req);
+    const identity = requireIdentity(body);
+    const mode = body.mode === 'free' ? 'free' : 'daily';
+    if (endpoint === 'start') return sendJson(res, 200, whenwhere.startGame(identity, mode, body.set));
+    if (endpoint === 'round') return sendJson(res, 200, whenwhere.startRound(identity, mode, body.gameId, body.round));
+    if (endpoint === 'guess') return sendJson(res, 200, whenwhere.submitGuess(identity, mode, body.gameId, body.round, body.guess));
+    return sendJson(res, 200, whenwhere.leaderboard(whenwhere.todayIstanbul(), identity.id));
+  }
   // Sadece testlerde (TEST_GAMES=1): oda/döngü sayısı + işlemci süresi (sızıntı ve yük testleri için).
   if (process.env.TEST_GAMES === '1' && process.env.TEST_MODE === '1' && url.pathname === '/api/_test/stats') {
     return sendJson(res, 200, { ...lobbyStats(), media: mediaStats(), cpu: process.cpuUsage(), uptimeMs: Math.round(process.uptime() * 1000), rss: process.memoryUsage().rss });
@@ -344,6 +358,7 @@ async function handleApi(url, res, req) {
   if (process.env.TEST_GAMES === '1' && process.env.TEST_MODE === '1' && url.pathname === '/api/_test/secret') {
     if (q.get('room')) return sendJson(res, 200, _testRoomSecrets(q.get('room')));
     if (q.get('recall')) return sendJson(res, 200, recall._testSecrets(q.get('recall'), q.get('gameId')));
+    if (q.get('whenwhere')) return sendJson(res, 200, whenwhere._testSecrets(q.get('gameId')));
     return sendJson(res, 200, perceptle._testSecrets(q.get('gameId')));
   }
   switch (url.pathname) {
@@ -423,7 +438,8 @@ const CSP = [
   'frame-src https://www.youtube.com https://www.youtube-nocookie.com',
   // Kapaklar ve önizlemeler sadece müzik servislerinin CDN'lerinden (host tarafından eklenen şarkılar dahil).
   // blob: → gizli uyaran görseli (Nüans hedefi) /api/media'dan indirilip gösterilir
-  "img-src 'self' data: blob: https://i.scdn.co https://*.spotifycdn.com https://i.ytimg.com https://*.dzcdn.net",
+  // tile.openstreetmap.org → 📸 Ne Zaman Nerede? haritası (OSM karoları; fotoğrafın kendisi /api/media'dan blob:)
+  "img-src 'self' data: blob: https://i.scdn.co https://*.spotifycdn.com https://i.ytimg.com https://*.dzcdn.net https://tile.openstreetmap.org",
   "media-src 'self' data: https://p.scdn.co https://*.dzcdn.net", // data: → ses kilidini açan sessiz klip
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   'font-src https://fonts.gstatic.com',

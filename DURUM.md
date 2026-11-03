@@ -188,3 +188,29 @@ Açık küçük notlar:
 - Kullanıcı denemeli: hız (2,5 sn/yıl) ve seçim sıklığı, ağır olayların tonu, telefonda bayrak yazı tipi yüklemesi, paylaşım kartı (iOS share).
 - Açık: boşanma verisi sadece 45 ülkede (gerisi bölge ortalaması); emeklilik yaşı ve kanser sağkalımı gelir eşiğinden (varsayım);
   ülkeler arası göç hedefi göçmen stokuna göre (ikili göç koridoru verisi yok); Tayvan veride yok (Dünya Bankası kapsamı).
+
+## 📸 Ne Zaman Nerede? — game/whenwhere dalında (main'e BİRLEŞTİRİLMEDİ, 2026-11-02)
+
+- Tarihi fotoğraftan NEREDE (haritada iğne) + NE ZAMAN (yıl) tahmini; tek oyunculu 📅 Günlük (herkese aynı 5 foto, tek deneme,
+  sıralama + 🆕 kuralı) ve ♾️ Serbest (set: Karışık / Türkiye / Eski İstanbul / 4 dönem / 5 tema; yakında görülen tekrar gelmez),
+  lobili çok oyunculu (1–12 kişi; host set + 3/5/10 tur + 30/60/90 sn; herkes aynı anda, açıklamada herkesin iğnesi tek haritada,
+  final kürsüsü). Kurallar, puan formülü ve havuz hattı PLAN.md §4.11.
+- Puan: tur 0–1000 = yer 500·e^(−km/k) (k: dünya 1500, Türkiye 150, İstanbul 3) + yıl 500·e^(−|Δ|/12).
+- Fotoğraflar Wikimedia Commons'tan (özgür lisans); sunucu küçük resmi kendisi çeker, üst veriyi siler, diskte önbellekler
+  (`data/whenwhere-cache`, 400 MB), sadece opak `/api/media` jetonuyla verir. Cevap (yer/yıl/başlık/dosya) kilitten önce hiçbir yanıtta yok.
+- Harita: Leaflet 1.9.4 (public/vendor/leaflet) + OSM karoları (CSP img-src'ye sadece tile.openstreetmap.org eklendi).
+- Havuz: `content/whenwhere/photos.json` (`node scripts/whenwhere-build.mjs`; `data/` gitignore'da olduğu için content/ altında).
+- Havuz (göz kontrollü, 2026-11-03): 294 foto — Türkiye 96 (%33), Eski İstanbul 43; dönem 66 / 73 / 39 / 116 (1850–1900 / –1945 / –1980 / –2015);
+  bölge Avrupa 73, Asya 47, K. Amerika 49, Afrika 17, Okyanusya 6, G. Amerika 6; tema Şehir 110, Ulaşım 82, İcat 37, Spor 17, Savaş 13.
+  Betik ~450 aday üretti; tüm küçük resimler tek tek bakıldı, 158 elendi (yazılı başlık/kartpostal yazısı, çizim/resim, belge, portre,
+  stereo kart, seçilemeyen yakın plan, logo/bayrak) → photos.json `rejected` listesinde (betik tekrar seçmez).
+- Dosyalar: server/whenwhere.js, server/games/whenwhere.js, server/image-strip.js, public/whenwhere-math.js,
+  public/games/whenwhere(-lobby|-map|-ui).js; ortak dosyalara küçük ekler: server.js (uçlar + CSP + .jpg MIME), server/games/index.js,
+  server/media-tokens.js (image/jpeg), public/games.js, public/index.html, public/style.css (sonda blok).
+- Testler: tests/unit/whenwhere.test.mjs, tests/security/sec-whenwhere.test.mjs, tests/swarm/whenwhere-lobby.test.mjs,
+  tests/e2e/whenwhere.test.mjs (ekranlar test-results/whenwhere/). TEST_MODE'da Wikimedia'ya gidilmez (16 kayıtlık test havuzu + yer tutucu JPEG).
+- Yeni testler: birim 15, güvenlik 6, sürü 7, e2e 3. Tam çalıştırma (2026-11-03): npm test 419/423 geçti + 3 atlandı (SOAK), tek düşen
+  swarm-vampir-chaos "yeniden bağlanma fırtınası" tek başına 17/17 (kararsız, paralel yük altında); npm run e2e 71/73, düşen nuance lobi
+  testi tek başına 2/2, whenwhere günlük testi (yatay çizgi "görünmez" sayıldı) düzeltildi → 3/3.
+- Kullanıcı denemeli: telefonda harita hissi (iki parmak yakınlaştırma, iğne sürükleme), puan ölçekleri (özellikle İstanbul 3 km sert mi),
+  60 sn tur süresi, fotoğraf kalitesi (görmediğim fotoğraflar kötü çıkarsa `rejected` listesine dosya adı eklenip betik yeniden çalıştırılır).

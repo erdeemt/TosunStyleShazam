@@ -80,4 +80,12 @@ export const GAMES = [
     categories: ['single'],
     load: () => import('./games/lifesim.js'),
   },
+  {
+    id: 'whenwhere',
+    name: 'Ne Zaman Nerede?',
+    icon: '📸',
+    desc: 'Eski fotoğraf: nerede ve hangi yıl çekildi?',
+    categories: ['single', 'multi'],
+    load: () => import('./games/whenwhere.js'),
+  },
 ];

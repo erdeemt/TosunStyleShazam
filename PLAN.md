@@ -677,3 +677,95 @@ animasyon yok. Test kancası: `localStorage['tss:lifesim-seed']` sabit tohum.
 ortalama ömür ±2 yıl ve ölüm nedeni payları ±3 puan, üniversite ±5 puan, kadın ilk evlilik yaşı ±1,5, kadın başına çocuk ±%15,
 göç ±1,5 puan, sigara ±3 puan; determinizm; NaN yok; yaş aralığı dışı olay yok; ≥120 olay, kaynak/renk kuralları; Türkçe ekler.
 `tests/e2e/lifesim.test.mjs` (2): 360×800 telefon, doğ → seçim → 4× + ⏭ → karne → PNG indirme → geçmiş; kaynaklar ve 📊.
+
+### 4.11 📸 Ne Zaman Nerede? (tarihi fotoğraf: yer + yıl tahmini) — 2026-11-02
+
+Kendi tasarımımız ("tarihi fotoğraftan yer ve zaman tahmini" türü; başka sitenin adı/metni/arayüzü kopyalanmadı). Tek oyunculu
+(Günlük + Serbest) ve lobili çok oyunculu. Dosyalar: `public/whenwhere-math.js` (ortak saf hesap), `server/whenwhere.js` (havuz,
+görsel vekili, tek oyunculu uçlar), `server/games/whenwhere.js` (lobi), `server/image-strip.js` (üst veri silme),
+`public/games/whenwhere.js` (tek oyunculu + kabuk), `whenwhere-lobby.js`, `whenwhere-map.js` (Leaflet), `whenwhere-ui.js` (ortak parçalar),
+`public/vendor/leaflet/` (Leaflet 1.9.4, BSD-2), `scripts/whenwhere-build.mjs` (havuz betiği), `content/whenwhere/` (havuz).
+
+**Oyun**: fotoğraf gösterilir (dokununca tam ekran); oyuncu haritaya iğne koyar (dokun → iğne, sürükle → düzelt, iki parmakla
+yakınlaştır) ve yılı seçer (kaydırıcı 1840–2020 + −10/−1/+1/+10 + büyük gösterge, başlangıç 1930), 🔒 Kilitle. Açıklama: harita
+(iğnen, 📍 gerçek yer, çizgi), "X km / Y yıl şaştın", yer + yıl puanı, başlık + açıklama + Vikipedi + Commons dosyası + yazar/lisans
+(CC BY/BY-SA atıf şartı), "Sonraki". Bitiş: toplam / 5000, tur tur döküm, puan bandına göre unvan, paylaşım
+(🟩 ≥ 850, 🟨 ≥ 600, 🟧 ≥ 300, 🟥).
+
+**Puan** (tur 0–1000, sunucu hesaplar; `public/whenwhere-math.js`, birim testli):
+- Yer `round(500 · e^(−d/k))`, d büyük daire (haversine) km. k: Dünya/Karışık/dönem/tema **1500 km**, Türkiye **150 km**,
+  Eski İstanbul **3 km**. Dünya: 50 km → 483, 150 km (doğru şehir) → 452, İstanbul↔Ankara (350 km) → 396. Türkiye: 10 km → 468.
+  İstanbul: 300 m → 452, 1 km → 358, 5 km → 94.
+- Yıl `round(500 · e^(−|Δ|/12))`: tam → 500, 5 yıl → 330, 20 yıl → 94.
+- Tahmin yoksa (lobide süre doldu, iğne yok) 0. Unvan (tur başına ortalama): ≥900 🕰️ Zaman Yolcusu, ≥750 🧭 Arşiv Kurdu,
+  ≥600 📚 Tarih Meraklısı, ≥450 🗺️ Gezgin, ≥300 🎒 Turist, ≥150 🌫️ Yolunu Kaybetmiş, altı 🙈 Pusulasız.
+- Tahmin temizliği: sadece JSON sayıları; enlem [−90, 90], yıl tam sayı [1840, 2020] dışı red; boylam [−540, 540] içinde sarılır.
+
+**Setler**: Karışık, Türkiye, Eski İstanbul (İstanbul + kesin konum + ≤ 1990), dönemler (1850–1900, 1900–1945, 1945–1980,
+1980–2015), temalar (Savaş, Ulaşım, Spor, Şehir, İcat & Yapı). 5'ten az fotoğraflı set seçilemez. Haritanın başlangıç görünümü sete
+göre (dünya z1, Türkiye z5, İstanbul z11; z18'e kadar).
+
+**Tek oyunculu** (`/api/whenwhere/start|round|guess|leaderboard`, gövdede kimlik):
+- **Günlük**: herkese aynı 5 fotoğraf. Gizli tuz (`secrets.whenwhereSalt`) ile karıştırılmış havuz sırasından günün dilimi
+  (gün × 5; döngü bitene kadar tekrar yok), sıra da tarihe göre karışık; gün ilk istendiğinde kimlikler `whenwhere-days` kaydına
+  sabitlenir (gün içinde havuz güncellense de değişmez). Kimlik başına tek deneme; turlar sırayla: `round` sadece sıradaki tur için
+  ve önceki tur kilitlenmeden açılmaz, kilitli tur yeniden açılmaz/tahmin edilmez. Süre yok; sayfa yenilenince yarıdaki tur yeni görsel
+  adresiyle döner. Sıralama: bitirenler, toplam ↓ sonra bitiş zamanı; ilk 50 + sen; bugün açılan hesap "🆕 sıralama dışı" (§3.6.1);
+  başkalarının tur puanları ancak sen bitirince. 45 günden eski kayıtlar silinir.
+- **Serbest**: set seç, 5 fotoğraf, sınırsız. Açılan turların fotoğrafları kimlik başına son 150 kayıtta (`whenwhere-seen`); yeni
+  oyun bunlardan kaçınır (set yetmezse en eskilerden başlayarak serbest bırakır). Kişi başına en fazla 3 açık oyun, toplam 5000, 6 sa ömür.
+
+**Çok oyunculu (lobi, 1–12 kişi)**: host ayarı set + tur (3/5/10) + süre (30/60/90 sn). Herkes aynı fotoğrafı aynı anda görür
+(`startAt` = şimdi + 1,5 sn senkron payı). Kilitleyen bekler (başkasının tahmini görünmez, sadece "🔒 kilitledi"); herkes kilitleyince
+ya da süre + 2 sn ağ payı dolunca tur kapanır. İstemci süre bitmeden 0,4 sn önce iğne varsa otomatik kilitler; iğnesi olmayan 0
+(timedOut). Açıklama 20 sn (host "Sonraki" ile geçer): tek haritada herkesin renkli iğnesi + adı, gerçek yer, çizgiler, bu turun
+sıralaması (mesafe, tahmin yılı), Σ toplam, künye. Final: kürsü (🥇🥈🥉), unvanlar, tur tur tablo. Oyun ortası gelen izleyici olur
+(fotoğrafı görür, tahmin edemez); ayrılan oyuncu beklenmez. Yeniden bağlanan aynı görsel adresini ve kilit durumunu alır. Seti
+yetmeyen tur sayısı başlatılamaz.
+
+**Güvenlik**:
+- Fotoğrafın kimliği, dosya adı, başlığı, koordinatı, yılı tur kilitlenene (lobide: tur kapanana) kadar hiçbir HTTP yanıtında / WS
+  görünümünde yok. `round` yanıtı sadece `{ mode, gameId, puzzleNo, index, rounds, image }`; lobi görünümünde sadece `image`
+  (+ kendi tahminin).
+- Görsel sadece `/api/media/<128 bit jeton>` (§3.4, `server/media-tokens.js`; `image/jpeg` eklendi): sahibine (lobide + odaya) bağlı,
+  tek oyunculu 20 dk / 3 kullanım, lobide tur süresi + 30 sn / 4 kullanım, IP hız sınırı, `no-store`. İstemci blob: olarak gösterir.
+- **Görsel vekili**: sunucu küçük resmi (≈1280 px) Wikimedia'dan kendisi çeker — sadece havuzdaki adres, sadece
+  `https://upload.wikimedia.org` (kullanıcı adı/port yok), yönlendirme izlenmez, 20 sn zaman aşımı, ≤ 12 MB, aynı anda en fazla
+  3 indirme, kendi User-Agent'ı. Üst veri silinir (`server/image-strip.js`, yeniden kodlamadan): JPEG'de APP1 (EXIF/XMP), APP13 (IPTC),
+  COM ve diğer APPn atılır (sadece JFIF APP0, ICC APP2, Adobe APP14 kalır), EOI sonrası atılır; PNG'de sadece görüntü parçaları kalır
+  (tEXt/zTXt/iTXt/tIME/eXIf atılır). Tanınmayan içerik asla gönderilmez. Disk önbelleği `DATA_DIR/whenwhere-cache/` (sha1(dosya adı)),
+  400 MB tavan (`WW_CACHE_MB`), en eski kullanılan silinir. Tur başlarken sıradaki fotoğraf arka planda ısıtılır.
+- Hız: genel HTTP sınırı + medya sınırı; serbest oyun kotası; tahminler sunucuda doğrulanır ve puanlanır.
+- Bilinçli bırakılan: görüntünün kendisi Commons'taki küçük resimle aynı bayt (ters görsel arama mümkün; kopya çeken ancak kendine
+  zarar verir). Günlük fotoğraflar herkese aynı (yan hesapla önizleme → yan hesap kuralı).
+
+**Havuz** (`content/whenwhere/photos.json`, betikle üretilir, commit'lenir; görseller commit'lenmez). `data/` çalışma verisi ve
+`.gitignore`'da olduğu (testler `DATA_DIR`'i geçici klasöre çevirir) için havuz `content/` altında (Wordle/Casus içerikleri gibi).
+`node scripts/whenwhere-build.mjs [--sample 40]`: ~340 tohum (Commons kategori adı + tema; İstanbul/Türkiye/dünya). Wikidata SPARQL:
+kategori → öğe (P373), koordinat (P625, yoksa P276'nın), Türkçe ad/açıklama, ülke + kıta, tr/en Vikipedi. Commons API: konu
+kategorisinden tarihli alt kategorilere iner ("X by year", "X in 1925", "X in the 1920s", "History of X", "Old photographs…", en fazla
+30 kategori, 300 dosya), dosyaların tarih/lisans/yazar/açıklama/kategori/koordinat bilgisi. Süzgeç: JPEG/PNG/TIFF, ≥ 900×500, en-boy
+0,55–2,6; lisans kamu malı / CC0 / CC BY / CC BY-SA / "No restrictions"; başlık + kategori + açıklamada harita, plan, çizim, resim,
+gravür, belge, pul, afiş, portre, ceset, idam, katliam, cenaze, mezar vb. yok. Yıl: kategori adındaki kesin yıl (dosya tarihiyle ±2
+çelişirse atılır) ya da dosya tarihi (tek yıl veya ≤ 6 yıllık aralığın ortası; on yıl kategorisiyle tutarlı; 1995 sonrası sadece EXIF
+saatli tarih). Konum: dosyanın kendi koordinatı (konuya ≤ 25 km; şehir tohumunda ≤ 40 km), yoksa konunun koordinatı; şehir
+tohumlarında kesin değil (`precise:false`, Eski İstanbul'a girmez). Tohum başına 1–10 fotoğraf; önce "fotoğraf" ipucu olanlar ve farklı
+on yıllar. Türkçe başlık/açıklama Wikidata Türkçe adı + açıklaması + yer + yıldan şablonla. `rejected`: göz kontrolünde elenen dosyalar
+(betik bir daha seçmez). Ağ nazik: tek sıra + aralık (`WW_GAP_MS`), 429'da geri çekilme, yanıt önbelleği (`WW_CACHE`).
+TEST_MODE'da (testler) Wikimedia'ya gidilmez: `content/whenwhere/test-photos.json` (16 sabit kayıt) + `test-placeholder.jpg`
+(her istekte fotoğraf kimliği/başlığı/koordinatı içeren sahte EXIF + yorum eklenir; testler silindiğini doğrular).
+`WW_POOL=real` ile TEST_MODE'da da gerçek havuz.
+
+**Harita**: Leaflet 1.9.4 (yerelde, `public/vendor/leaflet`, sadece bu oyunda yüklenir) + OpenStreetMap standart karoları
+(`tile.openstreetmap.org`, "© OpenStreetMap katkıcıları" atfı haritada); CSP `img-src`'ye sadece bu adres eklendi. İğneler divIcon
+(adlar metin düğümü). Gerekçe: bağımlılıksız, dokunmatik yakınlaştırma/kaydırma hazır, İstanbul'u sokak seviyesinde gösterir.
+Not: OSM karo kullanım politikası yoğun trafik için değil; arkadaş ölçeğinde uygun, büyürse kendi karo sunucusu/önbelleği gerekir.
+
+**Kabul / testler**: `tests/unit/whenwhere.test.mjs` (puan sabitleri, mesafe, temizlik, unvan, JPEG/PNG üst veri silme, günlük
+belirlenimcilik ve ardışık günde tekrar yok, set süzgeci + kaçınma, açık vekil koruması, gerçek havuz şeması/lisans/oranlar),
+`tests/security/sec-whenwhere.test.mjs` (kilitten önce sızıntı yok, görsel temiz, tek deneme + sıralı tur, bozuk tahmin, jeton
+sahipliği/kullanım sınırı, serbest set + tekrar önleme, sıralama + 🆕 kuralı), `tests/swarm/whenwhere-lobby.test.mjs` (3 kişi tam oyun +
+tur açıklamasından önceki tüm mesajlarda başlık/dosya/koordinat yok, süre dolunca 0, erken/çift/bozuk/host olmayan, jeton odaya ve
+sahibine bağlı, yeniden bağlanma + izleyici, ayrılma, ayar temizliği, İstanbul ölçeği), `tests/e2e/whenwhere.test.mjs` (günlük 5 tur +
+final + sıralama, serbest Eski İstanbul zoom 16 + iğne sürükleme, 3 telefon lobi 3 tur: iğne/yıl başkası kilitleyince korunur,
+açıklamada 3 iğne + gerçek yer, final kürsüsü). Karolar testte boş PNG'ye yönlendirilir (`WW_REAL_TILES=1` gerçek).

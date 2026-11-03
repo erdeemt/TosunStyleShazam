@@ -1,0 +1,450 @@
+{
+ "version": 1,
+ "test": true,
+ "photos": [
+  {
+   "id": "t00a7",
+   "src": {
+    "file": "Test photo 0.jpg",
+    "thumb": "https://upload.wikimedia.org/wikipedia/commons/thumb/x/xx/Test_0.jpg/1280px-Test_0.jpg"
+   },
+   "lat": 41.02562,
+   "lon": 28.97417,
+   "precise": true,
+   "year": 1895,
+   "title_tr": "Galata Kulesi",
+   "caption_tr": "Galata Kulesi — test havuzu fotoğrafı. Fotoğraf 1895 yılından.",
+   "desc_en": null,
+   "wikiUrl": "https://tr.wikipedia.org/wiki/Ana_Sayfa",
+   "fileUrl": "https://commons.wikimedia.org/wiki/Main_Page",
+   "author": "Test Yazar",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+   "tags": {
+    "era": "1850-1900",
+    "region": "turkiye",
+    "sets": [
+     "turkiye",
+     "istanbul"
+    ],
+    "themes": [
+     "sehir"
+    ]
+   }
+  },
+  {
+   "id": "t01c3",
+   "src": {
+    "file": "Test photo 1.jpg",
+    "thumb": "https://upload.wikimedia.org/wikipedia/commons/thumb/x/xx/Test_1.jpg/1280px-Test_1.jpg"
+   },
+   "lat": 41.0198,
+   "lon": 28.9733,
+   "precise": true,
+   "year": 1925,
+   "title_tr": "Galata Köprüsü",
+   "caption_tr": "Galata Köprüsü — test havuzu fotoğrafı. Fotoğraf 1925 yılından.",
+   "desc_en": null,
+   "wikiUrl": "https://tr.wikipedia.org/wiki/Ana_Sayfa",
+   "fileUrl": "https://commons.wikimedia.org/wiki/Main_Page",
+   "author": "Test Yazar",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+   "tags": {
+    "era": "1900-1945",
+    "region": "turkiye",
+    "sets": [
+     "turkiye",
+     "istanbul"
+    ],
+    "themes": [
+     "ulasim"
+    ]
+   }
+  },
+  {
+   "id": "t02e9",
+   "src": {
+    "file": "Test photo 2.jpg",
+    "thumb": "https://upload.wikimedia.org/wikipedia/commons/thumb/x/xx/Test_2.jpg/1280px-Test_2.jpg"
+   },
+   "lat": 41.00858,
+   "lon": 28.98,
+   "precise": true,
+   "year": 1870,
+   "title_tr": "Ayasofya",
+   "caption_tr": "Ayasofya — test havuzu fotoğrafı. Fotoğraf 1870 yılından.",
+   "desc_en": null,
+   "wikiUrl": "https://tr.wikipedia.org/wiki/Ana_Sayfa",
+   "fileUrl": "https://commons.wikimedia.org/wiki/Main_Page",
+   "author": "Test Yazar",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+   "tags": {
+    "era": "1850-1900",
+    "region": "turkiye",
+    "sets": [
+     "turkiye",
+     "istanbul"
+    ],
+    "themes": []
+   }
+  },
+  {
+   "id": "t03b1",
+   "src": {
+    "file": "Test photo 3.jpg",
+    "thumb": "https://upload.wikimedia.org/wikipedia/commons/thumb/x/xx/Test_3.jpg/1280px-Test_3.jpg"
+   },
+   "lat": 40.9969,
+   "lon": 29.019,
+   "precise": true,
+   "year": 1952,
+   "title_tr": "Haydarpaşa Garı",
+   "caption_tr": "Haydarpaşa Garı — test havuzu fotoğrafı. Fotoğraf 1952 yılından.",
+   "desc_en": null,
+   "wikiUrl": "https://tr.wikipedia.org/wiki/Ana_Sayfa",
+   "fileUrl": "https://commons.wikimedia.org/wiki/Main_Page",
+   "author": "Test Yazar",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+   "tags": {
+    "era": "1945-1980",
+    "region": "turkiye",
+    "sets": [
+     "turkiye",
+     "istanbul"
+    ],
+    "themes": [
+     "ulasim"
+    ]
+   }
+  },
+  {
+   "id": "t04a7",
+   "src": {
+    "file": "Test photo 4.jpg",
+    "thumb": "https://upload.wikimedia.org/wikipedia/commons/thumb/x/xx/Test_4.jpg/1280px-Test_4.jpg"
+   },
+   "lat": 41.037,
+   "lon": 28.985,
+   "precise": true,
+   "year": 1968,
+   "title_tr": "Taksim Meydanı",
+   "caption_tr": "Taksim Meydanı — test havuzu fotoğrafı. Fotoğraf 1968 yılından.",
+   "desc_en": null,
+   "wikiUrl": "https://tr.wikipedia.org/wiki/Ana_Sayfa",
+   "fileUrl": "https://commons.wikimedia.org/wiki/Main_Page",
+   "author": "Test Yazar",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+   "tags": {
+    "era": "1945-1980",
+    "region": "turkiye",
+    "sets": [
+     "turkiye",
+     "istanbul"
+    ],
+    "themes": [
+     "sehir"
+    ]
+   }
+  },
+  {
+   "id": "t05c3",
+   "src": {
+    "file": "Test photo 5.jpg",
+    "thumb": "https://upload.wikimedia.org/wikipedia/commons/thumb/x/xx/Test_5.jpg/1280px-Test_5.jpg"
+   },
+   "lat": 39.925,
+   "lon": 32.8369,
+   "precise": true,
+   "year": 1955,
+   "title_tr": "Anıtkabir",
+   "caption_tr": "Anıtkabir — test havuzu fotoğrafı. Fotoğraf 1955 yılından.",
+   "desc_en": null,
+   "wikiUrl": "https://tr.wikipedia.org/wiki/Ana_Sayfa",
+   "fileUrl": "https://commons.wikimedia.org/wiki/Main_Page",
+   "author": "Test Yazar",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+   "tags": {
+    "era": "1945-1980",
+    "region": "turkiye",
+    "sets": [
+     "turkiye"
+    ],
+    "themes": []
+   }
+  },
+  {
+   "id": "t06e9",
+   "src": {
+    "file": "Test photo 6.jpg",
+    "thumb": "https://upload.wikimedia.org/wikipedia/commons/thumb/x/xx/Test_6.jpg/1280px-Test_6.jpg"
+   },
+   "lat": 38.4189,
+   "lon": 27.1287,
+   "precise": true,
+   "year": 1985,
+   "title_tr": "Konak Meydanı",
+   "caption_tr": "Konak Meydanı — test havuzu fotoğrafı. Fotoğraf 1985 yılından.",
+   "desc_en": null,
+   "wikiUrl": "https://tr.wikipedia.org/wiki/Ana_Sayfa",
+   "fileUrl": "https://commons.wikimedia.org/wiki/Main_Page",
+   "author": "Test Yazar",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+   "tags": {
+    "era": "1980-2015",
+    "region": "turkiye",
+    "sets": [
+     "turkiye"
+    ],
+    "themes": [
+     "sehir"
+    ]
+   }
+  },
+  {
+   "id": "t07b1",
+   "src": {
+    "file": "Test photo 7.jpg",
+    "thumb": "https://upload.wikimedia.org/wikipedia/commons/thumb/x/xx/Test_7.jpg/1280px-Test_7.jpg"
+   },
+   "lat": 48.8583,
+   "lon": 2.2945,
+   "precise": true,
+   "year": 1889,
+   "title_tr": "Eyfel Kulesi",
+   "caption_tr": "Eyfel Kulesi — test havuzu fotoğrafı. Fotoğraf 1889 yılından.",
+   "desc_en": null,
+   "wikiUrl": "https://tr.wikipedia.org/wiki/Ana_Sayfa",
+   "fileUrl": "https://commons.wikimedia.org/wiki/Main_Page",
+   "author": "Test Yazar",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+   "tags": {
+    "era": "1850-1900",
+    "region": "avrupa",
+    "sets": [],
+    "themes": [
+     "icat"
+    ]
+   }
+  },
+  {
+   "id": "t08a7",
+   "src": {
+    "file": "Test photo 8.jpg",
+    "thumb": "https://upload.wikimedia.org/wikipedia/commons/thumb/x/xx/Test_8.jpg/1280px-Test_8.jpg"
+   },
+   "lat": 52.5163,
+   "lon": 13.3777,
+   "precise": true,
+   "year": 1961,
+   "title_tr": "Brandenburg Kapısı",
+   "caption_tr": "Brandenburg Kapısı — test havuzu fotoğrafı. Fotoğraf 1961 yılından.",
+   "desc_en": null,
+   "wikiUrl": "https://tr.wikipedia.org/wiki/Ana_Sayfa",
+   "fileUrl": "https://commons.wikimedia.org/wiki/Main_Page",
+   "author": "Test Yazar",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+   "tags": {
+    "era": "1945-1980",
+    "region": "avrupa",
+    "sets": [],
+    "themes": [
+     "savas"
+    ]
+   }
+  },
+  {
+   "id": "t09c3",
+   "src": {
+    "file": "Test photo 9.jpg",
+    "thumb": "https://upload.wikimedia.org/wikipedia/commons/thumb/x/xx/Test_9.jpg/1280px-Test_9.jpg"
+   },
+   "lat": 41.8902,
+   "lon": 12.4922,
+   "precise": true,
+   "year": 1910,
+   "title_tr": "Kolezyum",
+   "caption_tr": "Kolezyum — test havuzu fotoğrafı. Fotoğraf 1910 yılından.",
+   "desc_en": null,
+   "wikiUrl": "https://tr.wikipedia.org/wiki/Ana_Sayfa",
+   "fileUrl": "https://commons.wikimedia.org/wiki/Main_Page",
+   "author": "Test Yazar",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+   "tags": {
+    "era": "1900-1945",
+    "region": "avrupa",
+    "sets": [],
+    "themes": []
+   }
+  },
+  {
+   "id": "t10e9",
+   "src": {
+    "file": "Test photo 10.jpg",
+    "thumb": "https://upload.wikimedia.org/wikipedia/commons/thumb/x/xx/Test_10.jpg/1280px-Test_10.jpg"
+   },
+   "lat": 40.7061,
+   "lon": -73.9969,
+   "precise": true,
+   "year": 1883,
+   "title_tr": "Brooklyn Köprüsü",
+   "caption_tr": "Brooklyn Köprüsü — test havuzu fotoğrafı. Fotoğraf 1883 yılından.",
+   "desc_en": null,
+   "wikiUrl": "https://tr.wikipedia.org/wiki/Ana_Sayfa",
+   "fileUrl": "https://commons.wikimedia.org/wiki/Main_Page",
+   "author": "Test Yazar",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+   "tags": {
+    "era": "1850-1900",
+    "region": "kuzey-amerika",
+    "sets": [],
+    "themes": [
+     "ulasim"
+    ]
+   }
+  },
+  {
+   "id": "t11b1",
+   "src": {
+    "file": "Test photo 11.jpg",
+    "thumb": "https://upload.wikimedia.org/wikipedia/commons/thumb/x/xx/Test_11.jpg/1280px-Test_11.jpg"
+   },
+   "lat": 40.758,
+   "lon": -73.9855,
+   "precise": true,
+   "year": 1999,
+   "title_tr": "Times Meydanı",
+   "caption_tr": "Times Meydanı — test havuzu fotoğrafı. Fotoğraf 1999 yılından.",
+   "desc_en": null,
+   "wikiUrl": "https://tr.wikipedia.org/wiki/Ana_Sayfa",
+   "fileUrl": "https://commons.wikimedia.org/wiki/Main_Page",
+   "author": "Test Yazar",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+   "tags": {
+    "era": "1980-2015",
+    "region": "kuzey-amerika",
+    "sets": [],
+    "themes": [
+     "sehir"
+    ]
+   }
+  },
+  {
+   "id": "t12a7",
+   "src": {
+    "file": "Test photo 12.jpg",
+    "thumb": "https://upload.wikimedia.org/wikipedia/commons/thumb/x/xx/Test_12.jpg/1280px-Test_12.jpg"
+   },
+   "lat": -22.9122,
+   "lon": -43.2302,
+   "precise": true,
+   "year": 1950,
+   "title_tr": "Maracanã",
+   "caption_tr": "Maracanã — test havuzu fotoğrafı. Fotoğraf 1950 yılından.",
+   "desc_en": null,
+   "wikiUrl": "https://tr.wikipedia.org/wiki/Ana_Sayfa",
+   "fileUrl": "https://commons.wikimedia.org/wiki/Main_Page",
+   "author": "Test Yazar",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+   "tags": {
+    "era": "1945-1980",
+    "region": "guney-amerika",
+    "sets": [],
+    "themes": [
+     "spor"
+    ]
+   }
+  },
+  {
+   "id": "t13c3",
+   "src": {
+    "file": "Test photo 13.jpg",
+    "thumb": "https://upload.wikimedia.org/wikipedia/commons/thumb/x/xx/Test_13.jpg/1280px-Test_13.jpg"
+   },
+   "lat": 29.9792,
+   "lon": 31.1342,
+   "precise": true,
+   "year": 1905,
+   "title_tr": "Giza Piramitleri",
+   "caption_tr": "Giza Piramitleri — test havuzu fotoğrafı. Fotoğraf 1905 yılından.",
+   "desc_en": null,
+   "wikiUrl": "https://tr.wikipedia.org/wiki/Ana_Sayfa",
+   "fileUrl": "https://commons.wikimedia.org/wiki/Main_Page",
+   "author": "Test Yazar",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+   "tags": {
+    "era": "1900-1945",
+    "region": "afrika",
+    "sets": [],
+    "themes": []
+   }
+  },
+  {
+   "id": "t14e9",
+   "src": {
+    "file": "Test photo 14.jpg",
+    "thumb": "https://upload.wikimedia.org/wikipedia/commons/thumb/x/xx/Test_14.jpg/1280px-Test_14.jpg"
+   },
+   "lat": 35.6812,
+   "lon": 139.7671,
+   "precise": true,
+   "year": 1930,
+   "title_tr": "Tokyo İstasyonu",
+   "caption_tr": "Tokyo İstasyonu — test havuzu fotoğrafı. Fotoğraf 1930 yılından.",
+   "desc_en": null,
+   "wikiUrl": "https://tr.wikipedia.org/wiki/Ana_Sayfa",
+   "fileUrl": "https://commons.wikimedia.org/wiki/Main_Page",
+   "author": "Test Yazar",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+   "tags": {
+    "era": "1900-1945",
+    "region": "asya",
+    "sets": [],
+    "themes": [
+     "ulasim"
+    ]
+   }
+  },
+  {
+   "id": "t15b1",
+   "src": {
+    "file": "Test photo 15.jpg",
+    "thumb": "https://upload.wikimedia.org/wikipedia/commons/thumb/x/xx/Test_15.jpg/1280px-Test_15.jpg"
+   },
+   "lat": -33.8523,
+   "lon": 151.2108,
+   "precise": true,
+   "year": 1932,
+   "title_tr": "Sidney Liman Köprüsü",
+   "caption_tr": "Sidney Liman Köprüsü — test havuzu fotoğrafı. Fotoğraf 1932 yılından.",
+   "desc_en": null,
+   "wikiUrl": "https://tr.wikipedia.org/wiki/Ana_Sayfa",
+   "fileUrl": "https://commons.wikimedia.org/wiki/Main_Page",
+   "author": "Test Yazar",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+   "tags": {
+    "era": "1900-1945",
+    "region": "okyanusya",
+    "sets": [],
+    "themes": [
+     "ulasim",
+     "icat"
+    ]
+   }
+  }
+ ]
+}
