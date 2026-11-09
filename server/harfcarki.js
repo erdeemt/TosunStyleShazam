@@ -132,8 +132,8 @@ export function expireRun(run, now, grace = scaled(GRACE_MS)) {
 // Hamle: kind 'answer' | 'pass' | 'quit'. pos istemcinin gördüğü harf (eski/çift gönderim ayıklanır).
 // Döner: { pos, result: 'ok'|'bad'|'pass'|'quit' }.
 export function applyMove(run, { pos, kind, answer }, now, { grace = scaled(GRACE_MS), early = 0 } = {}) {
-  if (expireRun(run, now, grace)) throw new GameError('Süre doldu.');
   if (run.done) throw new GameError('Bu oyun bitti.');
+  if (expireRun(run, now, grace)) throw new GameError('Süre doldu.');
   if (now < run.startAt - early) throw new GameError('Oyun henüz başlamadı.');
   if (++run.moves > MAX_MOVES) throw new GameError('Çok fazla hamle.');
   if (kind === 'quit') { finishRun(run, 'quit', now); return { pos: run.pos, result: 'quit' }; }
