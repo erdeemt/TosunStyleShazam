@@ -1,0 +1,146 @@
+/* 🔗 Bağlantı Avı — oyunun kendi stilleri (games/baglanti-ui.js yükler; ortak style.css değişkenlerini kullanır) */
+.bg { padding-bottom: 32px; }
+.bg .game-head .round { text-align: center; }
+.bg-diff-badge { font-size: 13px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; }
+
+/* Zorluk seçici */
+.bg-diffs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
+.bg-diff { display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 56px; }
+
+/* Üst bilgi çubuğu */
+.bg-stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; font-size: 15px; font-variant-numeric: tabular-nums; }
+.bg-stats span { background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; }
+.bg-stats .bad { border-color: var(--bad); color: #ffb3b3; }
+
+/* Zincir */
+.bg-board { padding: 14px 12px; }
+.bg-chain { display: flex; flex-direction: column; align-items: stretch; }
+.bg-person {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px;
+  background: var(--bg); border: 1px solid var(--line); position: relative; min-height: 64px;
+}
+.bg-person.bg-start { border-color: #6ec3ff; background: linear-gradient(90deg, #1d3550, var(--bg)); }
+.bg-person.bg-target { border-color: var(--accent2); background: linear-gradient(90deg, #4a3112, var(--bg)); }
+.bg-person-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.bg-role { font-size: 12px; font-weight: 700; letter-spacing: .03em; color: var(--muted); text-transform: uppercase; }
+.bg-name { font-size: 17px; line-height: 1.2; overflow-wrap: anywhere; }
+.bg-years { font-size: 13px; color: var(--accent2); font-variant-numeric: tabular-nums; }
+.bg-desc { font-size: 13px; color: var(--muted); line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.bg-cat { font-size: 13px; margin-left: 6px; }
+.bg-x {
+  flex: none; width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: transparent;
+  color: var(--muted); font-size: 18px; cursor: pointer;
+}
+.bg-x:active { transform: scale(.95); }
+.bg-new { animation: bg-pop .55s cubic-bezier(.2, 1.4, .4, 1); border-color: var(--good); box-shadow: 0 0 0 3px #3ee08f33; }
+@keyframes bg-pop { 0% { opacity: 0; transform: translateY(-14px) scale(.92); } 100% { opacity: 1; transform: none; } }
+
+/* Avatar: fotoğraf (yüklenince) ya da renkli baş harf */
+.bg-av {
+  flex: none; position: relative; border-radius: 50%; overflow: hidden; display: grid; place-items: center;
+  background: hsl(var(--h) 45% 32%); color: #fff; font-weight: 800; border: 2px solid hsl(var(--h) 60% 55%);
+}
+.bg-av img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 22%; opacity: 0; transition: opacity .2s; }
+.bg-av.has-img img { opacity: 1; }
+.bg-av-txt { letter-spacing: .02em; }
+.bg-av-l { width: 72px; height: 72px; font-size: 24px; }
+.bg-av-m { width: 56px; height: 56px; font-size: 19px; }
+.bg-av-s { width: 40px; height: 40px; font-size: 14px; }
+
+/* Bağlantı çizgisi + nedeni */
+.bg-link { display: flex; align-items: center; gap: 10px; min-height: 40px; padding-left: 30px; position: relative; }
+.bg-link-line { position: absolute; left: 39px; top: 0; bottom: 0; width: 3px; border-radius: 2px; background: var(--good); }
+.bg-link-chip {
+  margin-left: 26px; font-size: 14px; line-height: 1.3; padding: 5px 10px; border-radius: 10px;
+  background: #3ee08f1f; border: 1px solid #3ee08f55; color: #c9ffe2; overflow-wrap: anywhere;
+}
+.bg-link-ico { font-size: 15px; }
+.bg-link-pending .bg-link-line, .bg-link-gap .bg-link-line { background: repeating-linear-gradient(var(--line) 0 6px, transparent 6px 11px); }
+.bg-link-gap .bg-link-chip, .bg-link-pending .bg-link-chip { background: transparent; border-color: transparent; color: var(--muted); }
+.bg-link-pending { min-height: 16px; }
+.bg-link-pending .bg-link-chip { display: none; }
+.bg-link-final .bg-link-line { background: linear-gradient(var(--good), var(--accent2)); }
+.bg-link-final .bg-link-chip { background: #ffb5471f; border-color: #ffb54766; color: #ffe2b8; }
+
+.bg-add {
+  min-height: 56px; border-radius: 14px; border: 2px dashed var(--accent); background: #ff4d8d14; color: var(--text);
+  font: inherit; font-weight: 700; font-size: 17px; cursor: pointer;
+}
+.bg-add:disabled { opacity: .45; cursor: not-allowed; }
+.bg-add:not(:disabled):active { transform: scale(.98); }
+
+/* Sıkışık zincir (sonuç, yan yana sütunlar) */
+.bg-chain.compact .bg-person { min-height: 48px; padding: 6px 8px; gap: 8px; }
+.bg-chain.compact .bg-name { font-size: 15px; }
+.bg-chain.compact .bg-years { font-size: 12px; }
+.bg-chain.compact .bg-link { min-height: 30px; padding-left: 20px; }
+.bg-chain.compact .bg-link-line { left: 27px; }
+.bg-chain.compact .bg-link-chip { margin-left: 16px; font-size: 13px; padding: 3px 8px; }
+
+/* Arama sayfası (tam ekran katman) */
+body.bg-noscroll { overflow: hidden; }
+.bg-sheet {
+  position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; gap: 10px; padding: 12px 12px 0;
+  background: var(--bg); max-width: 640px; margin: 0 auto;
+}
+.bg-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.bg-sheet-from { display: flex; align-items: center; gap: 10px; font-size: 15px; }
+.bg-search { font-size: 17px; min-height: 48px; }
+.bg-sheet-msg { min-height: 22px; font-size: 15px; color: var(--muted); }
+.bg-sheet-msg.bad { color: var(--bad); font-weight: 700; }
+.bg-sheet.busy .bg-results { opacity: .6; }
+.bg-shake .bg-search { animation: bg-shake .45s; border-color: var(--bad); }
+@keyframes bg-shake { 10%, 90% { transform: translateX(-2px); } 20%, 80% { transform: translateX(4px); } 30%, 50%, 70% { transform: translateX(-8px); } 40%, 60% { transform: translateX(8px); } }
+.bg-results { list-style: none; margin: 0; padding: 0 0 24px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 6px; -webkit-overflow-scrolling: touch; }
+.bg-res {
+  width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; min-height: 56px; padding: 8px 10px;
+  border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--text); font: inherit; cursor: pointer;
+}
+.bg-res:disabled { opacity: .45; cursor: not-allowed; }
+.bg-res.target { border-color: var(--accent2); }
+.bg-res-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bg-res-txt small { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bg-tag { font-size: 11px; margin-left: 6px; padding: 1px 6px; border-radius: 6px; background: var(--card2); color: var(--muted); font-weight: 600; }
+.bg-res-empty { color: var(--muted); padding: 12px 4px; }
+
+/* İpuçları */
+.bg-hints .row .btn { flex: 1; min-width: 140px; }
+.bg-hint-list { margin: 10px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.bg-hint-list li.now { color: var(--accent2); font-weight: 600; }
+.bg-hint-list li.old { color: var(--muted); }
+
+/* Sonuç */
+.bg-result { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.bg-title-icon { font-size: 52px; line-height: 1; }
+.bg-title { margin: 0; font-size: 22px; }
+.bg-total { font-size: 46px; font-weight: 900; color: var(--accent2); font-variant-numeric: tabular-nums; }
+.bg-total small { font-size: 16px; color: var(--muted); font-weight: 500; }
+.bg-break { list-style: none; margin: 6px 0 0; padding: 0; width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 4px; }
+.bg-break li { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; border-bottom: 1px dashed var(--line); padding: 3px 0; }
+.bg-break .bad { color: var(--bad); }
+.bg-start { display: flex; flex-direction: column; gap: 8px; }
+.bg-done { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.bg-done h2 { margin: 0; }
+
+/* Günlük sıralama */
+.bg-lb li { flex-wrap: wrap; }
+.bg-lb-meta { font-size: 13px; color: var(--muted); margin-left: auto; }
+.bg-lb-chain { flex-basis: 100%; font-size: 12px; color: var(--muted); }
+
+/* Lobi: yarış + sütunlar */
+.bg-lclock { font-size: 22px; }
+.bg-race .rc-check { font-variant-numeric: tabular-nums; }
+.bg-cols { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 8px; -webkit-overflow-scrolling: touch; }
+.bg-col { flex: 0 0 min(84%, 300px); scroll-snap-align: start; background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 8px; }
+.bg-col.me { border-color: var(--accent2); }
+.bg-col-opt { border-color: var(--good); }
+.bg-col-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+.bg-col-head small { color: var(--muted); font-size: 12px; }
+.bg-badge { font-size: 12px; color: var(--muted); }
+.bg-final-rank li { flex-wrap: wrap; }
+.bg-table-wrap { overflow-x: auto; }
+.bg-table th:first-child, .bg-table td:first-child { width: 46%; white-space: normal; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bg-new, .bg-shake .bg-search { animation: none; }
+}

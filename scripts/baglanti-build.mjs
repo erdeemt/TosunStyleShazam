@@ -603,6 +603,54 @@ async function main() {
   console.log(`Yapboz: kolay ${pools.kolay.length}, orta ${pools.orta.length}, zor ${pools.zor.length}`);
 }
 
+// ---------- Test grafiği (TEST_MODE) ----------
+// node scripts/baglanti-build.mjs --test-graph → content/baglanti/test-graph.json: gerçek verinin küçük, sabit bir alt grafiği
+// (her zorlukta uçları ayrık 6 yapboz + yollarındaki kişiler + aralarındaki gerçek bağlantılar + 8 "çeldirici" ünlü).
+// Alt grafikte mesafe ancak artabilir; yol hâlâ var → yapbozların en kısa uzunluğu aynı kalır (yine de doğrulanır).
+function testGraph() {
+  const P = JSON.parse(readFileSync(join(OUT_DIR, 'people.json'), 'utf8')).people;
+  const E = JSON.parse(readFileSync(join(OUT_DIR, 'edges.json'), 'utf8'));
+  const Z = JSON.parse(readFileSync(join(OUT_DIR, 'puzzles.json'), 'utf8'));
+  const LEN = { kolay: 3, orta: 4, zor: 5 };
+  const chosen = {};
+  const nodes = new Set();
+  for (const k of Object.keys(LEN)) {
+    const ends = new Set();
+    // Ünlü kişilerden geçenler önce; Türkiye'den biri olan yapbozlar öne
+    const ranked = [...Z[k]].sort((x, y) => (P[y[0]].t || P[y[1]].t) - (P[x[0]].t || P[x[1]].t) || Math.max(...x[2]) - Math.max(...y[2]));
+    chosen[k] = [];
+    for (const z of ranked) {
+      if (chosen[k].length >= 6) break;
+      if (ends.has(z[0]) || ends.has(z[1])) continue;
+      chosen[k].push(z);
+      ends.add(z[0]); ends.add(z[1]);
+      for (const v of z[2]) nodes.add(v);
+    }
+  }
+  for (let i = 0, extra = 0; extra < 8 && i < P.length; i++) if (!nodes.has(i)) { nodes.add(i); extra++; }
+  const keep = [...nodes].sort((x, y) => x - y);
+  const map = new Map(keep.map((v, i) => [v, i]));
+  const edges = E.edges.filter((e) => map.has(e[0]) && map.has(e[1])).map((e) => [map.get(e[0]), map.get(e[1]), ...e.slice(2)]);
+  const usedCtx = [...new Set(edges.map((e) => e[3]).filter((c) => c >= 0))].sort((x, y) => x - y);
+  const cmap = new Map(usedCtx.map((c, i) => [c, i]));
+  for (const e of edges) if (e[3] >= 0) e[3] = cmap.get(e[3]);
+  const people = keep.map((v) => P[v]);
+  const adj = people.map(() => []);
+  for (const [x, y] of edges) { adj[x].push(y); adj[y].push(x); }
+  const puzzles = {};
+  for (const [k, list] of Object.entries(chosen)) {
+    puzzles[k] = list.map(([s0, t0, path]) => [map.get(s0), map.get(t0), path.map((v) => map.get(v))]);
+    for (const [s0, t0] of puzzles[k]) {
+      const d = bfs(adj, s0, people.length).dist[t0];
+      if (d !== LEN[k]) throw new Error(`test yapbozu ${k} uzunluğu ${d}`);
+    }
+  }
+  const meta = { source: 'Wikidata (CC0) alt grafiği — sadece testler (TEST_MODE)', builtAt: new Date().toISOString().slice(0, 10) };
+  writeFileSync(join(OUT_DIR, 'test-graph.json'), `${JSON.stringify({ meta, people, types: E.types, ctx: usedCtx.map((c) => E.ctx[c]), edges, puzzles }, null, 1)}\n`);
+  console.log(`test grafiği: ${people.length} kişi, ${edges.length} bağlantı, yapboz ${Object.values(puzzles).map((l) => l.length).join('/')}`);
+}
+
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  main().catch((err) => { console.error(err); process.exit(1); });
+  if (process.argv.includes('--test-graph')) testGraph();
+  else main().catch((err) => { console.error(err); process.exit(1); });
 }

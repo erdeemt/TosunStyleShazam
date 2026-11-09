@@ -277,7 +277,7 @@ export function publicRun(run, { reveal = false, now = Date.now() } = {}) {
     opt: run.opt,
     chain: run.chain.map((c) => ({ q: c.q, e: c.e, t: c.t })),
     wrong: run.wrong,
-    hints: run.hints.map((h) => ({ k: h.k, at: h.at, text: h.text })),
+    hints: run.hints.map((h) => ({ k: h.k, at: h.at, end: h.end, text: h.text })),
     done: run.done,
     gaveUp: run.gaveUp,
     final: run.done && !run.gaveUp ? run.final : null,
