@@ -8,6 +8,7 @@ import * as wordle from './server/wordle.js';
 import * as recall from './server/recall.js';
 import * as perceptle from './server/perceptle.js';
 import * as whenwhere from './server/whenwhere.js';
+import * as baglanti from './server/baglanti.js';
 import { GameError } from './server/errors.js';
 import { serveMedia, mediaStats } from './server/media-tokens.js';
 import { clientIp, httpLimiter, upstreamLimiter } from './server/limits.js';
@@ -304,6 +305,9 @@ async function handleApi(url, res, req) {
   // Ses vekili kendi sınırlarıyla (Safari aynı klip için birkaç Range isteği atar; aynı evden 12 telefon).
   const clipRoute = url.pathname.match(/^\/api\/clip\/([^/]{1,64})$/);
   if (clipRoute) return handleClip(req, res, clipRoute[1], ip);
+  // 🔗 Bağlantı Avı kişi fotoğrafları: kendi IP sınırıyla (zincir + arama listesi aynı anda birçok küçük resim ister).
+  const bgPhoto = req.method === 'GET' && url.pathname.match(/^\/api\/baglanti\/photo\/(Q[1-9]\d{0,11})$/);
+  if (bgPhoto) return baglanti.servePhoto(res, bgPhoto[1], ip);
   if (!httpLimiter.hit(ip)) return sendJson(res, 429, { error: 'Çok fazla istek, biraz yavaşla.' });
   if (UPSTREAM_PATHS.has(url.pathname) && !upstreamLimiter.hit(ip)) {
     return sendJson(res, 429, { error: 'Çok fazla link isteği, bir dakika sonra tekrar dene.' });
@@ -350,6 +354,19 @@ async function handleApi(url, res, req) {
     if (endpoint === 'guess') return sendJson(res, 200, whenwhere.submitGuess(identity, mode, body.gameId, body.round, body.guess));
     return sendJson(res, 200, whenwhere.leaderboard(whenwhere.todayIstanbul(), identity.id));
   }
+  // 🔗 Bağlantı Avı: kişi dizini (GET, bağlantı içermez) + /api/baglanti/<uç>
+  if (url.pathname === '/api/baglanti/people' && req.method === 'GET') return baglanti.servePeople(req, res);
+  const baglantiRoute = url.pathname.match(/^\/api\/baglanti\/(start|begin|add|remove|hint|giveup|leaderboard)$/);
+  if (baglantiRoute) {
+    const endpoint = baglantiRoute[1];
+    const body = await readJson(req);
+    const identity = requireIdentity(body);
+    const mode = body.mode === 'free' ? 'free' : 'daily';
+    if (endpoint === 'start' || endpoint === 'begin') return sendJson(res, 200, baglanti.startGame(identity, mode, body.difficulty, endpoint === 'begin'));
+    if (endpoint === 'leaderboard') return sendJson(res, 200, baglanti.leaderboard(baglanti.todayIstanbul(), identity.id));
+    const arg = endpoint === 'add' ? body.qid : endpoint === 'remove' ? body.pos : endpoint === 'hint' ? body.kind : null;
+    return sendJson(res, 200, baglanti.step(identity, mode, body.gameId, endpoint, arg));
+  }
   // Sadece testlerde (TEST_GAMES=1): oda/döngü sayısı + işlemci süresi (sızıntı ve yük testleri için).
   if (process.env.TEST_GAMES === '1' && process.env.TEST_MODE === '1' && url.pathname === '/api/_test/stats') {
     return sendJson(res, 200, { ...lobbyStats(), media: mediaStats(), cpu: process.cpuUsage(), uptimeMs: Math.round(process.uptime() * 1000), rss: process.memoryUsage().rss });
@@ -359,6 +376,7 @@ async function handleApi(url, res, req) {
     if (q.get('room')) return sendJson(res, 200, _testRoomSecrets(q.get('room')));
     if (q.get('recall')) return sendJson(res, 200, recall._testSecrets(q.get('recall'), q.get('gameId')));
     if (q.get('whenwhere')) return sendJson(res, 200, whenwhere._testSecrets(q.get('gameId')));
+    if (q.get('baglanti')) return sendJson(res, 200, baglanti._testSecrets(q.get('gameId')));
     return sendJson(res, 200, perceptle._testSecrets(q.get('gameId')));
   }
   switch (url.pathname) {

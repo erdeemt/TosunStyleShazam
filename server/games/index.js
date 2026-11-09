@@ -8,6 +8,7 @@ import shazam from './shazam.js';
 import haxball from './haxball.js';
 import perceptle from './perceptle.js';
 import whenwhere from './whenwhere.js';
+import baglanti from './baglanti.js';
 
 export const GAMES = {
   [spyfall.id]: spyfall,
@@ -18,6 +19,7 @@ export const GAMES = {
   [haxball.id]: haxball,
   [perceptle.id]: perceptle,
   [whenwhere.id]: whenwhere,
+  [baglanti.id]: baglanti,
 };
 
 // Lobi altyapısını gerçek oyunlardan bağımsız test etmek için; sadece TEST_GAMES=1 iken açık.

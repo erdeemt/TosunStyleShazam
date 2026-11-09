@@ -88,4 +88,12 @@ export const GAMES = [
     categories: ['single', 'multi'],
     load: () => import('./games/whenwhere.js'),
   },
+  {
+    id: 'baglanti',
+    name: 'Bağlantı Avı',
+    icon: '🔗',
+    desc: 'İki ünlüyü aradaki kişilerle en kısa zincirle bağla',
+    categories: ['single', 'multi'],
+    load: () => import('./games/baglanti.js'),
+  },
 ];
