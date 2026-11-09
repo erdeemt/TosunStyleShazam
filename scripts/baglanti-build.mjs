@@ -197,6 +197,10 @@ async function details(ids) {
 export const TYPES = ['spouse', 'parent', 'sibling', 'relative', 'partner', 'teacher', 'successor', 'influence', 'band', 'team', 'cast', 'director', 'election',
   'coach', 'founder', 'battle', 'duet', 'song', 'associate', 'significant'];
 // Aynı çift için birden fazla bağlantı varsa gösterilecek olan (öncelik sırası)
+// Oyunculuk olmayan yapım türleri (P31/P136, alt sınıflarıyla): belgesel, TV özel bölümü (buluşma/reunion), ödül töreni, talk show,
+// realite, konser filmi, müzik videosu, varyete, yarışma programı, haber/spor yayını.
+const NON_ACTING = ['Q93204', 'Q1261214', 'Q4504495', 'Q622812', 'Q182415', 'Q193977', 'Q430525', 'Q336181', 'Q846662',
+  'Q133731271', 'Q1358344'].map((x) => `wd:${x}`).join(' ');
 const PRIORITY = ['spouse', 'parent', 'sibling', 'partner', 'band', 'duet', 'song', 'team', 'coach', 'director', 'cast', 'founder', 'successor', 'teacher',
   'battle', 'associate', 'relative', 'significant', 'election', 'influence'];
 
@@ -304,7 +308,19 @@ async function edgesOf(ids, people) {
   }
 
   console.log('   film/dizi kadroları + yönetmenler');
-  const cast = await perChunk(ids, (v) => `SELECT ?w ?a WHERE { VALUES ?a { ${v} } ?w wdt:P161 ?a . }`);
+  // Kadro satırları niteleyicileriyle: karakter rolü (P453), "olarak geçer" (P1932), rol (P3831). "Kendisi", arşiv görüntüsü,
+  // konuk/kamera önü görünümü oyunculuk sayılmaz.
+  const castRows = await perChunk(ids, (v) => `SELECT ?w ?a ?rl ?as ?ol WHERE { VALUES ?a { ${v} } ?w p:P161 ?st . ?st ps:P161 ?a .
+    OPTIONAL { ?st pq:P453 ?role . ?role rdfs:label ?rl . FILTER(LANG(?rl) = "en") }
+    OPTIONAL { ?st pq:P1932 ?as }
+    OPTIONAL { ?st pq:P3831 ?obj . ?obj rdfs:label ?ol . FILTER(LANG(?ol) = "en") } }`);
+  const SELF_ROLE = /^(himself|herself|themselves|themself|self|oneself|itself|narrator)$|archive footage|archival|cameo|guest appearance|uncredited|as himself|as herself/i;
+  const selfPairs = new Set();
+  for (const r of castRows) {
+    if ((r.rl && SELF_ROLE.test(r.rl.trim())) || (r.ol && SELF_ROLE.test(r.ol.trim())) || (r.as && /\b(himself|herself|themselves|self|kendisi|kendi)\b/i.test(r.as))) selfPairs.add(`${qid(r.w)}|${qid(r.a)}`);
+  }
+  const cast = castRows.filter((r) => !selfPairs.has(`${qid(r.w)}|${qid(r.a)}`));
+  console.log(`   kendisi/arşiv rolü olarak ayıklanan kadro satırı: ${selfPairs.size}`);
   const dirs = await perChunk(ids, (v) => `SELECT ?w ?a WHERE { VALUES ?a { ${v} } ?w wdt:P57 ?a . }`);
   const byWork = new Map();
   for (const r of cast) {
@@ -322,7 +338,7 @@ async function edgesOf(ids, people) {
   const workInfo = new Map();
   const wRows = await perChunk(workCands, (v) => `SELECT ?w ?sl ?kind ?doc ?date ?start WHERE { VALUES ?w { ${v} } ?w wikibase:sitelinks ?sl .
     OPTIONAL { ?w wdt:P31/wdt:P279* ?k . VALUES (?k ?kind) { (wd:Q11424 "film") (wd:Q5398426 "series") (wd:Q15416 "series") } }
-    OPTIONAL { ?w wdt:P31|wdt:P136 ?dk . VALUES ?dk { wd:Q93204 wd:Q2338524 wd:Q1059294 } BIND(1 AS ?doc) }
+    OPTIONAL { ?w wdt:P31|wdt:P136 ?dk0 . ?dk0 wdt:P279* ?dk . VALUES ?dk { ${NON_ACTING} } BIND(1 AS ?doc) }
     OPTIONAL { ?w wdt:P577 ?date } OPTIONAL { ?w wdt:P580 ?start } }`);
   for (const r of wRows) {
     const cur = workInfo.get(qid(r.w)) ?? { sl: Number(r.sl), kind: null, doc: false, year: null };
@@ -428,7 +444,7 @@ async function edgesOf(ids, people) {
     if (y != null && (cur.year == null || y < cur.year)) cur.year = y;
     ctx.set(x, cur);
   }
-  return { raw, ctx, workInfo };
+  return { raw, ctx, workInfo, rows: { direct, groupRows, cast, songRows } };
 }
 
 // ---------- 4) Birleştirme + yapbozlar ----------
@@ -439,8 +455,72 @@ function cleanLabel(s) {
   return String(s ?? '').replace(/\s+/g, ' ').trim();
 }
 
+// Bozuk hükümdar adları (Wikidata tr etiketi): "X. LouisVI" → İngilizce "Louis XVI of France"'tan "XVI. Louis".
+export function fixRegnal(label, en) {
+  const glued = /^([IVXLC]+)\.\s+(\S+?)([IVXLC]+)$/.exec(label);
+  const doubled = /^([IVXLC]+\.)\s+\1/.test(label) || /^[IVXLC]+\.\s+[IVXLC]+\.\s/.test(label);
+  if (!glued && !doubled) return label;
+  const e = /^(.+?) ([IVXLC]+)(?: (?:of|the) .+)?$/.exec(en ?? '');
+  if (e) return `${e[2]}. ${e[1]}`;
+  if (glued) return `${glued[1]}${glued[3]}. ${glued[2]}`;
+  return label.replace(/^([IVXLC]+\.)\s+\1\s*/, '$1 ');
+}
+
+// Açıklamada kalan İngilizce sözcükler (Türkçe açıklamaya karışmış) için küçük sözlük; çevrilemeyen İngilizce → alan adları.
+const EN_WORDS = {
+  american: 'Amerikalı', british: 'Britanyalı', english: 'İngiliz', french: 'Fransız', german: 'Alman', italian: 'İtalyan', spanish: 'İspanyol',
+  russian: 'Rus', brazilian: 'Brezilyalı', argentine: 'Arjantinli', portuguese: 'Portekizli', dutch: 'Hollandalı', greek: 'Yunan', turkish: 'Türk',
+  canadian: 'Kanadalı', australian: 'Avustralyalı', irish: 'İrlandalı', scottish: 'İskoç', japanese: 'Japon', chinese: 'Çinli', indian: 'Hintli',
+  and: 've', actor: 'oyuncu', actress: 'oyuncu', singer: 'şarkıcı', footballer: 'futbolcu', politician: 'siyasetçi', writer: 'yazar',
+  novelist: 'romancı', poet: 'şair', painter: 'ressam', printmaker: 'baskı sanatçısı', composer: 'besteci', musician: 'müzisyen',
+  songwriter: 'söz yazarı', rapper: 'rapçi', director: 'yönetmen', producer: 'yapımcı', player: 'oyuncu', businessman: 'iş insanı',
+  businesswoman: 'iş insanı', scientist: 'bilim insanı', philosopher: 'filozof', physicist: 'fizikçi', chemist: 'kimyager',
+  mathematician: 'matematikçi', journalist: 'gazeteci', model: 'model', comedian: 'komedyen', king: 'kral', queen: 'kraliçe',
+  emperor: 'imparator', general: 'general', basketball: 'basketbol', tennis: 'tenis', football: 'futbol', manager: 'teknik direktör', coach: 'antrenör',
+};
+const EN_LEFT = /\b(the|of|and|from|who|was|is|born|actor|actress|singer|footballer|politician|player|writer|American|British|English|French|German)\b/;
+export function trDesc(d) {
+  if (!EN_LEFT.test(d)) return d;
+  const out = d.replace(/[A-Za-z]+/g, (w) => EN_WORDS[w.toLowerCase()] ?? w);
+  return EN_LEFT.test(out) ? '' : out;
+}
+
+// Makam adları (ardıl/selef bağlamı) Türkçe etiketi yoksa: yaygın kalıplar + ülke adları.
+const COUNTRY_TR = {
+  France: 'Fransa', Spain: 'İspanya', England: 'İngiltere', Ireland: 'İrlanda', Scotland: 'İskoçya', Egypt: 'Mısır', Philippines: 'Filipinler',
+  Brazil: 'Brezilya', Portugal: 'Portekiz', Italy: 'İtalya', Prussia: 'Prusya', Sweden: 'İsveç', Denmark: 'Danimarka', Norway: 'Norveç',
+  Russia: 'Rusya', Poland: 'Polonya', Hungary: 'Macaristan', Austria: 'Avusturya', Germany: 'Almanya', Israel: 'İsrail', Iran: 'İran',
+  Iraq: 'Irak', India: 'Hindistan', Pakistan: 'Pakistan', Greece: 'Yunanistan', 'United Kingdom': 'Birleşik Krallık', 'United States': 'ABD',
+  Japan: 'Japonya', China: 'Çin', Mexico: 'Meksika', Argentina: 'Arjantin', Chile: 'Şili', Cuba: 'Küba', Syria: 'Suriye', Jordan: 'Ürdün',
+  'Saudi Arabia': 'Suudi Arabistan', Afghanistan: 'Afganistan', Bulgaria: 'Bulgaristan', Romania: 'Romanya', Serbia: 'Sırbistan',
+  Belgium: 'Belçika', Netherlands: 'Hollanda', Navarre: 'Navarra', Castile: 'Kastilya', Aragon: 'Aragon', Bohemia: 'Bohemya', Bavaria: 'Bavyera',
+  Saxony: 'Saksonya', Naples: 'Napoli', Sicily: 'Sicilya', Sardinia: 'Sardinya', Hanover: 'Hannover', Georgia: 'Gürcistan', Armenia: 'Ermenistan',
+  Azerbaijan: 'Azerbaycan', Ukraine: 'Ukrayna', Lebanon: 'Lübnan', Libya: 'Libya', Tunisia: 'Tunus', Algeria: 'Cezayir', Morocco: 'Fas',
+  'South Africa': 'Güney Afrika', Indonesia: 'Endonezya', Venezuela: 'Venezuela', Colombia: 'Kolombiya', Peru: 'Peru', Canada: 'Kanada',
+  Australia: 'Avustralya', 'New Zealand': 'Yeni Zelanda', 'Soviet Union': 'Sovyetler Birliği', USSR: 'SSCB', Rome: 'Roma', Wales: 'Galler',
+};
+const POS_TR = [
+  [/^(?:King) of (.+)$/i, 'Kralı'], [/^(?:Queen) of (.+)$/i, 'Kraliçesi'], [/^monarch of (.+)$/i, 'hükümdarı'], [/^Emperor of (.+)$/i, 'İmparatoru'],
+  [/^Empress of (.+)$/i, 'İmparatoriçesi'], [/^President of (.+)$/i, 'Devlet Başkanı'], [/^Vice President of (.+)$/i, 'Başkan Yardımcısı'],
+  [/^Prime Minister of (.+)$/i, 'Başbakanı'], [/^Chancellor of (.+)$/i, 'Şansölyesi'], [/^Duke of (.+)$/i, 'Dükü'], [/^Prince of (.+)$/i, 'Prensi'],
+  [/^Secretary General of (.+)$/i, 'Genel Sekreteri'], [/^Chairman of (.+)$/i, 'Başkanı'], [/^Governor of (.+)$/i, 'Valisi'],
+];
+const POS_FIXED = { 'Minister of Finance': 'Maliye Bakanı', 'Minister of Foreign Affairs': 'Dışişleri Bakanı', 'Minister of Defence': 'Savunma Bakanı',
+  'Minister of the Interior': 'İçişleri Bakanı', 'Leader of the Opposition': 'Muhalefet Lideri', Pope: 'Papa', 'First Lord of the Treasury': 'Hazine Birinci Lordu' };
+export function trPosition(en) {
+  if (POS_FIXED[en]) return POS_FIXED[en];
+  for (const [re, word] of POS_TR) {
+    const m = re.exec(en);
+    if (!m) continue;
+    const parts = m[1].replace(/^the /i, '').split(/ and /);
+    const tr = parts.map((x) => COUNTRY_TR[x] ?? (/^[A-Z][\p{L}-]+$/u.test(x) ? x : null));
+    if (tr.every(Boolean)) return `${tr.join(' ve ')} ${word}`;
+  }
+  return en;
+}
+
 function shortDesc(p, cats) {
-  let d = cleanLabel(p.trd);
+  let d = trDesc(cleanLabel(p.trd));
   if (d && d.length <= 70) return d;
   if (d) return `${d.slice(0, 67).replace(/[\s,;:]+\S*$/, '')}…`;
   const names = cats.map((c) => CATS.find((x) => x[0] === c)[2]);
@@ -456,7 +536,52 @@ function bfs(adj, src, n) {
     const u = q[h];
     for (const v of adj[u]) if (dist[v] < 0) { dist[v] = dist[u] + 1; prev[v] = u; q.push(v); }
   }
-  return { dist, prev };
+  return { dist, prev, order: q };
+}
+
+// raw kenarlarında (qid) en büyük bağlı bileşen
+function mainComponent(raw, people) {
+  const nb = new Map();
+  for (const e of raw) {
+    if (!people.has(e.a) || !people.has(e.b) || e.a === e.b) continue;
+    if (!nb.has(e.a)) nb.set(e.a, []);
+    if (!nb.has(e.b)) nb.set(e.b, []);
+    nb.get(e.a).push(e.b); nb.get(e.b).push(e.a);
+  }
+  const seen = new Set();
+  let best = new Set();
+  for (const q0 of nb.keys()) {
+    if (seen.has(q0)) continue;
+    const comp = new Set([q0]); seen.add(q0);
+    const queue = [q0];
+    for (let h = 0; h < queue.length; h++) for (const x of nb.get(queue[h])) if (!seen.has(x)) { seen.add(x); comp.add(x); queue.push(x); }
+    if (comp.size > best.size) best = comp;
+  }
+  return best;
+}
+
+// Ana ağa bağlı olmayan Türkiye kişileri (ör. Barış Manço) için kümede OLMAYAN gerçek komşular: doğrudan ilişkiler, aynı grubun
+// üyeleri, aynı film/dizinin kadrosu, aynı şarkının sanatçı/yazarları. Sadece tr maddeli insanlar; en çok 800. Bağlantı uydurulmaz:
+// adaylar sonra normal bağlantı sorgularından geçer ve sadece gerçekten köprü olanlar kalır.
+async function bridgeCandidates(people, raw, rows) {
+  const main0 = mainComponent(raw, people);
+  const lonely = new Set([...people].filter(([q, v]) => v.turkish && !main0.has(q)).map(([q]) => q));
+  console.log(`   ana ağ dışında Türkiye'den ${lonely.size} kişi — köprü aranıyor`);
+  const cand = new Map(); // qid -> kaç yalnıza komşu
+  const add = (q) => { if (!people.has(q)) cand.set(q, (cand.get(q) ?? 0) + 1); };
+  for (const r of rows.direct) if (lonely.has(qid(r.a))) add(qid(r.b));
+  const groups = [...new Set(rows.groupRows.filter((r) => lonely.has(qid(r.a))).map((r) => qid(r.g)))];
+  const works = [...new Set(rows.cast.filter((r) => lonely.has(qid(r.a))).map((r) => qid(r.w)))];
+  const songs = [...new Set(rows.songRows.filter((r) => lonely.has(qid(r.a))).map((r) => qid(r.x)))];
+  if (groups.length) for (const r of await perChunk(groups, (v) => `SELECT ?m WHERE { VALUES ?g { ${v} } { ?m wdt:P463 ?g } UNION { ?g wdt:P527 ?m } }`)) add(qid(r.m));
+  if (works.length) for (const r of await perChunk(works, (v) => `SELECT ?m WHERE { VALUES ?w { ${v} } ?w wdt:P161 ?m . }`)) add(qid(r.m));
+  if (songs.length) for (const r of await perChunk(songs, (v) => `SELECT ?m WHERE { VALUES ?x { ${v} } VALUES ?r { wdt:P175 wdt:P86 wdt:P676 } ?x ?r ?m . }`)) add(qid(r.m));
+  const ids = [...cand.keys()].filter((q) => /^Q\d+$/.test(q));
+  if (!ids.length) return [];
+  const ok = await perChunk(ids, (v) => `SELECT DISTINCT ?p WHERE { VALUES ?p { ${v} } ?p wdt:P31 wd:Q5 . ?a schema:about ?p ; schema:isPartOf <https://tr.wikipedia.org/> . }`);
+  const out = ok.map((r) => qid(r.p)).sort((a, b) => (cand.get(b) ?? 0) - (cand.get(a) ?? 0)).slice(0, 800);
+  console.log(`   köprü adayı: ${out.length}`);
+  return out;
 }
 
 async function main() {
@@ -466,8 +591,19 @@ async function main() {
   for (const [q, v] of info) Object.assign(v, set.get(q));
   // Adı olmayanlar (ne Türkçe ne İngilizce etiket) atılır
   for (const q of ids) { const v = info.get(q); if (!v || !(v.trl || v.enl || v.trw)) { set.delete(q); info.delete(q); } }
-  const people = info;
-  const { raw, ctx, workInfo } = await edgesOf([...people.keys()], people);
+  let people = info;
+  let { raw, ctx, workInfo, rows } = await edgesOf([...people.keys()], people);
+  const bridgeIds = await bridgeCandidates(people, raw, rows);
+  if (bridgeIds.length) {
+    const sl = await perChunk(bridgeIds, (v) => `SELECT ?p ?sl WHERE { VALUES ?p { ${v} } ?p wikibase:sitelinks ?sl . }`);
+    for (const r of sl) set.set(qid(r.p), { fame: Number(r.sl), origin: 'bridge' });
+    const all = [...people.keys(), ...bridgeIds];
+    const info2 = await details(all);
+    for (const [q, v] of info2) Object.assign(v, set.get(q));
+    for (const q of all) { const v = info2.get(q); if (!v || !(v.trl || v.enl || v.trw)) info2.delete(q); }
+    people = info2;
+    ({ raw, ctx, workInfo, rows } = await edgesOf([...people.keys()], people));
+  }
 
   // Kişi listesi: ünlüden aza
   // Hiç bağlantısı olmayan kişi zincirde kullanılamaz: kümeden çıkar (aramada çıkıp hep "Bağlantı yok" demesin)
@@ -479,6 +615,19 @@ async function main() {
     const e = raw[i];
     if ((e.type === 'cast' || e.type === 'director') && !(screen(e.a) && screen(e.b))) raw.splice(i, 1);
   }
+  // Köprü kişisi sadece gerçekten köprüyse kalır: ana bileşende ve asıl kümeden ana ağa bağlı olmayan birine komşu
+  {
+    const main0 = mainComponent(raw, people);
+    const nb = new Map();
+    for (const e of raw) { if (!nb.has(e.a)) nb.set(e.a, new Set()); if (!nb.has(e.b)) nb.set(e.b, new Set()); nb.get(e.a).add(e.b); nb.get(e.b).add(e.a); }
+    const before = mainComponent(raw.filter((e) => people.get(e.a)?.origin !== 'bridge' && people.get(e.b)?.origin !== 'bridge'), people);
+    const useful = (q) => main0.has(q) && [...(nb.get(q) ?? [])].some((x) => people.get(x)?.origin !== 'bridge' && !before.has(x));
+    let dropped = 0;
+    for (const [q, v] of people) if (v.origin === 'bridge' && !useful(q)) { people.delete(q); dropped++; }
+    const pulled = [...people.values()].filter((v) => v.origin !== 'bridge' && v.turkish).length;
+    console.log(`   köprü: ${[...people.values()].filter((v) => v.origin === 'bridge').length} kişi kaldı (${dropped} atıldı)`);
+    void pulled;
+  }
   const linked = new Set();
   for (const e of raw) if (e.a !== e.b && people.has(e.a) && people.has(e.b)) { linked.add(e.a); linked.add(e.b); }
   console.log(`   bağlantısız ${people.size - linked.size} kişi çıkarıldı`);
@@ -487,7 +636,7 @@ async function main() {
   const peopleOut = order.map(([q, v]) => {
     const cats = catsOf(v.occ ?? [], v.pos ?? []);
     v.cats = cats;
-    const name = cleanLabel(v.trl || v.trw || v.enl);
+    const name = fixRegnal(cleanLabel(v.trl || v.trw || v.enl), v.enl);
     const alt = cleanLabel(v.enl && v.enl !== name ? v.enl : '');
     return {
       q, n: name, a: alt || undefined, k: (v.al ?? []).filter((x) => x !== name && x !== alt).slice(0, 4).join('|') || undefined, b: v.b ?? null, d: v.d ?? null, s: shortDesc(v, cats), c: cats,
@@ -501,7 +650,7 @@ async function main() {
   const ctxText = (id, type) => {
     const c = ctx.get(id);
     if (!c) return -1;
-    let label = cleanLabel(c.trl || c.enl);
+    let label = cleanLabel(c.trl || (type === 'successor' ? trPosition(cleanLabel(c.enl)) : c.enl));
     if (!label) return -1;
     let meta = '';
     if (type === 'song' || type === 'duet') meta = '🎵';
@@ -571,11 +720,25 @@ async function main() {
   const pools = { kolay: [], orta: [], zor: [] };
   const seenPairs = new Set();
   const pairType = new Map(edges.map(([a, b, t]) => [a < b ? `${a}-${b}` : `${b}-${a}`, TYPES[t]]));
+  const typeOfPair = (a, b) => pairType.get(a < b ? `${a}-${b}` : `${b}-${a}`);
   const rnd = (() => { let s = 12345; return () => ((s = (s * 1103515245 + 12345) % 2147483648) / 2147483648); })();
   const uses = { kolay: new Map(), orta: new Map(), zor: new Map() };
   const shuffled = [...ends].sort(() => rnd() - 0.5);
   for (const s of shuffled) {
-    const { dist, prev } = bfs(adj, s, n);
+    const { dist, order } = bfs(adj, s, n);
+    // Tüm en kısa yollar arasından "sıkıcı" bağlantısı en az olanı: film/dizi 1, etkilenme 2 puan; eşitlikte ünlü komşu
+    const cost = new Float64Array(n).fill(Infinity);
+    const bestPrev = new Int32Array(n).fill(-1);
+    cost[s] = 0;
+    for (const v of order) {
+      if (v === s) continue;
+      for (const u of adj[v]) {
+        if (dist[u] !== dist[v] - 1) continue;
+        const ty = typeOfPair(u, v);
+        const c = cost[u] + (ty === 'cast' || ty === 'director' ? 1 : ty === 'influence' ? 2 : 0);
+        if (c < cost[v]) { cost[v] = c; bestPrev[v] = u; }
+      }
+    }
     const byLen = { kolay: [], orta: [], zor: [] };
     for (const t of ends) {
       if (t === s || seenPairs.has(s < t ? `${s}-${t}` : `${t}-${s}`)) continue;
@@ -599,12 +762,13 @@ async function main() {
       for (const t of good) {
         if (taken >= 2) break;
         const path = [];
-        // t'den s'ye geri izle (BFS ağacı)
-        for (let v = t; v >= 0; v = prev[v]) path.push(v);
+        for (let v = t; v >= 0; v = bestPrev[v]) path.push(v);
         path.reverse();
-        // "Etkilendi" zincirleri (felsefe/edebiyat) sıkıcı ve tahmini zor: yolda en çok bir etkilenme bağlantısı
-        const infl = path.slice(1).filter((v, i) => pairType.get(path[i] < v ? `${path[i]}-${v}` : `${v}-${path[i]}`) === 'influence').length;
-        if (infl > 1) continue;
+        // Çeşitlilik: yolda en çok 2 film/dizi, en çok 1 "etkilendi", en az 1 film dışı bağlantı
+        const types = path.slice(1).map((v, i) => typeOfPair(path[i], v));
+        const film = types.filter((x) => x === 'cast' || x === 'director').length;
+        const infl = types.filter((x) => x === 'influence').length;
+        if (film > 2 || infl > 1 || film === types.length) continue;
         taken++;
         pools[k].push([s, t, path]);
         seenPairs.add(s < t ? `${s}-${t}` : `${t}-${s}`);
