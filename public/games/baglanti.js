@@ -246,7 +246,7 @@ function body() {
         diffPicker(diff, (id) => { diff = id; try { localStorage.setItem(DIFF_KEY, id); } catch { /* yok say */ } render(); }),
         el('button', { class: 'btn big primary rc-go', disabled: busy, onclick: begin, 'data-testid': 'bg-start' }, 'Başla →'))];
     case 'ready':
-      return [el('section', { class: 'card center bg-start' },
+      return [el('section', { class: 'card center bg-ready' },
         el('div', { class: 'hint' }, `📅 Günlük #${game.puzzleNo}`),
         el('h2', {}, 'Bugünün iki ünlüsü seni bekliyor'),
         el('p', { class: 'hint' }, `Herkese aynı yapboz, tek deneme. En kısa yolda ${game.opt} ara kişi var. Süre "Başla"ya basınca işler.`),

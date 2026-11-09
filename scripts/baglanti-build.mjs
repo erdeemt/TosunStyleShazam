@@ -25,7 +25,7 @@ const OUT_DIR = join(ROOT, 'content', 'baglanti');
 const CACHE = process.env.BG_CACHE || join(tmpdir(), 'bg-build-cache');
 const ENDPOINT = process.env.BG_SPARQL || 'https://qlever.cs.uni-freiburg.de/api/wikidata';
 const UA = 'TosunStyleGames/1.0 (https://github.com/erdeemt/TosunStyleShazam; offline people graph builder) node';
-const GAP_MS = Number(process.env.BG_GAP_MS) || 700;
+const GAP_MS = Number(process.env.BG_GAP_MS) || 1500;
 const GLOBAL_N = 3000; // dünya: en çok dil sürümü olan insanlar
 const TR_N = 1350; // Türkiye/Osmanlı
 const SL_N = 220; // Süper Lig'in tanınmış yabancıları
@@ -143,9 +143,11 @@ async function candidates() {
   const set = new Map();
   for (const [q, s] of top(global, GLOBAL_N)) set.set(q, { fame: s, origin: 'global' });
   for (const [q, s] of top(tr, TR_N)) if (!set.has(q)) set.set(q, { fame: s, origin: 'tr' });
-  for (const [q, s] of top(pop, POP_N)) if (!set.has(q)) set.set(q, { fame: s, origin: 'trpop' });
-  for (const [q, s] of top(sl, SL_N)) if (!set.has(q)) set.set(q, { fame: s, origin: 'superlig' });
-  console.log(`   dünya ${Math.min(GLOBAL_N, global.length)}, Türkiye ${Math.min(TR_N, tr.length)}, Süper Lig ${Math.min(SL_N, sl.length)} → ${set.size} kişi`);
+  // Popüler kültür ve Süper Lig: kümede OLMAYANLARDAN en ünlü n kişi (en ünlüleri zaten Türkiye listesinde)
+  const addNew = (rows, n, origin) => { let k = 0; for (const [q, s] of top(rows, Infinity)) { if (k >= n) break; if (!set.has(q)) { set.set(q, { fame: s, origin }); k++; } } return k; };
+  const popN = addNew(pop, POP_N, 'trpop');
+  const slN = addNew(sl, SL_N, 'superlig');
+  console.log(`   dünya ${Math.min(GLOBAL_N, global.length)}, Türkiye ${Math.min(TR_N, tr.length)}, popüler kültür +${popN}, Süper Lig +${slN} → ${set.size} aday`);
   return set;
 }
 
@@ -468,7 +470,11 @@ async function main() {
   const { raw, ctx, workInfo } = await edgesOf([...people.keys()], people);
 
   // Kişi listesi: ünlüden aza
-  const order = [...people.entries()].sort((a, b) => b[1].fame - a[1].fame);
+  // Hiç bağlantısı olmayan kişi zincirde kullanılamaz: kümeden çıkar (aramada çıkıp hep "Bağlantı yok" demesin)
+  const linked = new Set();
+  for (const e of raw) if (e.a !== e.b && people.has(e.a) && people.has(e.b)) { linked.add(e.a); linked.add(e.b); }
+  console.log(`   bağlantısız ${people.size - linked.size} kişi çıkarıldı`);
+  const order = [...people.entries()].filter(([q]) => linked.has(q)).sort((a, b) => b[1].fame - a[1].fame);
   const index = new Map(order.map(([q], i) => [q, i]));
   const peopleOut = order.map(([q, v]) => {
     const cats = catsOf(v.occ ?? [], v.pos ?? []);

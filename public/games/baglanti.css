@@ -118,7 +118,7 @@ body.bg-noscroll { overflow: hidden; }
 .bg-break { list-style: none; margin: 6px 0 0; padding: 0; width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 4px; }
 .bg-break li { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; border-bottom: 1px dashed var(--line); padding: 3px 0; }
 .bg-break .bad { color: var(--bad); }
-.bg-start { display: flex; flex-direction: column; gap: 8px; }
+.bg-ready { display: flex; flex-direction: column; gap: 8px; }
 .bg-done { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .bg-done h2 { margin: 0; }
 
