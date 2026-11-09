@@ -38,8 +38,8 @@ export const summaryLine = (s) => `${s.correct} doğru · ${s.wrong} yanlış ·
 
 const SIZE = 300;
 const C = SIZE / 2;
-const R_LETTER = 130;
-const R_DOT = 15;
+const R_LETTER = 134;
+const R_DOT = 13;
 const R_RING = 98;
 const RING_LEN = 2 * Math.PI * R_RING;
 
@@ -113,7 +113,7 @@ export function playPanel(opts) {
   // Düğmeler odağı yazı kutusundan almasın (mobil klavye açık kalsın).
   const keepFocus = (e) => e.preventDefault();
   const sendBtn = el('button', { type: 'submit', class: 'btn primary hc-send', onpointerdown: keepFocus }, 'Gönder');
-  const passBtn = el('button', { type: 'button', class: 'btn hc-pass', onpointerdown: keepFocus, onclick: () => doPass() }, 'Pas ⏭');
+  const passBtn = el('button', { type: 'button', class: 'btn hc-pass-btn', onpointerdown: keepFocus, onclick: () => doPass() }, 'Pas ⏭');
   const form = el('form', { class: 'hc-form', onsubmit: (e) => { e.preventDefault(); doAnswer(); } },
     input, el('div', { class: 'hc-actions' }, passBtn, sendBtn));
   const statsEl = el('div', { class: 'hc-stats' });

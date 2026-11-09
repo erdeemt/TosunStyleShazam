@@ -16,7 +16,8 @@ if (!files.length) files.push(fileURLToPath(new URL('./clues.json', import.meta.
 
 const MAX_CLUE = 150;
 const WARN_CLUE = 115;
-const VAGUE = /(^|\s)(bir şey|bir tür|bir çeşit|vb\.?|vs\.?|falan|şey)(\s|$|[,.])/iu;
+const LABEL_WORDS = new Set(Object.values(CATEGORIES).flatMap((l) => fold(l).split(' ')).filter((w) => w.length >= 4));
+const VAGUE =/(^|\s)(bir şey|bir tür|bir çeşit|vb\.?|vs\.?|falan|şey)(\s|$|[,.])/iu;
 
 export function validate(clues, { minPerLetter = MIN_PER_LETTER, partial = false } = {}) {
   const errors = [];
@@ -57,7 +58,9 @@ export function validate(clues, { minPerLetter = MIN_PER_LETTER, partial = false
         if (root.length >= 4 && clueWords.some((cw) => cw.startsWith(root))) { E(c, `cevap ipucunda geçiyor ("${w}")`); break; }
       }
     }
-    if (c.category === 'deyim' && !/(…|\.\.\.|_{2,})/.test(clue)) W(c, 'deyim ipucunda boşluk (…) yok');
+    // Kategori etiketi ipucuyla birlikte ekranda görünür: cevap bir etiket kelimesi olmasın ("Coğrafya" → coğrafya).
+    if (LABEL_WORDS.has(compact(c.answer))) E(c, 'cevap bir kategori etiketiyle aynı');
+    if (c.category === 'deyim' &&!/(…|\.\.\.|_{2,})/.test(clue)) W(c, 'deyim ipucunda boşluk (…) yok');
     if (c.mode === 'starts') {
       for (const a of c.alt ?? []) if (compact(a)[0] !== compact(c.answer)[0]) W(c, `alt "${a}" başka harfle başlıyor`);
     }

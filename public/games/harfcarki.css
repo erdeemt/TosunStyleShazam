@@ -13,7 +13,7 @@
 .hc-big { font: 900 72px 'Rubik', system-ui, sans-serif; fill: var(--text); }
 .hc-time { font: 700 24px 'Rubik', system-ui, sans-serif; fill: var(--muted); font-variant-numeric: tabular-nums; }
 .hc-dot circle { fill: var(--card2); stroke: var(--line); stroke-width: 2; transition: fill .25s, stroke .25s; }
-.hc-dot text { font: 700 15px 'Rubik', system-ui, sans-serif; fill: var(--text); pointer-events: none; }
+.hc-dot text { font: 700 14px 'Rubik', system-ui, sans-serif; fill: var(--text); pointer-events: none; }
 .hc-dot.hc-ok circle { fill: var(--hc-ok); stroke: var(--hc-ok); }
 .hc-dot.hc-ok text { fill: #08261a; }
 .hc-dot.hc-bad circle { fill: var(--hc-bad); stroke: var(--hc-bad); }
@@ -23,8 +23,8 @@
 .hc-dot { transform-box: fill-box; transform-origin: center; }
 .hc-dot.hc-pulse circle { animation: hc-pulse .6s ease-out; }
 .hc-dot.hc-wrong circle { animation: hc-red .6s ease-out; }
-@keyframes hc-pulse { 0% { r: 15px; } 40% { r: 20px; } 100% { r: 15px; } }
-@keyframes hc-red { 0%, 100% { r: 15px; } 30% { r: 11px; } 60% { r: 17px; } }
+@keyframes hc-pulse { 0% { r: 13px; } 40% { r: 17px; } 100% { r: 13px; } }
+@keyframes hc-red { 0%, 100% { r: 13px; } 30% { r: 10px; } 60% { r: 15px; } }
 
 .hc-countdown {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
@@ -51,7 +51,7 @@
 .hc-input { width: 100%; font-size: 20px; padding: 12px 14px; min-height: 52px; border-radius: 12px; }
 .hc-actions { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; }
 .hc-actions .btn { min-height: 48px; font-size: 17px; }
-.hc-pass { border-color: var(--accent2); }
+.hc-pass-btn { border-color: var(--accent2); }
 .hc-stats { text-align: center; color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
 .hc-quit { min-height: 44px; }
 
