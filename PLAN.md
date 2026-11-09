@@ -769,3 +769,100 @@ tur açıklamasından önceki tüm mesajlarda başlık/dosya/koordinat yok, sür
 sahibine bağlı, yeniden bağlanma + izleyici, ayrılma, ayar temizliği, İstanbul ölçeği), `tests/e2e/whenwhere.test.mjs` (günlük 5 tur +
 final + sıralama, serbest Eski İstanbul zoom 16 + iğne sürükleme, 3 telefon lobi 3 tur: iğne/yıl başkası kilitleyince korunur,
 açıklamada 3 iğne + gerçek yer, final kürsüsü). Karolar testte boş PNG'ye yönlendirilir (`WW_REAL_TILES=1` gerçek).
+
+### 4.12 🔗 Bağlantı Avı (iki ünlüyü en kısa kişi zinciriyle bağla) — 2026-11-09
+
+Kendi tasarımımız ("altı derece / wiki yarışı" türü; başka sitenin adı/metni/arayüzü kopyalanmadı). Tek oyunculu (Günlük + Sınırsız)
+ve lobili çok oyunculu. Dosyalar: `public/baglanti-math.js` (ortak saf hesap: Türkçe duyarsız arama, puan, yıl biçimi),
+`server/baglanti.js` (veri + grafik, zincir motoru, kişi dizini, fotoğraf vekili, tek oyunculu uçlar), `server/games/baglanti.js`
+(lobi), `public/games/baglanti.js` (tek oyunculu + kabuk), `baglanti-lobby.js`, `baglanti-ui.js` (ortak parçalar), `baglanti.css`,
+`scripts/baglanti-build.mjs` (veri betiği), `content/baglanti/` (veri).
+
+**Oyun**: üstte BAŞLANGIÇ, altta HEDEF kişi kartı (fotoğraf, ad, yıllar, tek satır açıklama, alan rozetleri). Oyuncu araya "➕ Kişi
+ekle" ile kişi ekler: tam ekran arama (Türkçe duyarsız: i/İ/ı, ş, ğ, ü, ö, ç, şapka ve aksanlar; ek adlar: "Fatih" → II. Mehmed),
+seçilen kişi sunucuya gider; zincirin ucuna BAĞLIYSA kart, bağlantı nedeniyle ("💍 eşi", "👪 babası", "⚽ takım arkadaşı: Fenerbahçe
+(1998–2000)", "🎬 aynı filmde: …", "🎵 aynı grupta: …", "👑 tahtta ardılı: …") kayarak eklenir; değilse sayfa sallanır, "✋ Bağlantı
+yok" + yanlış deneme sayacı (adım sayılmaz). Eklenen kişi hedefe bağlıysa zincir kendiliğinden biter (son bağlantının nedeni de
+gösterilir); hedef kişi aramada seçilirse uç hedefe bağlıysa biter. ✕: o adımı ve sonrasını siler (zincir ortadan kopamaz). En fazla
+12 ara kişi. Zincir sadece baştan kurulur (iki uçtan kurma yok).
+- **İpucu** (zincirin şu anki ucundan hedefe en kısa yoldaki SIRADAKİ kişi): 🔤 baş harf (−100; Romen rakamı/sıra eki atlanır),
+  🧭 alan + doğum on yılı/yüzyılı (−50). Aynı uçta aynı ipucu tekrar ücretsiz; oyun başına en fazla 8.
+- **Puan** (sunucu hesaplar, `scoreRun`): en kısa yoldaki ara kişi sayısı = 1000; fazladan her ara kişi −150 (taban 300); yanlış
+  deneme −25 (en çok −250); ipuçları; süre: ilk 60 sn ücretsiz, sonra her 10 sn −5 (en çok −200); bitiren en az 50; pes eden /
+  süresi biten 0. Unvan: ≥950 🕸️ Altı Derece Ustası, ≥800 🔗 Zincir Ustası, ≥600 🧭 İz Sürücü, ≥400 🗺️ Yolunu Bulan, >0 🐢 Dolambaçlı
+  Yolcu, 0 🙈 Kayıp Halka.
+- **Bitiş**: puan + döküm, "Senin zincirin" ve "🏁 En kısa yol" (fotoğraflı kartlar + nedenler; "aynı uzunlukta başka yollar da
+  olabilir"), paylaş metni.
+
+**Tek oyunculu** (`POST /api/baglanti/start|begin|add|remove|hint|giveup|leaderboard`, gövdede kimlik):
+- **Günlük**: herkese aynı Orta (3 ara kişi) yapboz; gizli tuzla (`secrets.baglantiSalt`) karıştırılmış havuz sırası (döngü bitene
+  kadar tekrar yok), gün ilk istendiğinde `baglanti-days` kaydına qid'lerle sabitlenir (gün içinde veri değişse de aynı kalır;
+  yol bozulursa yeniden seçilir). `start` başlamadan uçları bile vermez (süre "Başla"ya — `begin` — basınca işler). Kimlik başına tek
+  deneme (bitince/pes edince hiçbir uç kabul etmez; yenileyince bitiş ekranı). Kayıt `baglanti-daily` (45 gün). Sıralama: bitirenler,
+  puan ↓ sonra süre ↑; ilk 50 + sen; pes edenler sıralanmaz (sayı gösterilir); bugün açılan hesap "🆕 sıralama dışı" (§3.6.1);
+  başkalarının zinciri ancak sen bitirince.
+- **Sınırsız**: zorluk Kolay 3 / Orta 4 / Zor 5 bağlantı (2/3/4 ara kişi). Açılan yapbozlar kimlik başına son 300 kayıtta
+  (`baglanti-seen`), yenisi bunlardan kaçınır (havuz yetmezse en eskiden serbest bırakır). Kişi başına en fazla 3 açık oyun, toplam 5000,
+  6 sa ömür.
+
+**Çok oyunculu (lobi, 1–12 kişi)**: host ayarı zorluk + tur (1/3/5) + süre (3/5/8 dk). Herkes aynı yapbozu aynı anda alır
+(`startAt` = şimdi + 1,5 sn). Tur sürerken görünümde herkesin sadece ADIM SAYISI, bitirdi mi, kaçıncı bitirdi, pes etti mi ("Ayşe: 2
+adım", "✅ 1. bitirdi") — zincirdeki adlar değil. Bitiren beklerken kendi zincirini görür (en kısa yolu değil). Herkes bitirince/pes
+edince ya da süre + 1,5 sn dolunca tur kapanır; bitirmeyen 0. Açıklama 30 sn (host "Sonraki"): en kısa yol + herkesin zinciri yan yana
+(yatay kaydırılan sütunlar; 🥇🥈🥉 bitiş sırası, puan, ara kişi, yanlış, süre). Final: sıralama + unvan (tur ortalamasından), tur tur
+tablo, son turun sütunları. Oyun ortası gelen izleyici olur (uçları ve yarışı görür, ekleyemez). Yeniden bağlanan zincirini aynen
+alır. Aynı oyunda bir kişi iki yapbozda uç olmaz. Eylemler: `add {index, qid}`, `remove {index, pos}`, `hint {index, kind}`,
+`giveup {index}`, `next {index}` (host); eski tura ait eylem sessizce yok sayılır; bağlantısız kişi hata değil geri bildirimdir
+(`me.run.fb = { n, ok:false }`), bozuk girdi Türkçe hata.
+
+**Güvenlik / adalet**:
+- Komşu listeleri ve en kısa yol hiçbir yanıtta/görünümde yok (Network sekmesi güvenli): istemci her adımı gönderir, sunucu kenarı
+  doğrular ve sadece o kenarın etiketini döner. En kısa yol tek oyunculuda zincir bitince/pes edince, lobide tur kapanınca. Sadece
+  uzunluğu (= zorluk) baştan bilinir. İstemcinin kişi dizini (`GET /api/baglanti/people`: qid, ad, diğer ad, doğum, ölüm, kısa açıklama,
+  alanlar, fotoğraf var mı, ek adlar; gzip + ETag/304) bağlantı içermez.
+- Girdiler sunucuda: qid `^Q[1-9]\d{0,11}$` ve kümede olmalı, zincirde/başlangıç olamaz, en fazla 12 ara kişi, konum tam sayı,
+  ipucu türü sabit liste; günlük tek deneme; başkasının serbest oyunu oynanamaz; genel HTTP sınırı + gövde ≤ 2 KB.
+- **Fotoğraf vekili** `GET /api/baglanti/photo/<qid>`: sadece kümedeki kişinin P18 dosyası; adres sunucuda hesaplanır
+  (`https://upload.wikimedia.org/wikipedia/commons/thumb/<md5>/…/330px-…`, kullanıcı/port yok, yönlendirme izlenmez, 20 sn, ≤ 4 MB,
+  aynı anda 3 indirme, kendi UA'sı). Üst veri silinir (`server/image-strip.js`), disk önbelleği `DATA_DIR/baglanti-cache` (150 MB,
+  `BG_CACHE_MB`), kaynakta olmayan dosya 6 sa tekrar denenmez. Kişi zaten açık bilgi olduğundan opak jeton yok; tarayıcı 7 gün
+  önbelleğe alabilir. Kendi IP sınırı: dakikada 900 (`LIMIT_PHOTO_PER_MIN`; arama listesi + zincir aynı anda çok küçük resim ister).
+  Fotoğrafı olmayan / yüklenemeyen kişi: renkli baş harf avatarı.
+
+**Veri** (`node scripts/baglanti-build.mjs`; `content/baglanti/people.json`, `edges.json`, `puzzles.json`, commit'lenir):
+Wikidata (CC0). SPARQL uç noktası varsayılan olarak QLever'in Wikidata aynası (`qlever.cs.uni-freiburg.de/api/wikidata`; aynı veri —
+"insan + site bağlantısı sayısı" taraması query.wikidata.org'da 60 sn sınırını aşıyor); `BG_SPARQL` ile değiştirilebilir. Ağ nazik:
+tek sıra, `BG_GAP_MS` (1,5 sn) aralık, 429'da üstel geri çekilme, yanıt önbelleği (`BG_CACHE`), e-postasız genel UA.
+- Kişi adayları: dünya genelinde en çok Vikipedi diline sahip 3000 insan; Türkiye/Osmanlı vatandaşı (P27 Q43/Q12560) tr.wikipedia
+  maddeli ilk 1350; listede olmayan Türkiye popüler kültürü (oyuncu, şarkıcı, futbolcu, basketbolcu, voleybolcu, sunucu, rapçi,
+  komedyen…) ilk 450; Süper Lig'de oynamış tr maddeli yabancı ilk 220. Hiç bağlantısı olmayan kişi kümeden çıkarılır.
+- Alanlar: meslek (P106) + makam (P39) İngilizce etiketlerinden anahtar kelimeyle (hükümdar, futbolcu, sporcu, müzisyen, oyuncu,
+  yönetmen, siyasetçi, asker, bilim insanı, yazar, düşünür, sanatçı, din insanı, iş insanı; en çok 3). Açıklama: Türkçe Wikidata
+  açıklaması (≤ 70 karakter), yoksa alan adları. Ad: tr etiketi > tr.wikipedia başlığı > en etiketi; ek adlar (tr/en takma adlar) arama için.
+- Bağlantılar (iki uç da kümede; aynı çift için öncelikli tek tür): eş (P26), ebeveyn/çocuk (P22/P25/P40), kardeş (P3373),
+  sevgili/partner (P451), aynı müzik grubu (P463 / grubun P527'si; tür müzik grubu alt sınıfı, ≤ 12 kişi), düet (aynı şarkının P175
+  sanatçıları, ≤ 4), şarkısını yazdı (şarkının P86/P676'sı ↔ P175), takım arkadaşı (P54 + P580/P582 başlangıç/bitiş; aynı takımda
+  ≥ 1 yıl çakışma; milli takımlar dahil; bitişsiz kayıt sadece yaşayan ve 2014+ başlangıçlıysa "sürüyor"; > 22 yıllık kayıt şüpheli
+  sayılıp atılır), teknik direktör–oyuncu (P6087, aynı takımda çakışma), yönetmen–oyuncu (P57 ↔ P161), aynı film/dizi kadrosu (P161;
+  ≤ 15 kümeden kişi; belgesel değil; yapım yılında iki kişi de yaşıyor — arşiv görüntüsü sayılmaz; en az 3 dilde maddesi olan yapım,
+  Türk oyunculu yapımda tr maddesi yeter), birlikte kurdular (P112, 2–6 kurucu), görevde/tahtta ardıl–selef (P39 niteleyicisi
+  P1365/P1366; makam adı + devir yılı; hükümdarlık makamında 👑), hoca/öğrenci (P1066/P802, doktora P184/P185), aynı muharebe
+  (P1344/P710; muharebe/kuşatma, ≤ 8), ortak (P1327), "hayatında önemli" (P3342 + rol niteleyicisi), akraba (P1038), aynı seçimde
+  aday (P726, ≤ 8), etkilenme (P737).
+- Yapbozlar: uç adayı = fotoğraflı, dev bileşende, dünya ilk ~1500 ya da Türkiye ilk 450. Her uçtan BFS; uzunluğu tam 3/4/5 olan
+  çiftler; "karışık" şartı: farklı ana alan ya da ≥ 60 yıl doğum farkı; bir kişi zorluk başına en çok 3 yapbozda; Türkiye'den uçlu
+  çiftler önce. Zorluk başına 600 yapboz (karıştırılmış). Saklanan: [başlangıç, hedef, bir en kısa yol] (BFS ağacından). Sunucu
+  açılışta her yapbozun yolunu ve uzunluğunu yeniden doğrular.
+- TEST_MODE (testler): `content/baglanti/test-graph.json` — gerçek verinin küçük sabit alt grafiği (`--test-graph`: her zorlukta uçları
+  ayrık 6 yapboz + yollarındaki kişiler + aralarındaki gerçek bağlantılar + 8 çeldirici; alt grafikte uzunluklar doğrulanır) ve yer
+  tutucu görsel `test-placeholder.jpg` (her istekte kişi adı/qid'li sahte EXIF + yorum eklenir; testler silindiğini doğrular).
+  `BG_DATA=real` ile TEST_MODE'da da gerçek veri.
+
+**Kabul / testler**: `tests/unit/baglanti.test.mjs` (fold/arama sırası/ek ad, baş harf, puan sınırları, MÖ yıl, test grafiğinde
+bağımsız BFS ile 3/4/5, etiketlerin iki yönü, motor: tamamlanma/yanlış/hatalı girdi/silme/ipucu/12 sınırı/pes, bitmeden en kısa yol yok,
+günlük belirlenimcilik + döngüde tekrar yok, kaçınma, fotoğraf adresi süzgeci, dizinde bağlantı yok), `tests/unit/baglanti-data.test.mjs`
+(gerçek veri: sayı, Türkiye payı, fotoğraf kapsamı, şema, örneklemde yapboz uzunlukları), `tests/security/sec-baglanti.test.mjs`
+(her yanıtta sızıntı taraması, tek deneme, bozuk girdiler, sahiplik, Sınırsız tekrar yok, dizin gzip/ETag, fotoğraf vekili üst veri +
+404 + IP sınırı, sıralama + 🆕 + gizli zincirler), `tests/swarm/baglanti-lobby.test.mjs` (3 kişi yarış + sızıntı + puanlar, süre dolunca 0,
+yeniden bağlanma, izleyici, host ayrılması, ayarlar), `tests/e2e/baglanti.test.mjs` (günlük telefon akışı; 3 telefon lobi yarışı;
+ekranlar test-results/baglanti/, `BG_SHOTS` klasörüne `bg-*.png`).
