@@ -471,6 +471,14 @@ async function main() {
 
   // Kişi listesi: ünlüden aza
   // Hiç bağlantısı olmayan kişi zincirde kullanılamaz: kümeden çıkar (aramada çıkıp hep "Bağlantı yok" demesin)
+  // Film/dizi bağlantısı sadece ekran insanları (oyuncu, yönetmen, müzisyen) arasında: siyasetçi/yazar/sporcu kadrolarda çoğu
+  // zaman arşiv görüntüsü ya da "kendisi" olarak geçiyor (Merkel bir bilimkurgu filminde, Castro bir Hitchcock filminde…).
+  for (const v of people.values()) v.cats = catsOf(v.occ ?? [], v.pos ?? []);
+  const screen = (q) => { const c = people.get(q)?.cats ?? []; return c.some((x) => x === 'actor' || x === 'director' || x === 'music') && !c.some((x) => x === 'politics' || x === 'monarch' || x === 'military' || x === 'religion'); };
+  for (let i = raw.length - 1; i >= 0; i--) {
+    const e = raw[i];
+    if ((e.type === 'cast' || e.type === 'director') && !(screen(e.a) && screen(e.b))) raw.splice(i, 1);
+  }
   const linked = new Set();
   for (const e of raw) if (e.a !== e.b && people.has(e.a) && people.has(e.b)) { linked.add(e.a); linked.add(e.b); }
   console.log(`   bağlantısız ${people.size - linked.size} kişi çıkarıldı`);
@@ -520,6 +528,18 @@ async function main() {
     best.set(key, { a: ia, b: ib, type: e.type, c, y1: e.y1 ?? null, y2: e.y2 ?? null });
   }
   const edges = [...best.values()].map((e) => [e.a, e.b, TYPES.indexOf(e.type), e.c, e.y1 ?? 0, e.y2 ?? 0]);
+  // Etiketlenemeyen bağlantılar atılınca yalnız kalanlar da çıkar (sıra numaraları yeniden verilir)
+  const deg = new Uint32Array(peopleOut.length);
+  for (const [a, b] of edges) { deg[a]++; deg[b]++; }
+  const remap = new Int32Array(peopleOut.length).fill(-1);
+  let kept = 0;
+  for (let i = 0; i < peopleOut.length; i++) if (deg[i]) remap[i] = kept++;
+  if (kept < peopleOut.length) {
+    const keepList = peopleOut.filter((_, i) => deg[i]);
+    peopleOut.length = 0;
+    peopleOut.push(...keepList);
+    for (const e of edges) { e[0] = remap[e[0]]; e[1] = remap[e[1]]; }
+  }
   const n = peopleOut.length;
   const adj = Array.from({ length: n }, () => []);
   for (const [a, b] of edges) { adj[a].push(b); adj[b].push(a); }
@@ -550,6 +570,7 @@ async function main() {
   const LENS = { kolay: 3, orta: 4, zor: 5 };
   const pools = { kolay: [], orta: [], zor: [] };
   const seenPairs = new Set();
+  const pairType = new Map(edges.map(([a, b, t]) => [a < b ? `${a}-${b}` : `${b}-${a}`, TYPES[t]]));
   const rnd = (() => { let s = 12345; return () => ((s = (s * 1103515245 + 12345) % 2147483648) / 2147483648); })();
   const uses = { kolay: new Map(), orta: new Map(), zor: new Map() };
   const shuffled = [...ends].sort(() => rnd() - 0.5);
@@ -574,11 +595,17 @@ async function main() {
       const trFirst = (t) => (peopleOut[t].t || ps.t ? 0 : 1);
       const keyed = good.map((t) => [t, trFirst(t), rnd()]).sort((x, y) => x[1] - y[1] || x[2] - y[2]);
       good.splice(0, good.length, ...keyed.map((x) => x[0]));
-      for (const t of good.slice(0, 2)) {
+      let taken = 0;
+      for (const t of good) {
+        if (taken >= 2) break;
         const path = [];
         // t'den s'ye geri izle (BFS ağacı)
         for (let v = t; v >= 0; v = prev[v]) path.push(v);
         path.reverse();
+        // "Etkilendi" zincirleri (felsefe/edebiyat) sıkıcı ve tahmini zor: yolda en çok bir etkilenme bağlantısı
+        const infl = path.slice(1).filter((v, i) => pairType.get(path[i] < v ? `${path[i]}-${v}` : `${v}-${path[i]}`) === 'influence').length;
+        if (infl > 1) continue;
+        taken++;
         pools[k].push([s, t, path]);
         seenPairs.add(s < t ? `${s}-${t}` : `${t}-${s}`);
         uses[k].set(s, (uses[k].get(s) ?? 0) + 1);
@@ -586,7 +613,13 @@ async function main() {
       }
     }
   }
-  for (const k of Object.keys(pools)) pools[k] = pools[k].sort(() => rnd() - 0.5).slice(0, 600);
+  // Zorluk başına 600: yarısına kadar Türkiye'den uçlu yapbozlar, kalanı diğerleri (karıştırılmış)
+  for (const k of Object.keys(pools)) {
+    const mix = (l) => l.map((z) => [z, rnd()]).sort((x, y) => x[1] - y[1]).map((x) => x[0]);
+    const tr = mix(pools[k].filter(([s, t]) => peopleOut[s].t || peopleOut[t].t)).slice(0, 300);
+    const rest = mix(pools[k].filter(([s, t]) => !(peopleOut[s].t || peopleOut[t].t))).slice(0, 600 - tr.length);
+    pools[k] = mix([...tr, ...rest]);
+  }
 
   // ---------- Çıktı ----------
   const meta = {

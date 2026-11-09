@@ -1,0 +1,1788 @@
+{
+ "meta": {
+  "source": "Wikidata (CC0) alt grafiği — sadece testler (TEST_MODE)",
+  "builtAt": "2026-11-09"
+ },
+ "people": [
+  {
+   "q": "Q302",
+   "n": "İsa",
+   "a": "Jesus Christ",
+   "k": "Hazreti İsa|İsa Mesih|İsa peygamber|Mesih",
+   "b": -5,
+   "d": 30,
+   "s": "Yahudi vaiz ve dinî lider, Hristiyanlığın merkezî figürü",
+   "c": [
+    "religion"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 347,
+   "img": "Spas_vsederzhitel_sinay_(cropped1).jpg"
+  },
+  {
+   "q": "Q76",
+   "n": "Barack Obama",
+   "b": 1961,
+   "d": null,
+   "s": "44. Amerika Birleşik Devletleri başkanı (2009–2017)",
+   "c": [
+    "politics",
+    "writer"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 341,
+   "img": "President_Barack_Obama.jpg"
+  },
+  {
+   "q": "Q22686",
+   "n": "Donald Trump",
+   "a": "Donald J. Trump",
+   "k": "Başkan Donald John Trump|Başkan Donald J. Trump|Başkan Donald Trump|Başkan Trump",
+   "b": 1946,
+   "d": null,
+   "s": "45 ve 47. Amerika Birleşik Devletleri başkanı",
+   "c": [
+    "actor",
+    "director",
+    "politics"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 337,
+   "img": "Official_Presidential_Portrait_of_President_Donald_J._Trump_(2025)_(3x4).jpg"
+  },
+  {
+   "q": "Q692",
+   "n": "William Shakespeare",
+   "b": 1564,
+   "d": 1616,
+   "s": "İngiliz oyun yazarı ve şair (1564–1616)",
+   "c": [
+    "actor",
+    "writer"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 336,
+   "img": "Shakespeare.jpg"
+  },
+  {
+   "q": "Q352",
+   "n": "Adolf Hitler",
+   "k": "Bohem Onbaşı",
+   "b": 1889,
+   "d": 1945,
+   "s": "Almanya diktatörü (1933–1945)",
+   "c": [
+    "politics"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 329,
+   "img": "Adolf_Hitler_cropped_restored_3x4.jpg"
+  },
+  {
+   "q": "Q2831",
+   "n": "Michael Jackson",
+   "b": 1958,
+   "d": 2009,
+   "s": "Amerikalı şarkıcı (1958–2009)",
+   "c": [
+    "music",
+    "art",
+    "business"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 324,
+   "img": "Michael_Jackson_1983_(3x4_cropped)_(contrast).jpg"
+  },
+  {
+   "q": "Q937",
+   "n": "Albert Einstein",
+   "b": 1879,
+   "d": 1955,
+   "s": "Almanya doğumlu teorik fizikçi (1879-1955)",
+   "c": [
+    "science",
+    "writer",
+    "philosophy"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 322,
+   "img": "Albert_Einstein_Head_cleaned.jpg"
+  },
+  {
+   "q": "Q868",
+   "n": "Aristoteles",
+   "a": "Aristotle",
+   "k": "the Stagirite",
+   "b": -383,
+   "d": -321,
+   "s": "Antik Yunan filozofu (MÖ 384–322)",
+   "c": [
+    "philosophy"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 320,
+   "img": "Aristotle_Altemps_Inv8575.jpg"
+  },
+  {
+   "q": "Q34424",
+   "n": "Shakira",
+   "k": "Şakira|Shakira Isabel Mebarak Ripoll",
+   "b": 1977,
+   "d": null,
+   "s": "Kolombiyalı şarkıcı",
+   "c": [
+    "music",
+    "actor"
+   ],
+   "t": 0,
+   "g": "f",
+   "f": 237,
+   "img": "2023-11-16_Gala_de_los_Latin_Grammy,_03_(cropped)01.jpg"
+  },
+  {
+   "q": "Q615",
+   "n": "Lionel Messi",
+   "k": "GOAT",
+   "b": 1987,
+   "d": null,
+   "s": "Arjantinli futbolcu",
+   "c": [
+    "football"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 227,
+   "img": "Leo_Messi_Argentina_v_Egypt_7_July_2026-1.jpg"
+  },
+  {
+   "q": "Q19848",
+   "n": "Lady Gaga",
+   "b": 1986,
+   "d": null,
+   "s": "Amerikalı şarkıcı ve oyuncu",
+   "c": [
+    "music"
+   ],
+   "t": 0,
+   "g": "f",
+   "f": 198,
+   "img": "Lady_Gaga_at_the_White_House_in_2023_(1).jpg"
+  },
+  {
+   "q": "Q1744",
+   "n": "Madonna",
+   "k": "Madonna Ciccone|Madge|Madonna L. Ciccone",
+   "b": 1958,
+   "d": null,
+   "s": "Amerikalı şarkıcı",
+   "c": [
+    "music",
+    "actor",
+    "director"
+   ],
+   "t": 0,
+   "g": "f",
+   "f": 195,
+   "img": "Madonna_Rebel_Heart_Tour_2015_-_Stockholm_(23051472299)_(cropped).jpg"
+  },
+  {
+   "q": "Q329",
+   "n": "Nicolas Sarkozy",
+   "k": "Nicolas Sarközy|Sarko|Sarkozy",
+   "b": 1955,
+   "d": null,
+   "s": "23. Fransa cumhurbaşkanı (2007–2012)",
+   "c": [
+    "politics"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 193,
+   "img": "Nicolas_Sarkozy_in_2010.jpg"
+  },
+  {
+   "q": "Q8440",
+   "n": "Hugo Chávez",
+   "k": "Hugo Rafael Chavez Frias|Hugo Rafael Chávez Frías",
+   "b": 1954,
+   "d": 2013,
+   "s": "Venezuela devlet başkanı (1999–2013)",
+   "c": [
+    "actor",
+    "politics",
+    "military"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 187,
+   "img": "Hugo_Chávez_in_Brasília_2011_(3x4_cropped)_(2).jpg"
+  },
+  {
+   "q": "Q39259",
+   "n": "Recep Tayyip Erdoğan",
+   "k": "Başkan Erdoğan|Cumhurbaşkanı Erdoğan|Erdoğan|Milletin Adamı",
+   "b": 1954,
+   "d": null,
+   "s": "Türkiye Cumhuriyeti 12. Cumhurbaşkanı (2014-görevde)",
+   "c": [
+    "politics"
+   ],
+   "t": 1,
+   "g": "m",
+   "f": 185,
+   "img": "Recep_Tayyip_Erdogan_in_Ukraine.jpg"
+  },
+  {
+   "q": "Q36153",
+   "n": "Beyoncé",
+   "k": "Beyoncé Giselle Knowles Carter|Harmonies by the Hive|Queen B|Queen Bey",
+   "b": 1981,
+   "d": null,
+   "s": "Amerikalı şarkıcı",
+   "c": [
+    "music",
+    "actor",
+    "business"
+   ],
+   "t": 0,
+   "g": "f",
+   "f": 177,
+   "img": "Beyoncé_-_Tottenham_Hotspur_Stadium_-_1st_June_2023_(10_of_118)_(52946364598)_(best_crop).jpg"
+  },
+  {
+   "q": "Q17515",
+   "n": "Diego Maradona",
+   "b": 1960,
+   "d": 2020,
+   "s": "Arjantinli futbolcu (1960-2020)",
+   "c": [
+    "football",
+    "actor"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 176,
+   "img": "Argentina_celebrando_copa_(cropped).jpg"
+  },
+  {
+   "q": "Q15869",
+   "n": "Freddie Mercury",
+   "k": "Larry Lurex",
+   "b": 1946,
+   "d": 1991,
+   "s": "Britanyalı şarkıcı, şarkı yazarı ve müzik grubu Queen'in baş vokalisti",
+   "c": [
+    "music",
+    "writer",
+    "art"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 176,
+   "img": "Freddie_Mercury_at_Sheraton_Hotel_Buenos_Aires.jpg"
+  },
+  {
+   "q": "Q5105",
+   "n": "Celine Dion",
+   "a": "Céline Dion",
+   "k": "Céline Marie Claudette Dion|Celine Marie Claudette Dion",
+   "b": 1968,
+   "d": null,
+   "s": "Kanadalı şarkıcı",
+   "c": [
+    "music"
+   ],
+   "t": 0,
+   "g": "f",
+   "f": 162,
+   "img": "Céline_Dion_2012.jpg"
+  },
+  {
+   "q": "Q25089",
+   "n": "Woody Allen",
+   "b": 1935,
+   "d": null,
+   "s": "Amerikalı film yönetmeni, senarist ve sinema oyuncusu",
+   "c": [
+    "music",
+    "actor",
+    "director"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 157,
+   "img": "Woody_Allen_Cannes_2011.jpg"
+  },
+  {
+   "q": "Q8474",
+   "n": "Kanuni Sultan Süleyman",
+   "a": "Suleiman the Magnificent",
+   "k": "Kanuni|Muhibbi|Muhibbî|Sulayman",
+   "b": 1494,
+   "d": 1566,
+   "s": "10. Osmanlı padişahı (1520–1566)",
+   "c": [
+    "monarch",
+    "politics",
+    "military"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 153,
+   "img": "Suleiman_I._Semailname_(Millet_Library,_Ali_Emîrî_Collection,_History,_MS_no._1216).jpg"
+  },
+  {
+   "q": "Q58132",
+   "n": "Nicolás Maduro",
+   "k": "Maduro|Nicolas Maduro|Nicolas Maduro Moros|Nicolás Maduro Moros",
+   "b": 1962,
+   "d": null,
+   "s": "Venezuelalı politikacı",
+   "c": [
+    "politics"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 141,
+   "img": "Nicolás_Maduro_in_2023_(cropped).jpg"
+  },
+  {
+   "q": "Q10520",
+   "n": "David Beckham",
+   "k": "David Robert Joseph Beckham|Sir David Beckham|Sir David Robert Joseph Beckham",
+   "b": 1975,
+   "d": null,
+   "s": "İngiliz futbolcu",
+   "c": [
+    "football",
+    "actor",
+    "business"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 140,
+   "img": "David_Beckham_UNICEF_(cropped).jpg"
+  },
+  {
+   "q": "Q57371",
+   "n": "İlham Aliyev",
+   "a": "Ilham Aliyev",
+   "k": "Ilham Aliev|Ilham Heydar oghlu Aliev|İlham Eliyev|İlham Əliyev",
+   "b": 1961,
+   "d": null,
+   "s": "Azerbaycan Cumhuriyeti Cumhurbaşkanı",
+   "c": [
+    "politics"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 130,
+   "img": "Ilham_Aliyev,_December_2025_(cropped).jpg"
+  },
+  {
+   "q": "Q57410",
+   "n": "Şimon Peres",
+   "a": "Shimon Peres",
+   "k": "Szymon Perski|Shimon Perez|Simon Peres|Şimon Perez",
+   "b": 1923,
+   "d": 2016,
+   "s": "İsrail 9. Cumhurbaşkanı (1923–2016)",
+   "c": [
+    "politics",
+    "writer"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 128,
+   "img": "Shimon_Peres_-_portrait_photograh_-_1996_(full).jpg"
+  },
+  {
+   "q": "Q80938",
+   "n": "John Travolta",
+   "k": "John Joseph Travolta|Jonathan Joseph Travolta|Jonathan Travolta",
+   "b": 1954,
+   "d": null,
+   "s": "Amerikalı oyuncu",
+   "c": [
+    "music",
+    "actor",
+    "director"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 117,
+   "img": "John_Travolta,_2014_(cropped).jpg"
+  },
+  {
+   "q": "Q34060",
+   "n": "İzak Rabin",
+   "a": "Yizhak Rabin",
+   "k": "İzhak Rabin|Itshak Rabin",
+   "b": 1922,
+   "d": 1995,
+   "s": "5. İsrail başbakanı",
+   "c": [
+    "politics",
+    "military"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 114,
+   "img": "Flickr_-_Israel_Defense_Forces_-_Life_of_Lt._Gen._Yitzhak_Rabin,_7th_IDF_Chief_of_Staff_in_photos_(11).jpg"
+  },
+  {
+   "q": "Q42455",
+   "n": "Björk",
+   "k": "Bjork|Biejörk|Björk Guðmundsdóttir",
+   "b": 1965,
+   "d": null,
+   "s": "şarkıcı",
+   "c": [
+    "music",
+    "actor",
+    "director"
+   ],
+   "t": 0,
+   "g": "f",
+   "f": 110,
+   "img": "Björk_at_Cannes.jpg"
+  },
+  {
+   "q": "Q7345",
+   "n": "Dan Brown",
+   "k": "Dan Gerhard Brown|Daniel Gerhard Brown",
+   "b": 1964,
+   "d": null,
+   "s": "Amerikalı roman yazarı",
+   "c": [
+    "music",
+    "writer"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 110,
+   "img": "Návštěva_Dana_Browna_v_NK_ČR_17._-_18._2025_03_(cropped).jpg"
+  },
+  {
+   "q": "Q83488",
+   "n": "Mesut Özil",
+   "b": 1988,
+   "d": null,
+   "s": "Alman millî futbolcu",
+   "c": [
+    "football"
+   ],
+   "t": 1,
+   "g": "m",
+   "f": 107,
+   "img": "Mesut_Özil_at_Baku_before_2019_UEFA_Europe_League_Final.jpg"
+  },
+  {
+   "q": "Q133151",
+   "n": "Ozzy Osbourne",
+   "k": "John Michael \"Ozzy\" Osbourne|Prince of Darkness|The Prince of Darkness",
+   "b": 1948,
+   "d": 2025,
+   "s": "İngiliz müzisyen ve televizyon kişiliği",
+   "c": [
+    "music"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 106,
+   "img": "OzzyChangingHands02-20-2010.jpg"
+  },
+  {
+   "q": "Q134817",
+   "n": "II. Abdülhamid",
+   "a": "Abdul Hamid II",
+   "k": "Abdulhamid 2|Abdul-Hamid II|Abdul Hamid II, Sultan of Turkey|2. Abdülhamid",
+   "b": 1842,
+   "d": 1918,
+   "s": "34. Osmanlı padişahı (1876–1909)",
+   "c": [
+    "monarch"
+   ],
+   "t": 1,
+   "g": "m",
+   "f": 104,
+   "img": "Sultan_Abdul_Hamid_II_in_1899.jpg"
+  },
+  {
+   "q": "Q104000",
+   "n": "Lauren Bacall",
+   "k": "Betty Joan Perske|Betty Perske|Loren Beykoll",
+   "b": 1924,
+   "d": 2014,
+   "s": "Amerikalı oyuncu ve manken (1924 – 2014)",
+   "c": [
+    "music",
+    "actor",
+    "writer"
+   ],
+   "t": 0,
+   "g": "f",
+   "f": 103,
+   "img": "Lauren_Bacall_1945_press_photo.jpg"
+  },
+  {
+   "q": "Q44063",
+   "n": "Reese Witherspoon",
+   "k": "Laura Jeanne Reese Witherspoon",
+   "b": 1976,
+   "d": null,
+   "s": "Amerikalı oyuncu",
+   "c": [
+    "actor",
+    "director",
+    "business"
+   ],
+   "t": 0,
+   "g": "f",
+   "f": 103,
+   "img": "Reese_Witherspoon_at_Nashville_Film_Festival_2026.jpg"
+  },
+  {
+   "q": "Q11584",
+   "n": "Iker Casillas",
+   "k": "Iker Casillas Fernández",
+   "b": 1981,
+   "d": null,
+   "s": "İspanyol kaleci",
+   "c": [
+    "football"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 101,
+   "img": "Iker_Casillas_2.jpg"
+  },
+  {
+   "q": "Q102642",
+   "n": "Diane Keaton",
+   "k": "Diane Hall Keaton",
+   "b": 1946,
+   "d": 2025,
+   "s": "Amerikalı sinema oyuncusu",
+   "c": [
+    "actor"
+   ],
+   "t": 0,
+   "g": "f",
+   "f": 99,
+   "img": "Diane_Keaton_by_Firooz_Zahedi_2.jpg"
+  },
+  {
+   "q": "Q44467",
+   "n": "Orlando Bloom",
+   "k": "Orlando Jonathan Bloom",
+   "b": 1977,
+   "d": null,
+   "s": "İngiliz oyuncu",
+   "c": [
+    "actor",
+    "director"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 97,
+   "img": "Orlando_Bloom_at_the_2024_Toronto_International_Film_Festival_(cropped2).jpg"
+  },
+  {
+   "q": "Q47122",
+   "n": "Enrique Iglesias",
+   "k": "Enrique Miguel Iglesias Preysler|Enrique Miguel Iglesias",
+   "b": 1975,
+   "d": null,
+   "s": "İspanyol şarkıcı",
+   "c": [
+    "music",
+    "actor"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 95,
+   "img": "Enrique_Iglesias_(6891751264).jpg"
+  },
+  {
+   "q": "Q17507",
+   "n": "Gerard Piqué",
+   "b": 1987,
+   "d": null,
+   "s": "İspanyol futbolcu",
+   "c": [
+    "football",
+    "business"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 91,
+   "img": "GerardPique.jpg"
+  },
+  {
+   "q": "Q255809",
+   "n": "Hürrem Sultan",
+   "k": "Alexandra Anastasia Lisowska|Roxalana|Roxelana|Roxolana",
+   "b": 1505,
+   "d": 1558,
+   "s": "I. Süleyman'ın nikâhlı eşi ve II. Selim'in annesi",
+   "c": [
+    "monarch",
+    "writer"
+   ],
+   "t": 1,
+   "g": "f",
+   "f": 87,
+   "img": "Haseki_Hürrem_Sultan_(Roxelana).jpg"
+  },
+  {
+   "q": "Q15615",
+   "n": "Lil Wayne",
+   "k": "Baby D|Birdman Jr.|President Carter|Shrimp Daddy",
+   "b": 1982,
+   "d": null,
+   "s": "Amerikalı rapçi",
+   "c": [
+    "music",
+    "actor",
+    "business"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 81,
+   "img": "Lil_Wayne_Feb._2020.jpg"
+  },
+  {
+   "q": "Q182763",
+   "n": "Forest Whitaker",
+   "k": "Forest Steven Whitaker|Forrest Whitaker",
+   "b": 1961,
+   "d": null,
+   "s": "Amerikalı sinema oyuncusu",
+   "c": [
+    "actor",
+    "director"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 81,
+   "img": "Forest_Whitaker_TIFF_2026_02_(cropped).jpg"
+  },
+  {
+   "q": "Q143945",
+   "n": "Carla Bruni",
+   "b": 1967,
+   "d": null,
+   "s": "İtalyan şarkıcı",
+   "c": [
+    "music"
+   ],
+   "t": 0,
+   "g": "f",
+   "f": 80,
+   "img": "Carla_Cannes_2021.jpg"
+  },
+  {
+   "q": "Q82199",
+   "n": "Hande Yener",
+   "k": "Makbule Hande Özyener",
+   "b": 1973,
+   "d": null,
+   "s": "Türk şarkıcı",
+   "c": [
+    "music",
+    "art"
+   ],
+   "t": 1,
+   "g": "f",
+   "f": 80,
+   "img": "Hande_Yener_-_Müzik_Dergisi_-_2004_(cropped).png"
+  },
+  {
+   "q": "Q159934",
+   "n": "III. Murad",
+   "a": "Murad III",
+   "k": "3. Murat|Iii. murat|Şehzade Abdullah|Üçüncü Murad",
+   "b": 1546,
+   "d": 1595,
+   "s": "12. Osmanlı padişahı (1574–1595)",
+   "c": [
+    "monarch"
+   ],
+   "t": 1,
+   "g": "m",
+   "f": 80,
+   "img": "Murad_III._Semailname_(Millet_Library,_Ali_Emîrî_Collection,_History,_MS_no._1216).jpg"
+  },
+  {
+   "q": "Q174791",
+   "n": "II. Mahmud",
+   "a": "Mahmud II",
+   "k": "2. Mahmud|2. Mahmut|Ii. mahmut|II.Mahmut",
+   "b": 1785,
+   "d": 1839,
+   "s": "30. Osmanlı padişahı (1808–1839)",
+   "c": [
+    "monarch"
+   ],
+   "t": 1,
+   "g": "m",
+   "f": 79,
+   "img": "Mahmud_II.jpg"
+  },
+  {
+   "q": "Q161872",
+   "n": "II. Selim",
+   "a": "Selim II",
+   "k": "Selim the Blond|Selim the Drunk|2. Selim|İkinci Selim",
+   "b": 1524,
+   "d": 1574,
+   "s": "11. Osmanlı padişahı (1566–1574)",
+   "c": [
+    "monarch"
+   ],
+   "t": 1,
+   "g": "m",
+   "f": 78,
+   "img": "Selim_II._Semailname_(Millet_Library,_Ali_Emîrî_Collection,_History,_MS_no._1216).jpg"
+  },
+  {
+   "q": "Q199633",
+   "n": "III. Selim",
+   "a": "Selim III",
+   "k": "3. Selim|Divan Edebiyatı Müzesi|III.Selim|Üçüncü Selim",
+   "b": 1761,
+   "d": 1808,
+   "s": "28. Osmanlı padişahı (1789–1807)",
+   "c": [
+    "monarch"
+   ],
+   "t": 1,
+   "g": "m",
+   "f": 76,
+   "img": "Konstantin_Kapidagli_002.jpg"
+  },
+  {
+   "q": "Q171465",
+   "n": "III. Mehmed",
+   "a": "Mehmed III",
+   "k": "III. Mehmet|Sultan Üçüncü Mehmed Han|Üçüncü Mehmet",
+   "b": 1566,
+   "d": 1603,
+   "s": "13. Osmanlı padişahı (1595–1603)",
+   "c": [
+    "monarch"
+   ],
+   "t": 1,
+   "g": "m",
+   "f": 75,
+   "img": "Portrait_of_Sultan_Mehmed_III._Kitâb-î_zubdet-ettewârîkh,_Karbala,_1595_(Badische_Landesbibliothek,_Cod._Rastatt_201).jpg"
+  },
+  {
+   "q": "Q174772",
+   "n": "Abdülmecid",
+   "a": "Abdülmecid I",
+   "k": "Abd-ul-Medjid|Abdul Medjid|Abdul Medjid I|Abdul Mejid",
+   "b": 1823,
+   "d": 1861,
+   "s": "31. Osmanlı padişahı (1839–1861)",
+   "c": [
+    "monarch"
+   ],
+   "t": 1,
+   "g": "m",
+   "f": 74,
+   "img": "Sultan_Abdülmecid_-_Google_Art_Project.jpg"
+  },
+  {
+   "q": "Q168776",
+   "n": "I. İbrahim",
+   "a": "Ibrahim I",
+   "k": "Ibrahim bin Ahmed|Ibrahim I of the Ottoman Empire|Ibrahim the Mad|Sultan Ibrahim",
+   "b": 1615,
+   "d": 1648,
+   "s": "18. Osmanlı padişahı (1640–1648)",
+   "c": [
+    "monarch"
+   ],
+   "t": 1,
+   "g": "m",
+   "f": 74,
+   "img": "Ibrahim_I.jpg"
+  },
+  {
+   "q": "Q114749",
+   "n": "I. Ahmed",
+   "a": "Ahmed I",
+   "k": "Achmet I",
+   "b": 1590,
+   "d": 1617,
+   "s": "14. Osmanlı padişahı (1603–1617)",
+   "c": [
+    "monarch",
+    "writer"
+   ],
+   "t": 1,
+   "g": "m",
+   "f": 74,
+   "img": "Portrait_of_Sultan_Ahmet_I_(r._1603–17)_(cropped).jpg"
+  },
+  {
+   "q": "Q174762",
+   "n": "IV. Murad",
+   "a": "Murad IV",
+   "k": "Amurat IV, Sultan of the Turks|Morat IV, Sultan of the Turks|Murad IV, Sultan of the Turks|4. Murad",
+   "b": 1612,
+   "d": 1640,
+   "s": "17. Osmanlı padişahı (1623–1640)",
+   "c": [
+    "monarch",
+    "writer"
+   ],
+   "t": 1,
+   "g": "m",
+   "f": 74,
+   "img": "Murad_IV_minature.jpg"
+  },
+  {
+   "q": "Q170514",
+   "n": "IV. Mehmed",
+   "a": "Mehmed IV",
+   "k": "Mehmed the Hunter|4. Mehmed|4. Mehmet|Avcı Mehmet",
+   "b": 1642,
+   "d": 1693,
+   "s": "19. Osmanlı padişahı (1648–1687)",
+   "c": [
+    "monarch"
+   ],
+   "t": 1,
+   "g": "m",
+   "f": 73,
+   "img": "Sultan_Mehmed_IV_(2).jpg"
+  },
+  {
+   "q": "Q487459",
+   "n": "Arda Turan",
+   "b": 1987,
+   "d": null,
+   "s": "Türk futbolcu ve teknik direktör",
+   "c": [
+    "football"
+   ],
+   "t": 1,
+   "g": "m",
+   "f": 72,
+   "img": "Arda_Turan,_Eyüpspor_Teknik_Direktörü,_1_Eylül_2024_Kasımpaşa_Stadyumu.jpg"
+  },
+  {
+   "q": "Q170707",
+   "n": "I. Abdülhamid",
+   "a": "Abdul Hamid I",
+   "k": "1. Abdülhamid|1.Abdülhamid|1. Abdülhamit|1.Abdülhamit",
+   "b": 1725,
+   "d": 1789,
+   "s": "27. Osmanlı padişahı (1774–1789)",
+   "c": [
+    "monarch"
+   ],
+   "t": 1,
+   "g": "m",
+   "f": 72,
+   "img": "Portrait_of_Abdülhamid_I_of_the_Ottoman_Empire.jpg"
+  },
+  {
+   "q": "Q199482",
+   "n": "III. Ahmed",
+   "a": "Ahmed III",
+   "k": "Achmet III|Sultan Ahmed III|3. Ahmed|3. Ahmet",
+   "b": 1673,
+   "d": 1736,
+   "s": "23. Osmanlı padişahı (1703–1730)",
+   "c": [
+    "monarch",
+    "politics",
+    "writer"
+   ],
+   "t": 1,
+   "g": "m",
+   "f": 72,
+   "img": "Levni_002.jpeg"
+  }
+ ],
+ "types": [
+  "spouse",
+  "parent",
+  "sibling",
+  "relative",
+  "partner",
+  "teacher",
+  "successor",
+  "influence",
+  "band",
+  "team",
+  "cast",
+  "director",
+  "election",
+  "coach",
+  "founder",
+  "battle",
+  "duet",
+  "song",
+  "associate",
+  "significant"
+ ],
+ "ctx": [
+  [
+   "🏛️",
+   "Amerika Birleşik Devletleri'nin seçilmiş başkanı"
+  ],
+  [
+   "🏛️",
+   "Secretary General of the Non-Aligned Movement"
+  ],
+  [
+   "🏛️",
+   "İsrail Başbakanı"
+  ],
+  [
+   "🏛️",
+   "Venezuela Devlet Başkanı"
+  ],
+  [
+   "🏛️",
+   "genel sekreter"
+  ],
+  [
+   "👑",
+   "sultan of the Ottoman Empire"
+  ],
+  [
+   "⚽",
+   "Real Madrid CF"
+  ],
+  [
+   "⚽",
+   "FC Barcelona"
+  ],
+  [
+   "⚽",
+   "Arjantin millî futbol takımı"
+  ],
+  [
+   "⚽",
+   "İspanya millî futbol takımı"
+  ],
+  [
+   "🎬",
+   "Vision Quest (1985)"
+  ],
+  [
+   "🎬",
+   "Gölgeler ve Sis (1991)"
+  ],
+  [
+   "📺",
+   "The Young Pope (2016)"
+  ],
+  [
+   "🎬",
+   "Friends: The Reunion (2021)"
+  ],
+  [
+   "🎬",
+   "Muppets Aranıyor (2014)"
+  ],
+  [
+   "🎬",
+   "Avanak Ajan: Altın Kuş (2002)"
+  ],
+  [
+   "🎬",
+   "Küçük Nicky (2000)"
+  ],
+  [
+   "🎬",
+   "Prêt-à-Porter (1994)"
+  ],
+  [
+   "🎬",
+   "Be Cool (2005)"
+  ],
+  [
+   "🎬",
+   "Look Who's Talking Now (1993)"
+  ],
+  [
+   "🎬",
+   "Phenomenon (1996)"
+  ],
+  [
+   "🎬",
+   "Paris'te Gece Yarısı (2011)"
+  ],
+  [
+   "🎬",
+   "Zulu (2013)"
+  ],
+  [
+   "🎬",
+   "Hurricane Season (2010)"
+  ],
+  [
+   "🎬",
+   "Wildflower (1991)"
+  ],
+  [
+   "🎵",
+   "Give It Up to Me"
+  ],
+  [
+   "🎵",
+   "Beautiful Liar"
+  ],
+  [
+   "🎵",
+   "Telephone"
+  ],
+  [
+   "🎵",
+   "Love in This Club, Part II"
+  ],
+  [
+   "🎵",
+   "Push"
+  ],
+  [
+   "🎵",
+   "Bedtime Story"
+  ]
+ ],
+ "edges": [
+  [
+   12,
+   42,
+   0,
+   -1,
+   0,
+   0
+  ],
+  [
+   8,
+   38,
+   4,
+   -1,
+   0,
+   0
+  ],
+  [
+   19,
+   35,
+   4,
+   -1,
+   0,
+   0
+  ],
+  [
+   18,
+   17,
+   7,
+   -1,
+   0,
+   0
+  ],
+  [
+   10,
+   11,
+   7,
+   -1,
+   0,
+   0
+  ],
+  [
+   15,
+   5,
+   7,
+   -1,
+   0,
+   0
+  ],
+  [
+   24,
+   32,
+   3,
+   -1,
+   0,
+   0
+  ],
+  [
+   20,
+   39,
+   0,
+   -1,
+   0,
+   0
+  ],
+  [
+   46,
+   20,
+   1,
+   -1,
+   0,
+   0
+  ],
+  [
+   31,
+   49,
+   1,
+   -1,
+   0,
+   0
+  ],
+  [
+   46,
+   39,
+   1,
+   -1,
+   0,
+   0
+  ],
+  [
+   45,
+   55,
+   1,
+   -1,
+   0,
+   0
+  ],
+  [
+   53,
+   50,
+   1,
+   -1,
+   0,
+   0
+  ],
+  [
+   48,
+   44,
+   1,
+   -1,
+   0,
+   0
+  ],
+  [
+   52,
+   51,
+   1,
+   -1,
+   0,
+   0
+  ],
+  [
+   51,
+   48,
+   1,
+   -1,
+   0,
+   0
+  ],
+  [
+   56,
+   53,
+   1,
+   -1,
+   0,
+   0
+  ],
+  [
+   49,
+   45,
+   1,
+   -1,
+   0,
+   0
+  ],
+  [
+   44,
+   46,
+   1,
+   -1,
+   0,
+   0
+  ],
+  [
+   50,
+   51,
+   1,
+   -1,
+   0,
+   0
+  ],
+  [
+   55,
+   56,
+   1,
+   -1,
+   0,
+   0
+  ],
+  [
+   52,
+   50,
+   2,
+   -1,
+   0,
+   0
+  ],
+  [
+   43,
+   11,
+   7,
+   -1,
+   0,
+   0
+  ],
+  [
+   1,
+   2,
+   6,
+   0,
+   2016,
+   0
+  ],
+  [
+   13,
+   21,
+   6,
+   3,
+   2013,
+   0
+  ],
+  [
+   23,
+   14,
+   6,
+   4,
+   2021,
+   0
+  ],
+  [
+   21,
+   23,
+   6,
+   1,
+   2019,
+   0
+  ],
+  [
+   26,
+   24,
+   6,
+   2,
+   1977,
+   0
+  ],
+  [
+   55,
+   47,
+   6,
+   5,
+   1789,
+   0
+  ],
+  [
+   22,
+   34,
+   9,
+   6,
+   2003,
+   2007
+  ],
+  [
+   29,
+   34,
+   9,
+   6,
+   2009,
+   2013
+  ],
+  [
+   9,
+   38,
+   9,
+   7,
+   2008,
+   2021
+  ],
+  [
+   9,
+   54,
+   9,
+   7,
+   2015,
+   2020
+  ],
+  [
+   38,
+   54,
+   9,
+   7,
+   2015,
+   2020
+  ],
+  [
+   34,
+   38,
+   9,
+   9,
+   2009,
+   2016
+  ],
+  [
+   16,
+   9,
+   13,
+   8,
+   2008,
+   2010
+  ],
+  [
+   11,
+   41,
+   10,
+   10,
+   0,
+   0
+  ],
+  [
+   19,
+   11,
+   11,
+   11,
+   0,
+   0
+  ],
+  [
+   16,
+   35,
+   10,
+   12,
+   0,
+   0
+  ],
+  [
+   10,
+   22,
+   10,
+   13,
+   0,
+   0
+  ],
+  [
+   10,
+   33,
+   10,
+   13,
+   0,
+   0
+  ],
+  [
+   22,
+   33,
+   10,
+   13,
+   0,
+   0
+  ],
+  [
+   10,
+   18,
+   10,
+   14,
+   0,
+   0
+  ],
+  [
+   15,
+   25,
+   10,
+   15,
+   0,
+   0
+  ],
+  [
+   30,
+   33,
+   10,
+   16,
+   0,
+   0
+  ],
+  [
+   27,
+   32,
+   10,
+   17,
+   0,
+   0
+  ],
+  [
+   27,
+   42,
+   10,
+   17,
+   0,
+   0
+  ],
+  [
+   27,
+   41,
+   10,
+   17,
+   0,
+   0
+  ],
+  [
+   32,
+   42,
+   10,
+   17,
+   0,
+   0
+  ],
+  [
+   32,
+   41,
+   10,
+   17,
+   0,
+   0
+  ],
+  [
+   42,
+   41,
+   10,
+   17,
+   0,
+   0
+  ],
+  [
+   28,
+   25,
+   10,
+   18,
+   0,
+   0
+  ],
+  [
+   25,
+   35,
+   10,
+   19,
+   0,
+   0
+  ],
+  [
+   25,
+   41,
+   10,
+   20,
+   0,
+   0
+  ],
+  [
+   19,
+   42,
+   11,
+   21,
+   0,
+   0
+  ],
+  [
+   36,
+   41,
+   10,
+   22,
+   0,
+   0
+  ],
+  [
+   40,
+   41,
+   10,
+   23,
+   0,
+   0
+  ],
+  [
+   35,
+   33,
+   11,
+   24,
+   0,
+   0
+  ],
+  [
+   8,
+   40,
+   16,
+   25,
+   0,
+   0
+  ],
+  [
+   15,
+   8,
+   16,
+   26,
+   0,
+   0
+  ],
+  [
+   15,
+   10,
+   16,
+   27,
+   0,
+   0
+  ],
+  [
+   15,
+   40,
+   16,
+   28,
+   0,
+   0
+  ],
+  [
+   37,
+   40,
+   16,
+   29,
+   0,
+   0
+  ],
+  [
+   27,
+   11,
+   17,
+   30,
+   0,
+   0
+  ]
+ ],
+ "puzzles": {
+  "kolay": [
+   [
+    13,
+    14,
+    [
+     13,
+     21,
+     23,
+     14
+    ]
+   ],
+   [
+    36,
+    43,
+    [
+     36,
+     41,
+     11,
+     43
+    ]
+   ],
+   [
+    20,
+    48,
+    [
+     20,
+     46,
+     44,
+     48
+    ]
+   ],
+   [
+    51,
+    46,
+    [
+     51,
+     48,
+     44,
+     46
+    ]
+   ],
+   [
+    44,
+    50,
+    [
+     44,
+     48,
+     51,
+     50
+    ]
+   ],
+   [
+    54,
+    15,
+    [
+     54,
+     38,
+     8,
+     15
+    ]
+   ]
+  ],
+  "orta": [
+   [
+    30,
+    29,
+    [
+     30,
+     33,
+     22,
+     34,
+     29
+    ]
+   ],
+   [
+    12,
+    43,
+    [
+     12,
+     42,
+     19,
+     11,
+     43
+    ]
+   ],
+   [
+    53,
+    44,
+    [
+     53,
+     50,
+     51,
+     48,
+     44
+    ]
+   ],
+   [
+    37,
+    54,
+    [
+     37,
+     40,
+     8,
+     38,
+     54
+    ]
+   ],
+   [
+    50,
+    47,
+    [
+     50,
+     53,
+     56,
+     55,
+     47
+    ]
+   ],
+   [
+    56,
+    31,
+    [
+     56,
+     55,
+     45,
+     49,
+     31
+    ]
+   ]
+  ],
+  "zor": [
+   [
+    17,
+    29,
+    [
+     17,
+     18,
+     10,
+     22,
+     34,
+     29
+    ]
+   ],
+   [
+    26,
+    43,
+    [
+     26,
+     24,
+     32,
+     27,
+     11,
+     43
+    ]
+   ],
+   [
+    50,
+    39,
+    [
+     50,
+     51,
+     48,
+     44,
+     46,
+     39
+    ]
+   ],
+   [
+    20,
+    52,
+    [
+     20,
+     46,
+     44,
+     48,
+     51,
+     52
+    ]
+   ],
+   [
+    54,
+    28,
+    [
+     54,
+     9,
+     16,
+     35,
+     25,
+     28
+    ]
+   ],
+   [
+    56,
+    44,
+    [
+     56,
+     53,
+     50,
+     51,
+     48,
+     44
+    ]
+   ]
+  ]
+ }
+}
