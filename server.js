@@ -8,6 +8,7 @@ import * as wordle from './server/wordle.js';
 import * as recall from './server/recall.js';
 import * as perceptle from './server/perceptle.js';
 import * as whenwhere from './server/whenwhere.js';
+import * as harfcarki from './server/harfcarki.js';
 import { GameError } from './server/errors.js';
 import { serveMedia, mediaStats } from './server/media-tokens.js';
 import { clientIp, httpLimiter, upstreamLimiter } from './server/limits.js';
@@ -350,6 +351,18 @@ async function handleApi(url, res, req) {
     if (endpoint === 'guess') return sendJson(res, 200, whenwhere.submitGuess(identity, mode, body.gameId, body.round, body.guess));
     return sendJson(res, 200, whenwhere.leaderboard(whenwhere.todayIstanbul(), identity.id));
   }
+  // 🔤 Harf Çarkı: /api/harfcarki/<uç>
+  const harfcarkiRoute = url.pathname.match(/^\/api\/harfcarki\/(start|begin|move|leaderboard)$/);
+  if (harfcarkiRoute) {
+    const endpoint = harfcarkiRoute[1];
+    const body = await readJson(req);
+    const identity = requireIdentity(body);
+    const mode = body.mode === 'free' ? 'free' : 'daily';
+    if (endpoint === 'start') return sendJson(res, 200, harfcarki.startGame(identity, mode));
+    if (endpoint === 'begin') return sendJson(res, 200, harfcarki.beginGame(identity, mode, { difficulty: body.difficulty, minutes: body.minutes }));
+    if (endpoint === 'move') return sendJson(res, 200, harfcarki.move(identity, mode, body.gameId, body));
+    return sendJson(res, 200, harfcarki.leaderboard(harfcarki.todayIstanbul(), identity.id));
+  }
   // Sadece testlerde (TEST_GAMES=1): oda/döngü sayısı + işlemci süresi (sızıntı ve yük testleri için).
   if (process.env.TEST_GAMES === '1' && process.env.TEST_MODE === '1' && url.pathname === '/api/_test/stats') {
     return sendJson(res, 200, { ...lobbyStats(), media: mediaStats(), cpu: process.cpuUsage(), uptimeMs: Math.round(process.uptime() * 1000), rss: process.memoryUsage().rss });
@@ -359,6 +372,7 @@ async function handleApi(url, res, req) {
     if (q.get('room')) return sendJson(res, 200, _testRoomSecrets(q.get('room')));
     if (q.get('recall')) return sendJson(res, 200, recall._testSecrets(q.get('recall'), q.get('gameId')));
     if (q.get('whenwhere')) return sendJson(res, 200, whenwhere._testSecrets(q.get('gameId')));
+    if (q.get('harfcarki')) return sendJson(res, 200, harfcarki._testSecrets(q.get('gameId')));
     return sendJson(res, 200, perceptle._testSecrets(q.get('gameId')));
   }
   switch (url.pathname) {
