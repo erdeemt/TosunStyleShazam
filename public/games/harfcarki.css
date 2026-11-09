@@ -13,13 +13,15 @@
 .hc-big { font: 900 72px 'Rubik', system-ui, sans-serif; fill: var(--text); }
 .hc-time { font: 700 24px 'Rubik', system-ui, sans-serif; fill: var(--muted); font-variant-numeric: tabular-nums; }
 .hc-dot circle { fill: var(--card2); stroke: var(--line); stroke-width: 2; transition: fill .25s, stroke .25s; }
-.hc-dot text { font: 700 14px 'Rubik', system-ui, sans-serif; fill: var(--text); pointer-events: none; }
+.hc-dot text { font: 800 15px 'Rubik', system-ui, sans-serif; fill: #fff; pointer-events: none; paint-order: stroke; stroke: #120a1f; stroke-width: 2.5px; stroke-linejoin: round; }
 .hc-dot.hc-ok circle { fill: var(--hc-ok); stroke: var(--hc-ok); }
-.hc-dot.hc-ok text { fill: #08261a; }
+.hc-dot.hc-ok text { fill: #062015; stroke: none; }
 .hc-dot.hc-bad circle { fill: var(--hc-bad); stroke: var(--hc-bad); }
 .hc-dot.hc-pass circle { fill: #4a3a1a; stroke: var(--hc-pass); }
+.hc-dot.hc-pass text { fill: #ffd27a; }
+.hc-dot.hc-bad text { stroke: #5a0f0f; }
 .hc-dot.hc-cur circle { stroke: #fff; stroke-width: 3.5; fill: var(--accent); }
-.hc-dot.hc-cur text { fill: #fff; }
+.hc-dot.hc-cur text { fill: #fff; stroke: #5a1030; }
 .hc-dot { transform-box: fill-box; transform-origin: center; }
 .hc-dot.hc-pulse circle { animation: hc-pulse .6s ease-out; }
 .hc-dot.hc-wrong circle { animation: hc-red .6s ease-out; }

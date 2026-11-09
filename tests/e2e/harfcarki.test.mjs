@@ -13,7 +13,7 @@ import { startServer } from '../lib/server.js';
 import { secret } from '../lib/media.js';
 import { fold } from '../../server/harfcarki-text.js';
 
-const DAY = '2030-04-04';
+const DAY = '2026-11-09'; // çıkış günü = #1
 const SHOTS = fileURLToPath(new URL('../../test-results/harfcarki/', import.meta.url));
 let srv;
 let browser;
@@ -84,6 +84,8 @@ test('Günlük: doğru / yanlış / pas, çark renkleri, ağda cevap yok, sonuç
   await p.page.waitForSelector('.hc-wheel .hc-dot.hc-cur');
   const answers = (await secret(srv, { harfcarki: 1, gameId: DAY })).answers;
   assert.equal(await p.page.locator('.hc-dot').count(), 28);
+  assert.deepEqual(await p.page.locator('.hc-dot text').allTextContents(), ['A','B','C','Ç','D','E','F','G','H','I','İ','J','K','L','M','N','O','Ö','P','R','S','Ş','T','U','Ü','V','Y','Z'], 'her dairede harfi');
+  assert.match(await p.page.locator('.tab.active').textContent(), /Günlük #1$/);
   assert.match(await p.page.locator('.hc-rule').textContent(), /^A (ile başlar|harfini içerir)$/);
   // Doğru
   await answer(p.page, answers[0].toLocaleUpperCase('tr'));

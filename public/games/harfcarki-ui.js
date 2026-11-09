@@ -65,7 +65,9 @@ function wheel(letters) {
     setStates(list, cur) {
       list.forEach((l, i) => {
         const d = dots[i];
-        const cls = `hc-dot hc-${l.state}${i === cur ? ' hc-cur' : ''}`;
+        const label = d.querySelector('text');
+        if (label.textContent !== l.letter) label.textContent = l.letter; // çark harfleri ilk görünümle gelir
+        const cls =`hc-dot hc-${l.state}${i === cur ? ' hc-cur' : ''}`;
         if (d.getAttribute('class').replace(/ hc-(pulse|wrong)/g, '') !== cls) {
           const keep = d.getAttribute('class').match(/ hc-(pulse|wrong)/g)?.join('') ?? '';
           d.setAttribute('class', cls + keep);
