@@ -59,6 +59,24 @@ test('bağlantılar: geçerli uçlar, tür ve bağlam; aynı çift bir kez', () 
   for (const t of ['spouse', 'parent', 'team', 'cast', 'successor', 'band']) assert.ok(byType[t] > 30, `${t}: ${byType[t]}`);
 });
 
+test('veri temizliği: kendisi/özel bölüm kadrosu yok (Beckham↔Aniston), bozuk hükümdar adı yok, saklanan yollar çeşitli', () => {
+  const qi = (q) => people.findIndex((p) => p.q === q);
+  const beckham = qi('Q10520');
+  const aniston = qi('Q32522');
+  if (beckham >= 0 && aniston >= 0) assert.ok(!adj[beckham].includes(aniston), 'Friends: The Reunion bağlantısı olmamalı');
+  for (const c of E.ctx) assert.ok(!/Friends: The Reunion|Academy Awards|Golden Globe Awards|Ödül Töreni/i.test(c.at(-1)), `oyunculuk dışı yapım: ${c.at(-1)}`);
+  for (const p of people) assert.ok(!/[a-zçğıöşü][IVXLC]{1,4}$/.test(p.n) && !/^([IVXLC]+\.)\s+\1/.test(p.n), `bozuk ad: ${p.n}`);
+  const typeOf = new Map(E.edges.map(([a, b, t]) => [a < b ? `${a}-${b}` : `${b}-${a}`, E.types[t]]));
+  for (const k of Object.keys(LEN)) {
+    for (const [, , path] of Z[k]) {
+      const types = path.slice(1).map((v, i) => typeOf.get(path[i] < v ? `${path[i]}-${v}` : `${v}-${path[i]}`));
+      const film = types.filter((x) => x === 'cast' || x === 'director').length;
+      assert.ok(film <= 2 && film < types.length, `${k}: ${film} film bağlantısı`);
+      assert.ok(types.filter((x) => x === 'influence').length <= 1);
+    }
+  }
+});
+
 test('yapbozlar: her zorlukta ≥ 200; örneklemde yol geçerli ve en kısa uzunluk tam 3/4/5; uçlar fotoğraflı ve karışık', () => {
   for (const [k, L] of Object.entries(LEN)) {
     assert.ok(Z[k].length >= 200, `${k}: ${Z[k].length}`);

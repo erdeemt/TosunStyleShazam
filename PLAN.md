@@ -844,14 +844,19 @@ tek sıra, `BG_GAP_MS` (1,5 sn) aralık, 429'da üstel geri çekilme, yanıt ön
   sanatçıları, ≤ 4), şarkısını yazdı (şarkının P86/P676'sı ↔ P175), takım arkadaşı (P54 + P580/P582 başlangıç/bitiş; aynı takımda
   ≥ 1 yıl çakışma; milli takımlar dahil; bitişsiz kayıt sadece yaşayan ve 2014+ başlangıçlıysa "sürüyor"; > 22 yıllık kayıt şüpheli
   sayılıp atılır), teknik direktör–oyuncu (P6087, aynı takımda çakışma), yönetmen–oyuncu (P57 ↔ P161), aynı film/dizi kadrosu (P161;
-  ≤ 15 kümeden kişi; belgesel değil; yapım yılında iki kişi de yaşıyor — arşiv görüntüsü sayılmaz; en az 3 dilde maddesi olan yapım,
+  ≤ 15 kümeden kişi; "kendisi"/arşiv/konuk rolleri (P453/P1932/P3831) ve oyunculuk dışı yapımlar (belgesel, TV özel bölümü, ödül
+  töreni, talk show, realite, konser filmi, müzik videosu, varyete, yarışma, haber; P31/P136 alt sınıflarıyla) hariç; sadece oyuncu/
+  yönetmen/müzisyen olan ve siyasetçi/hükümdar/asker/din insanı olmayan kişiler arasında; yapım yılında iki kişi de yaşıyor — arşiv görüntüsü sayılmaz; en az 3 dilde maddesi olan yapım,
   Türk oyunculu yapımda tr maddesi yeter), birlikte kurdular (P112, 2–6 kurucu), görevde/tahtta ardıl–selef (P39 niteleyicisi
   P1365/P1366; makam adı + devir yılı; hükümdarlık makamında 👑), hoca/öğrenci (P1066/P802, doktora P184/P185), aynı muharebe
   (P1344/P710; muharebe/kuşatma, ≤ 8), ortak (P1327), "hayatında önemli" (P3342 + rol niteleyicisi), akraba (P1038), aynı seçimde
   aday (P726, ≤ 8), etkilenme (P737).
 - Yapbozlar: uç adayı = fotoğraflı, dev bileşende, dünya ilk ~1500 ya da Türkiye ilk 450. Her uçtan BFS; uzunluğu tam 3/4/5 olan
   çiftler; "karışık" şartı: farklı ana alan ya da ≥ 60 yıl doğum farkı; bir kişi zorluk başına en çok 3 yapbozda; Türkiye'den uçlu
-  çiftler önce. Zorluk başına 600 yapboz (karıştırılmış). Saklanan: [başlangıç, hedef, bir en kısa yol] (BFS ağacından). Sunucu
+  çiftler önce; saklanan yol tüm en kısa yollardan en az film/etkilenme içereni (DP), en çok 2 film, 1 etkilenme, en az 1 film dışı.
+  Köprüler: ana ağa bağlı olmayan Türkiye kişilerinin kümede olmayan gerçek komşuları (doğrudan ilişki, grup, kadro, şarkı) aday olur,
+  sadece gerçekten köprü olanlar kalır. Bozuk hükümdar adları İngilizce etiketten onarılır; makam adları kalıpla çevrilir.
+  Zorluk başına 600 yapboz (yarısı Türkiye uçlu). Saklanan: [başlangıç, hedef, bir en kısa yol] (BFS ağacından). Sunucu
   açılışta her yapbozun yolunu ve uzunluğunu yeniden doğrular.
 - TEST_MODE (testler): `content/baglanti/test-graph.json` — gerçek verinin küçük sabit alt grafiği (`--test-graph`: her zorlukta uçları
   ayrık 6 yapboz + yollarındaki kişiler + aralarındaki gerçek bağlantılar + 8 çeldirici; alt grafikte uzunluklar doğrulanır) ve yer

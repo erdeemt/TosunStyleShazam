@@ -148,35 +148,6 @@
    "img": "2023-11-16_Gala_de_los_Latin_Grammy,_03_(cropped)01.jpg"
   },
   {
-   "q": "Q615",
-   "n": "Lionel Messi",
-   "k": "GOAT",
-   "b": 1987,
-   "d": null,
-   "s": "Arjantinli futbolcu",
-   "c": [
-    "football"
-   ],
-   "t": 0,
-   "g": "m",
-   "f": 227,
-   "img": "Leo_Messi_Argentina_v_Egypt_7_July_2026-1.jpg"
-  },
-  {
-   "q": "Q19848",
-   "n": "Lady Gaga",
-   "b": 1986,
-   "d": null,
-   "s": "Amerikalı şarkıcı ve oyuncu",
-   "c": [
-    "music"
-   ],
-   "t": 0,
-   "g": "f",
-   "f": 198,
-   "img": "Lady_Gaga_at_the_White_House_in_2023_(1).jpg"
-  },
-  {
    "q": "Q1744",
    "n": "Madonna",
    "k": "Madonna Ciccone|Madge|Madonna L. Ciccone",
@@ -226,6 +197,22 @@
    "img": "Hugo_Chávez_in_Brasília_2011_(3x4_cropped)_(2).jpg"
   },
   {
+   "q": "Q1203",
+   "n": "John Lennon",
+   "b": 1940,
+   "d": 1980,
+   "s": "İngiliz müzisyen (1940-1980)",
+   "c": [
+    "music",
+    "actor",
+    "director"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 186,
+   "img": "John_Lennon,_1974_(cropped).jpg"
+  },
+  {
    "q": "Q39259",
    "n": "Recep Tayyip Erdoğan",
    "k": "Başkan Erdoğan|Cumhurbaşkanı Erdoğan|Erdoğan|Milletin Adamı",
@@ -239,87 +226,6 @@
    "g": "m",
    "f": 185,
    "img": "Recep_Tayyip_Erdogan_in_Ukraine.jpg"
-  },
-  {
-   "q": "Q36153",
-   "n": "Beyoncé",
-   "k": "Beyoncé Giselle Knowles Carter|Harmonies by the Hive|Queen B|Queen Bey",
-   "b": 1981,
-   "d": null,
-   "s": "Amerikalı şarkıcı",
-   "c": [
-    "music",
-    "actor",
-    "business"
-   ],
-   "t": 0,
-   "g": "f",
-   "f": 177,
-   "img": "Beyoncé_-_Tottenham_Hotspur_Stadium_-_1st_June_2023_(10_of_118)_(52946364598)_(best_crop).jpg"
-  },
-  {
-   "q": "Q17515",
-   "n": "Diego Maradona",
-   "b": 1960,
-   "d": 2020,
-   "s": "Arjantinli futbolcu (1960-2020)",
-   "c": [
-    "football",
-    "actor"
-   ],
-   "t": 0,
-   "g": "m",
-   "f": 176,
-   "img": "Argentina_celebrando_copa_(cropped).jpg"
-  },
-  {
-   "q": "Q15869",
-   "n": "Freddie Mercury",
-   "k": "Larry Lurex",
-   "b": 1946,
-   "d": 1991,
-   "s": "Britanyalı şarkıcı, şarkı yazarı ve müzik grubu Queen'in baş vokalisti",
-   "c": [
-    "music",
-    "writer",
-    "art"
-   ],
-   "t": 0,
-   "g": "m",
-   "f": 176,
-   "img": "Freddie_Mercury_at_Sheraton_Hotel_Buenos_Aires.jpg"
-  },
-  {
-   "q": "Q5105",
-   "n": "Celine Dion",
-   "a": "Céline Dion",
-   "k": "Céline Marie Claudette Dion|Celine Marie Claudette Dion",
-   "b": 1968,
-   "d": null,
-   "s": "Kanadalı şarkıcı",
-   "c": [
-    "music"
-   ],
-   "t": 0,
-   "g": "f",
-   "f": 162,
-   "img": "Céline_Dion_2012.jpg"
-  },
-  {
-   "q": "Q25089",
-   "n": "Woody Allen",
-   "b": 1935,
-   "d": null,
-   "s": "Amerikalı film yönetmeni, senarist ve sinema oyuncusu",
-   "c": [
-    "music",
-    "actor",
-    "director"
-   ],
-   "t": 0,
-   "g": "m",
-   "f": 157,
-   "img": "Woody_Allen_Cannes_2011.jpg"
   },
   {
    "q": "Q8474",
@@ -355,6 +261,22 @@
    "img": "Nicolás_Maduro_in_2023_(cropped).jpg"
   },
   {
+   "q": "Q36949",
+   "n": "Robert De Niro",
+   "k": "De Niro|Robert Anthony De Niro|Robert DeNiro",
+   "b": 1943,
+   "d": null,
+   "s": "Amerikalı sinema oyuncusu",
+   "c": [
+    "actor",
+    "director"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 141,
+   "img": "Robert_de_Niro_Cannes_Film_Festival_(3x4_cropped).jpg"
+  },
+  {
    "q": "Q10520",
    "n": "David Beckham",
    "k": "David Robert Joseph Beckham|Sir David Beckham|Sir David Robert Joseph Beckham",
@@ -370,6 +292,23 @@
    "g": "m",
    "f": 140,
    "img": "David_Beckham_UNICEF_(cropped).jpg"
+  },
+  {
+   "q": "Q5383",
+   "n": "David Bowie",
+   "k": "David Jones|David Robert Jones|Davy Jones|Halloween Jack",
+   "b": 1947,
+   "d": 2016,
+   "s": "İngiliz şarkıcı, şarkı yazarı, aktör ve prodüktör",
+   "c": [
+    "music",
+    "actor",
+    "director"
+   ],
+   "t": 0,
+   "g": "m",
+   "f": 136,
+   "img": "David-Bowie_Chicago_2002-08-08_photoby_Adam-Bielawski-cropped.jpg"
   },
   {
    "q": "Q57371",
@@ -388,55 +327,34 @@
    "img": "Ilham_Aliyev,_December_2025_(cropped).jpg"
   },
   {
-   "q": "Q57410",
-   "n": "Şimon Peres",
-   "a": "Shimon Peres",
-   "k": "Szymon Perski|Shimon Perez|Simon Peres|Şimon Perez",
-   "b": 1923,
-   "d": 2016,
-   "s": "İsrail 9. Cumhurbaşkanı (1923–2016)",
-   "c": [
-    "politics",
-    "writer"
-   ],
-   "t": 0,
-   "g": "m",
-   "f": 128,
-   "img": "Shimon_Peres_-_portrait_photograh_-_1996_(full).jpg"
-  },
-  {
-   "q": "Q80938",
-   "n": "John Travolta",
-   "k": "John Joseph Travolta|Jonathan Joseph Travolta|Jonathan Travolta",
-   "b": 1954,
+   "q": "Q40649",
+   "n": "Cristina Fernández de Kirchner",
+   "k": "CFK|Cristina Fernandez|Cristina Fernández|Cristina Fernandez de Kirchner",
+   "b": 1953,
    "d": null,
-   "s": "Amerikalı oyuncu",
+   "s": "Siyasetçi",
    "c": [
-    "music",
-    "actor",
-    "director"
+    "politics"
    ],
    "t": 0,
-   "g": "m",
-   "f": 117,
-   "img": "John_Travolta,_2014_(cropped).jpg"
+   "g": "f",
+   "f": 119,
+   "img": "Cristinakirchnermensaje2010.jpg"
   },
   {
-   "q": "Q34060",
-   "n": "İzak Rabin",
-   "a": "Yizhak Rabin",
-   "k": "İzhak Rabin|Itshak Rabin",
-   "b": 1922,
-   "d": 1995,
-   "s": "5. İsrail başbakanı",
+   "q": "Q12927",
+   "n": "Marine Le Pen",
+   "k": "Marion Anne Le Pen|Marion Anne Perrine Le Pen|Marion Anne Perrine \"Marine\" Le Pen|Marion Le Pen",
+   "b": 1968,
+   "d": null,
+   "s": "Fransız Avukat",
    "c": [
-    "politics",
-    "military"
+    "politics"
    ],
    "t": 0,
-   "g": "m",
-   "f": 114,
-   "img": "Flickr_-_Israel_Defense_Forces_-_Life_of_Lt._Gen._Yitzhak_Rabin,_7th_IDF_Chief_of_Staff_in_photos_(11).jpg"
+   "g": "f",
+   "f": 117,
+   "img": "Marine_Le_Pen_2025_(cropped).jpg"
   },
   {
    "q": "Q42455",
@@ -456,20 +374,21 @@
    "img": "Björk_at_Cannes.jpg"
   },
   {
-   "q": "Q7345",
-   "n": "Dan Brown",
-   "k": "Dan Gerhard Brown|Daniel Gerhard Brown",
-   "b": 1964,
-   "d": null,
-   "s": "Amerikalı roman yazarı",
+   "q": "Q40933",
+   "n": "Eva Perón",
+   "k": "Eva Maria Duarte|Eva peron|Eva Peron|Evita",
+   "b": 1919,
+   "d": 1952,
+   "s": "Arjantinli oyuncu (1919-1952)",
    "c": [
     "music",
-    "writer"
+    "actor",
+    "politics"
    ],
    "t": 0,
-   "g": "m",
-   "f": 110,
-   "img": "Návštěva_Dana_Browna_v_NK_ČR_17._-_18._2025_03_(cropped).jpg"
+   "g": "f",
+   "f": 108,
+   "img": "Evita_(cropped2).JPG"
   },
   {
    "q": "Q83488",
@@ -484,21 +403,6 @@
    "g": "m",
    "f": 107,
    "img": "Mesut_Özil_at_Baku_before_2019_UEFA_Europe_League_Final.jpg"
-  },
-  {
-   "q": "Q133151",
-   "n": "Ozzy Osbourne",
-   "k": "John Michael \"Ozzy\" Osbourne|Prince of Darkness|The Prince of Darkness",
-   "b": 1948,
-   "d": 2025,
-   "s": "İngiliz müzisyen ve televizyon kişiliği",
-   "c": [
-    "music"
-   ],
-   "t": 0,
-   "g": "m",
-   "f": 106,
-   "img": "OzzyChangingHands02-20-2010.jpg"
   },
   {
    "q": "Q134817",
@@ -517,40 +421,6 @@
    "img": "Sultan_Abdul_Hamid_II_in_1899.jpg"
   },
   {
-   "q": "Q104000",
-   "n": "Lauren Bacall",
-   "k": "Betty Joan Perske|Betty Perske|Loren Beykoll",
-   "b": 1924,
-   "d": 2014,
-   "s": "Amerikalı oyuncu ve manken (1924 – 2014)",
-   "c": [
-    "music",
-    "actor",
-    "writer"
-   ],
-   "t": 0,
-   "g": "f",
-   "f": 103,
-   "img": "Lauren_Bacall_1945_press_photo.jpg"
-  },
-  {
-   "q": "Q44063",
-   "n": "Reese Witherspoon",
-   "k": "Laura Jeanne Reese Witherspoon",
-   "b": 1976,
-   "d": null,
-   "s": "Amerikalı oyuncu",
-   "c": [
-    "actor",
-    "director",
-    "business"
-   ],
-   "t": 0,
-   "g": "f",
-   "f": 103,
-   "img": "Reese_Witherspoon_at_Nashville_Film_Festival_2026.jpg"
-  },
-  {
    "q": "Q11584",
    "n": "Iker Casillas",
    "k": "Iker Casillas Fernández",
@@ -566,51 +436,68 @@
    "img": "Iker_Casillas_2.jpg"
   },
   {
-   "q": "Q102642",
-   "n": "Diane Keaton",
-   "k": "Diane Hall Keaton",
-   "b": 1946,
-   "d": 2025,
-   "s": "Amerikalı sinema oyuncusu",
+   "q": "Q56009",
+   "n": "Gina Lollobrigida",
+   "k": "Luigia Lollobrigida|Luigina Lollobrigida",
+   "b": 1927,
+   "d": 2023,
+   "s": "İtalyan oyuncu, foto muhabiri ve siyasetçi (1927-2023)",
    "c": [
     "actor"
    ],
    "t": 0,
    "g": "f",
-   "f": 99,
-   "img": "Diane_Keaton_by_Firooz_Zahedi_2.jpg"
+   "f": 98,
+   "img": "Gina_Lollobrigida_-_Publicity_still_(1956).png"
   },
   {
-   "q": "Q44467",
-   "n": "Orlando Bloom",
-   "k": "Orlando Jonathan Bloom",
-   "b": 1977,
+   "q": "Q19810",
+   "n": "Victoria Beckham",
+   "k": "Adams|Posh|Posh Spice|Victoria Adams",
+   "b": 1974,
    "d": null,
-   "s": "İngiliz oyuncu",
+   "s": "İngiliz moda tasarımcısı ve sosyetik",
    "c": [
+    "music",
+    "actor",
+    "art"
+   ],
+   "t": 0,
+   "g": "f",
+   "f": 97,
+   "img": "VictoriaBeckham2018-2-Crop.jpg"
+  },
+  {
+   "q": "Q51545",
+   "n": "Luis Buñuel",
+   "b": 1900,
+   "d": 1983,
+   "s": "İspanyol yönetmen ve senarist",
+   "c": [
+    "music",
     "actor",
     "director"
    ],
    "t": 0,
    "g": "m",
-   "f": 97,
-   "img": "Orlando_Bloom_at_the_2024_Toronto_International_Film_Festival_(cropped2).jpg"
+   "f": 95,
+   "img": "Luis_Buñuel.JPG"
   },
   {
-   "q": "Q47122",
-   "n": "Enrique Iglesias",
-   "k": "Enrique Miguel Iglesias Preysler|Enrique Miguel Iglesias",
-   "b": 1975,
+   "q": "Q106418",
+   "n": "Catherine Deneuve",
+   "k": "Catherine Fabienne Dorléac|Catherine Dorléac|Catherine Fabienne Dorleac",
+   "b": 1943,
    "d": null,
-   "s": "İspanyol şarkıcı",
+   "s": "Fransız oyuncu (d. 1943)",
    "c": [
     "music",
     "actor"
    ],
    "t": 0,
-   "g": "m",
-   "f": 95,
-   "img": "Enrique_Iglesias_(6891751264).jpg"
+   "g": "f",
+   "f": 93,
+   "img": "Catherine_Deneuve_Berlinale_2017.jpg"
   },
   {
    "q": "Q17507",
@@ -628,53 +515,37 @@
    "img": "GerardPique.jpg"
   },
   {
-   "q": "Q255809",
-   "n": "Hürrem Sultan",
-   "k": "Alexandra Anastasia Lisowska|Roxalana|Roxelana|Roxolana",
-   "b": 1505,
-   "d": 1558,
-   "s": "I. Süleyman'ın nikâhlı eşi ve II. Selim'in annesi",
+   "q": "Q162543",
+   "n": "VI. Mehmed",
+   "a": "Mehmed VI",
+   "k": "6.Mehmet|6.Mehmet Vahdettin|Altıncı Mehmet|Mehmadül Hüseyin Vahidettin",
+   "b": 1861,
+   "d": 1926,
+   "s": "36. ve son Osmanlı padişahı (1918–1922)",
    "c": [
-    "monarch",
-    "writer"
+    "monarch"
    ],
    "t": 1,
-   "g": "f",
-   "f": 87,
-   "img": "Haseki_Hürrem_Sultan_(Roxelana).jpg"
+   "g": "m",
+   "f": 81,
+   "img": "Sébah_&_Joaillier_-_Sultan_Mehmed_VI.jpg"
   },
   {
-   "q": "Q15615",
-   "n": "Lil Wayne",
-   "k": "Baby D|Birdman Jr.|President Carter|Shrimp Daddy",
-   "b": 1982,
+   "q": "Q561837",
+   "n": "Mauricio Macri",
+   "k": "Macri|Mauricio Macri Blanco Villegas",
+   "b": 1959,
    "d": null,
-   "s": "Amerikalı rapçi",
+   "s": "Arjantin cumhurbaşkanı (hd. 2015-2019) ve inşaat mühendisi",
    "c": [
-    "music",
-    "actor",
+    "politics",
+    "science",
     "business"
    ],
    "t": 0,
    "g": "m",
    "f": 81,
-   "img": "Lil_Wayne_Feb._2020.jpg"
-  },
-  {
-   "q": "Q182763",
-   "n": "Forest Whitaker",
-   "k": "Forest Steven Whitaker|Forrest Whitaker",
-   "b": 1961,
-   "d": null,
-   "s": "Amerikalı sinema oyuncusu",
-   "c": [
-    "actor",
-    "director"
-   ],
-   "t": 0,
-   "g": "m",
-   "f": 81,
-   "img": "Forest_Whitaker_TIFF_2026_02_(cropped).jpg"
+   "img": "Mauricio_Macri_2016.jpg"
   },
   {
    "q": "Q143945",
@@ -769,6 +640,23 @@
    "g": "m",
    "f": 76,
    "img": "Konstantin_Kapidagli_002.jpg"
+  },
+  {
+   "q": "Q151500",
+   "n": "Abdülaziz",
+   "k": "Abdul-Aziz|Abdülâziz|Abdülaziz Han|Sultan Abdulaziz",
+   "b": 1830,
+   "d": 1876,
+   "s": "32. Osmanlı padişahı (1861–1876)",
+   "c": [
+    "monarch",
+    "music",
+    "writer"
+   ],
+   "t": 1,
+   "g": "m",
+   "f": 75,
+   "img": "Sultan_Abdulaziz.jpg"
   },
   {
    "q": "Q171465",
@@ -915,6 +803,22 @@
    "g": "m",
    "f": 72,
    "img": "Levni_002.jpeg"
+  },
+  {
+   "q": "Q172061",
+   "n": "II. Süleyman",
+   "a": "Suleiman II",
+   "k": "Qanuni Sultan Süleyman",
+   "b": 1642,
+   "d": 1691,
+   "s": "20. Osmanlı padişahı (1687–1691)",
+   "c": [
+    "monarch"
+   ],
+   "t": 1,
+   "g": "m",
+   "f": 72,
+   "img": "Süleyman_II.jpg"
   }
  ],
  "types": [
@@ -950,7 +854,7 @@
   ],
   [
    "🏛️",
-   "İsrail Başbakanı"
+   "President pro tempore of the Union of South American Nations"
   ],
   [
    "🏛️",
@@ -959,6 +863,10 @@
   [
    "🏛️",
    "genel sekreter"
+  ],
+  [
+   "🏛️",
+   "Arjantin devlet başkanı"
   ],
   [
    "👑",
@@ -974,39 +882,27 @@
   ],
   [
    "⚽",
-   "Arjantin millî futbol takımı"
-  ],
-  [
-   "⚽",
    "İspanya millî futbol takımı"
   ],
   [
    "🎬",
-   "Vision Quest (1985)"
+   "Zoolander (2001)"
   ],
   [
    "🎬",
-   "Gölgeler ve Sis (1991)"
-  ],
-  [
-   "📺",
-   "The Young Pope (2016)"
+   "Arthur and the Minimoys (2006)"
   ],
   [
    "🎬",
-   "Friends: The Reunion (2021)"
+   "The Book That Wrote Itself (1999)"
   ],
   [
    "🎬",
-   "Muppets Aranıyor (2014)"
+   "One Hundred and One Nights (1995)"
   ],
   [
    "🎬",
-   "Avanak Ajan: Altın Kuş (2002)"
-  ],
-  [
-   "🎬",
-   "Küçük Nicky (2000)"
+   "The Hunger (1983)"
   ],
   [
    "🎬",
@@ -1014,51 +910,14 @@
   ],
   [
    "🎬",
-   "Be Cool (2005)"
+   "Karanlıkta Dans (2000)"
   ],
   [
    "🎬",
-   "Look Who's Talking Now (1993)"
+   "Gündüz Güzeli (1967)"
   ],
   [
-   "🎬",
-   "Phenomenon (1996)"
-  ],
-  [
-   "🎬",
-   "Paris'te Gece Yarısı (2011)"
-  ],
-  [
-   "🎬",
-   "Zulu (2013)"
-  ],
-  [
-   "🎬",
-   "Hurricane Season (2010)"
-  ],
-  [
-   "🎬",
-   "Wildflower (1991)"
-  ],
-  [
-   "🎵",
-   "Give It Up to Me"
-  ],
-  [
-   "🎵",
-   "Beautiful Liar"
-  ],
-  [
-   "🎵",
-   "Telephone"
-  ],
-  [
-   "🎵",
-   "Love in This Club, Part II"
-  ],
-  [
-   "🎵",
-   "Push"
+   "French presidential election 2012 first round"
   ],
   [
    "🎵",
@@ -1067,8 +926,8 @@
  ],
  "edges": [
   [
-   12,
-   42,
+   10,
+   34,
    0,
    -1,
    0,
@@ -1076,118 +935,86 @@
   ],
   [
    8,
-   38,
+   31,
    4,
    -1,
    0,
    0
   ],
   [
-   19,
-   35,
-   4,
-   -1,
-   0,
-   0
-  ],
-  [
-   18,
-   17,
+   8,
+   12,
    7,
    -1,
    0,
    0
   ],
   [
+   9,
+   18,
    10,
    11,
+   0,
+   0
+  ],
+  [
+   17,
+   28,
+   0,
+   -1,
+   0,
+   0
+  ],
+  [
+   38,
+   14,
+   1,
+   -1,
+   0,
+   0
+  ],
+  [
+   20,
+   23,
    7,
    -1,
    0,
    0
   ],
   [
-   15,
-   5,
-   7,
+   25,
+   42,
+   1,
    -1,
    0,
    0
   ],
   [
-   24,
+   25,
    32,
+   2,
+   -1,
+   0,
+   0
+  ],
+  [
+   32,
+   42,
+   1,
+   -1,
+   0,
+   0
+  ],
+  [
+   49,
+   50,
    3,
    -1,
    0,
    0
   ],
   [
-   20,
-   39,
-   0,
-   -1,
-   0,
-   0
-  ],
-  [
-   46,
-   20,
-   1,
-   -1,
-   0,
-   0
-  ],
-  [
-   31,
-   49,
-   1,
-   -1,
-   0,
-   0
-  ],
-  [
-   46,
-   39,
-   1,
-   -1,
-   0,
-   0
-  ],
-  [
-   45,
-   55,
-   1,
-   -1,
-   0,
-   0
-  ],
-  [
-   53,
-   50,
-   1,
-   -1,
-   0,
-   0
-  ],
-  [
-   48,
-   44,
-   1,
-   -1,
-   0,
-   0
-  ],
-  [
-   52,
-   51,
-   1,
-   -1,
-   0,
-   0
-  ],
-  [
-   51,
+   37,
    48,
    1,
    -1,
@@ -1195,16 +1022,24 @@
    0
   ],
   [
-   56,
-   53,
+   46,
+   43,
    1,
    -1,
    0,
    0
   ],
   [
-   49,
+   41,
+   36,
+   1,
+   -1,
+   0,
+   0
+  ],
+  [
    45,
+   44,
    1,
    -1,
    0,
@@ -1212,6 +1047,14 @@
   ],
   [
    44,
+   41,
+   1,
+   -1,
+   0,
+   0
+  ],
+  [
+   49,
    46,
    1,
    -1,
@@ -1219,23 +1062,55 @@
    0
   ],
   [
+   42,
+   37,
+   1,
+   -1,
+   0,
+   0
+  ],
+  [
+   36,
+   38,
+   1,
+   -1,
+   0,
+   0
+  ],
+  [
+   43,
+   44,
+   1,
+   -1,
+   0,
+   0
+  ],
+  [
+   48,
+   49,
+   1,
+   -1,
+   0,
+   0
+  ],
+  [
+   40,
+   37,
+   1,
+   -1,
+   0,
+   0
+  ],
+  [
    50,
-   51,
+   43,
    1,
    -1,
    0,
    0
   ],
   [
-   55,
-   56,
-   1,
-   -1,
-   0,
-   0
-  ],
-  [
-   52,
+   46,
    50,
    2,
    -1,
@@ -1243,8 +1118,24 @@
    0
   ],
   [
+   45,
    43,
-   11,
+   2,
+   -1,
+   0,
+   0
+  ],
+  [
+   40,
+   42,
+   2,
+   -1,
+   0,
+   0
+  ],
+  [
+   35,
+   9,
    7,
    -1,
    0,
@@ -1259,322 +1150,178 @@
    0
   ],
   [
-   13,
-   21,
+   11,
+   15,
    6,
    3,
    2013,
    0
   ],
   [
-   23,
-   14,
+   19,
+   13,
    6,
    4,
    2021,
    0
   ],
   [
-   21,
-   23,
+   15,
+   19,
    6,
    1,
    2019,
    0
   ],
   [
-   26,
-   24,
+   15,
+   33,
    6,
    2,
-   1977,
+   2017,
    0
   ],
   [
-   55,
-   47,
+   20,
+   33,
    6,
    5,
+   2015,
+   0
+  ],
+  [
+   48,
+   39,
+   6,
+   6,
    1789,
    0
   ],
   [
-   22,
-   34,
+   17,
+   26,
    9,
-   6,
+   7,
    2003,
    2007
   ],
   [
-   29,
-   34,
+   24,
+   26,
    9,
-   6,
+   7,
    2009,
    2013
   ],
   [
+   31,
+   47,
    9,
-   38,
-   9,
-   7,
-   2008,
-   2021
-  ],
-  [
-   9,
-   54,
-   9,
-   7,
+   8,
    2015,
    2020
   ],
   [
-   38,
-   54,
-   9,
-   7,
-   2015,
-   2020
-  ],
-  [
-   34,
-   38,
+   26,
+   31,
    9,
    9,
    2009,
    2016
   ],
   [
-   16,
+   18,
+   28,
+   10,
+   10,
+   0,
+   0
+  ],
+  [
    9,
-   13,
-   8,
-   2008,
-   2010
-  ],
-  [
+   16,
+   10,
    11,
-   41,
-   10,
-   10,
    0,
    0
   ],
   [
-   19,
-   11,
-   11,
+   18,
+   16,
+   10,
    11,
    0,
    0
   ],
   [
    16,
-   35,
+   30,
    10,
    12,
    0,
    0
   ],
   [
-   10,
-   22,
-   10,
-   13,
-   0,
-   0
-  ],
-  [
-   10,
-   33,
+   16,
+   27,
    10,
    13,
    0,
    0
   ],
   [
-   22,
-   33,
+   27,
+   30,
    10,
    13,
    0,
    0
   ],
   [
-   10,
    18,
+   30,
    10,
    14,
    0,
    0
   ],
   [
-   15,
-   25,
+   22,
+   34,
    10,
    15,
    0,
    0
   ],
   [
+   22,
    30,
-   33,
    10,
    16,
    0,
    0
   ],
   [
-   27,
-   32,
-   10,
+   29,
+   30,
+   11,
    17,
    0,
    0
   ],
   [
-   27,
-   42,
    10,
-   17,
-   0,
-   0
-  ],
-  [
-   27,
-   41,
-   10,
-   17,
-   0,
-   0
-  ],
-  [
-   32,
-   42,
-   10,
-   17,
-   0,
-   0
-  ],
-  [
-   32,
-   41,
-   10,
-   17,
-   0,
-   0
-  ],
-  [
-   42,
-   41,
-   10,
-   17,
-   0,
-   0
-  ],
-  [
-   28,
-   25,
-   10,
+   21,
+   12,
    18,
    0,
    0
   ],
   [
-   25,
-   35,
-   10,
-   19,
-   0,
-   0
-  ],
-  [
-   25,
-   41,
-   10,
-   20,
-   0,
-   0
-  ],
-  [
-   19,
-   42,
-   11,
-   21,
-   0,
-   0
-  ],
-  [
-   36,
-   41,
-   10,
    22,
-   0,
-   0
-  ],
-  [
-   40,
-   41,
-   10,
-   23,
-   0,
-   0
-  ],
-  [
-   35,
-   33,
-   11,
-   24,
-   0,
-   0
-  ],
-  [
-   8,
-   40,
-   16,
-   25,
-   0,
-   0
-  ],
-  [
-   15,
-   8,
-   16,
-   26,
-   0,
-   0
-  ],
-  [
-   15,
-   10,
-   16,
-   27,
-   0,
-   0
-  ],
-  [
-   15,
-   40,
-   16,
-   28,
-   0,
-   0
-  ],
-  [
-   37,
-   40,
-   16,
-   29,
-   0,
-   0
-  ],
-  [
-   27,
-   11,
+   9,
    17,
-   30,
+   19,
    0,
    0
   ]
@@ -1582,205 +1329,205 @@
  "puzzles": {
   "kolay": [
    [
+    11,
     13,
-    14,
     [
-     13,
-     21,
-     23,
-     14
-    ]
-   ],
-   [
-    36,
-    43,
-    [
-     36,
-     41,
      11,
-     43
+     15,
+     19,
+     13
     ]
    ],
    [
-    20,
-    48,
+    27,
+    35,
     [
-     20,
-     46,
-     44,
-     48
+     27,
+     16,
+     9,
+     35
     ]
    ],
    [
-    51,
+    43,
+    36,
+    [
+     43,
+     44,
+     41,
+     36
+    ]
+   ],
+   [
     46,
+    41,
     [
-     51,
-     48,
+     46,
+     43,
      44,
-     46
+     41
     ]
    ],
    [
-    44,
-    50,
+    12,
+    47,
     [
-     44,
-     48,
-     51,
-     50
-    ]
-   ],
-   [
-    54,
-    15,
-    [
-     54,
-     38,
+     12,
      8,
-     15
+     31,
+     47
+    ]
+   ],
+   [
+    39,
+    40,
+    [
+     39,
+     48,
+     37,
+     40
     ]
    ]
   ],
   "orta": [
    [
-    30,
+    18,
+    24,
+    [
+     18,
+     28,
+     17,
+     26,
+     24
+    ]
+   ],
+   [
     29,
+    35,
     [
+     29,
      30,
-     33,
      22,
-     34,
-     29
+     9,
+     35
     ]
    ],
    [
-    12,
     43,
+    38,
     [
-     12,
-     42,
-     19,
-     11,
-     43
+     43,
+     44,
+     41,
+     36,
+     38
     ]
    ],
    [
-    53,
-    44,
+    49,
+    41,
     [
-     53,
-     50,
-     51,
-     48,
-     44
-    ]
-   ],
-   [
-    37,
-    54,
-    [
-     37,
-     40,
-     8,
-     38,
-     54
-    ]
-   ],
-   [
-    50,
-    47,
-    [
-     50,
-     53,
-     56,
-     55,
-     47
-    ]
-   ],
-   [
-    56,
-    31,
-    [
-     56,
-     55,
-     45,
      49,
-     31
+     46,
+     43,
+     44,
+     41
+    ]
+   ],
+   [
+    45,
+    48,
+    [
+     45,
+     43,
+     46,
+     49,
+     48
+    ]
+   ],
+   [
+    46,
+    42,
+    [
+     46,
+     49,
+     48,
+     37,
+     42
     ]
    ]
   ],
   "zor": [
    [
-    17,
-    29,
+    23,
+    13,
     [
-     17,
-     18,
-     10,
-     22,
-     34,
-     29
+     23,
+     20,
+     33,
+     15,
+     19,
+     13
     ]
    ],
    [
-    26,
-    43,
+    21,
+    35,
     [
-     26,
-     24,
-     32,
-     27,
-     11,
-     43
+     21,
+     10,
+     34,
+     22,
+     9,
+     35
+    ]
+   ],
+   [
+    43,
+    14,
+    [
+     43,
+     44,
+     41,
+     36,
+     38,
+     14
+    ]
+   ],
+   [
+    37,
+    45,
+    [
+     37,
+     48,
+     49,
+     46,
+     43,
+     45
+    ]
+   ],
+   [
+    46,
+    25,
+    [
+     46,
+     49,
+     48,
+     37,
+     42,
+     25
     ]
    ],
    [
     50,
-    39,
+    32,
     [
      50,
-     51,
+     49,
      48,
-     44,
-     46,
-     39
-    ]
-   ],
-   [
-    20,
-    52,
-    [
-     20,
-     46,
-     44,
-     48,
-     51,
-     52
-    ]
-   ],
-   [
-    54,
-    28,
-    [
-     54,
-     9,
-     16,
-     35,
-     25,
-     28
-    ]
-   ],
-   [
-    56,
-    44,
-    [
-     56,
-     53,
-     50,
-     51,
-     48,
-     44
+     37,
+     42,
+     32
     ]
    ]
   ]
