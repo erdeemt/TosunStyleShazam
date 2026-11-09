@@ -769,3 +769,69 @@ tur açıklamasından önceki tüm mesajlarda başlık/dosya/koordinat yok, sür
 sahibine bağlı, yeniden bağlanma + izleyici, ayrılma, ayar temizliği, İstanbul ölçeği), `tests/e2e/whenwhere.test.mjs` (günlük 5 tur +
 final + sıralama, serbest Eski İstanbul zoom 16 + iğne sürükleme, 3 telefon lobi 3 tur: iğne/yıl başkası kilitleyince korunur,
 açıklamada 3 iğne + gerçek yer, final kürsüsü). Karolar testte boş PNG'ye yönlendirilir (`WW_REAL_TILES=1` gerçek).
+
+### 4.13 🔤 Harf Çarkı (alfabe bilgi yarışması) — 2026-11-09
+
+TV'deki alfabe yarışmaları türünde, kendi tasarımımız (hiçbir programın/uygulamanın metni veya arayüzü kopyalanmadı).
+Tek oyunculu (📅 Günlük + ♾️ Sınırsız) ve lobili kapışma (1–12 kişi). Dosyalar: `server/harfcarki-text.js` (harf kuralı,
+normalleştirme, yazım payı), `server/harfcarki.js` (banka, çark kurma, oyun durumu, HTTP uçları), `server/games/harfcarki.js`
+(lobi), `public/games/harfcarki(-ui|-lobby).js` + `harfcarki.css` (sadece bu oyunda yüklenir), `content/harfcarki/`.
+
+**Çark**: 28 harf, sırayla A B C Ç D E F G H I İ J K L M N O Ö P R S Ş T U Ü V Y Z (Ğ yok). Harf başına bir ipucu; cevap o harfle
+başlar, zor harflerde (I, J, Ö, Ü, V, Z) bazı ipuçları "X harfini içerir" (cevap harfi içerir ama onunla başlamaz). Tüm çark için
+toplam süre (günlük 5 dk; sınırsız/lobi 3/5/7). Yaz + Gönder ya da Pas. Doğru → yeşil, yanlış → kırmızı (ikinci hak yok), pas →
+sarı; ilk tur bitince paslananlar çark sırasıyla döner (yine pas geçilebilir). Hepsi cevaplanınca, süre dolunca ya da "Bitir"le
+biter (kalanlar cevapsız). Sonuç: "24 doğru · 3 yanlış · 1 pas", harf harf döküm (ipucu, doğru cevap, yanlışsa senin yazdığın),
+paylaşım (7'li satırlarla 🟩🟥⬜ ızgarası + süre).
+
+**Puan / sıralama**: doğru ↓, sonra yanlış ↑, sonra süre ↑ (bitiş − başlangıç). Gösterilen puan = 10 × doğru + süre ödülü; ödül
+sadece bütün harfler süre bitmeden cevaplandıysa: kalan her 20 sn'ye 1, en fazla 9 (bir doğrudan az).
+
+**Cevap kontrolü** (sunucuda, `checkAnswer`): ikisi de katlanır — Türkçe küçük harf, ç/ğ/ı/ö/ş/ü/â/î/û → c/g/i/o/s/u/a/i/u
+(İ/i ve I/ı aynı), diğer aksanlar atılır, kesme işareti silinir, diğer noktalama boşluk, boşluklar tek, sonra boşluksuz
+karşılaştırma ("ay çiçeği" = "ayçiçeği"). Kabul: cevap veya `alt` biçimlerinden biri tam eşleşir; ya da cevap (boşluksuz) ≥ 6 harf
+ve Damerau-Levenshtein (bitişik yer değiştirme dahil) ≤ 1 — `starts` ipucunda ilk harf aynı olmalı. Yazım payı, yazılan şey aynı
+harfteki **başka bir ipucunun** cevabı/alt'ı ise uygulanmaz (ör. "kartal" ipucuna "kartel"). Cevap 40 karaktere kırpılır.
+
+**Çark kurma** (`composeWheel(rng, { difficulty, avoid })`): zorluk planı (28 harfte kaç tane 1/2/3): Kolay 22/6/0, Karışık
+13/11/4, Zor 4/14/10; seviyeler harflere rastgele dağıtılır. Kategori tavanı çark başına 4 (genel 10), "içerir" ipucu en fazla 3.
+Aynı cevap iki kez yok; bir ipucunun metni çarktaki başka bir ipucunun cevabını (≥ 4 harf, kelime olarak) içeremez (ör. "Rolling
+Stones'un solisti Mick …" ile "Rolling Stones" aynı çarka girmez). Uymazsa kısıtlar sırayla gevşer (zorluk ±1 → kategori → görülen).
+
+**Tek oyunculu** (`POST /api/harfcarki/start|begin|move|leaderboard`, gövdede kimlik, genel HTTP sınırı):
+- `start`: günlükte durum (`ready` / `playing` (kaldığı yerden, kalan süreyle) / `done`); sınırsızda açık oyun varsa o.
+- `begin`: saati başlatır. **Günlük**: herkese aynı çark — gizli tuz (`secrets.harfcarkiSalt`, testte `HARFCARKI_SALT`) +
+  tarihle tohumlanır, gün ilk istendiğinde `harfcarki-days`'e sabitlenir; kimlik başına tek deneme (yeniden `begin` aynı oyunu
+  döner, yenileyince devam). 1 numaralı çark 2026-11-09. **Sınırsız**: zorluk + süre seçilir, kripto üreteç; kimliğin son 1200
+  görülen ipucundan (`harfcarki-seen`, lobiyle ortak, ≤ 5000 kimlik) kaçınır. Kişi başına 3 açık oyun, toplam 5000, 2 sa ömür.
+- `move { gameId, pos, kind: answer|pass|quit, answer }`: `pos` sunucunun sıradaki harfi değilse reddedilir (çift gönderim).
+  Süre + 1,5 sn ağ payı geçtiyse hamle sayılmaz, oyun "time" ile biter (yanıt bitmiş görünüm). Oyun başına ≤ 600 hamle.
+- Yanıt: `{ letters: [{letter, state}], current: { pos, letter, mode, clue, category, lap }, startAt, endsAt, summary, done,
+  recap }`. Cevap, alt ve yazdıkların (`recap`) **sadece oyun bitince**. Sıralama: bitirenler, ilk 50 + sen, 🆕 kuralı (§3.6.1),
+  başkalarının harf renkleri sadece sen bitirdiysen; cevap/yazılan yok. 45 günden eski kayıtlar silinir.
+
+**Çok oyunculu (lobi, 1–12)**: host ayarı süre 3/5/7 dk + zorluk Kolay/Karışık/Zor. Başlatınca 3 sn "3-2-1" (`ready`, ipucu yok),
+sonra herkes AYNI çarkı aynı saatle kendi hızında oynar (`action { type: answer|pass|quit, pos, text }`; eski `pos` sessizce yok
+sayılır). Görünüm: kendi run'ın (sadece kendi ipucun) + herkesin harf renkleri, sırası ve doğru/yanlış sayısı (cevap, ipucu,
+yazılan yok). Herkes bitirince ya da süre + ağ payı dolunca `over`: sıralama, herkesin harf harf sonucu + yazdıkları + doğru
+cevaplar (oyuncu sekmeleriyle). Erken bitiren cevapları görmez (diğerlerine söylemesin), "Diğerleri bekleniyor" + canlı ilerleme.
+Kopan oyuncu dönünce aynı harften, aynı bitiş anıyla devam eder (süre işlemeye devam eder); oyun ortası gelen izleyici olur
+(sadece mini çarklar); ayrılan sıralamada en alta düşer, beklenmez. Çark oyuncuların görülen ipuçlarından kaçınır.
+Not: WS hız sınırı (30 mesaj / 5 sn) insan hızına yeter; çok hızlı pas basılırsa fazlası düşer, düğmeler 2,5 sn sonra açılır.
+
+**Arayüz**: telefon öncelikli. Büyük SVG çark (28 nokta, durum renkleri, sıradaki beyaz çerçeveli), ortada büyük harf + süre
+halkası (son 30 sn kırmızı), altında "X ile başlar / X harfini içerir" + kategori, büyük ipucu, yazı kutusu (autocapitalize/
+autocorrect kapalı, enterkeyhint=send), Pas + Gönder (≥ 48 px; dokununca odak kutuda kalır → klavye kapanmaz). Panel bir kez kurulur
+ve yerinde güncellenir. `visualViewport` küçülünce (klavye açık) çark küçülür, sekmeler/istatistik gizlenir, kutu görünür tutulur.
+Animasyonlar: doğru yeşil nabız, yanlış kırmızı sarsıntı, pas kayma; `prefers-reduced-motion`'da kapalı.
+
+**İçerik** (`content/harfcarki/clues.json`, README'de şema + Kaynaklar): 2777 özgün ipucu, harf başına 87–110; ayrıntı DURUM.md.
+`node content/harfcarki/validate.mjs` (§ README): 0 hata şart.
+
+**Testler**: `tests/unit/harfcarki.test.mjs` (normalleştirme, yazım payı + rakip kelime, harf kuralı, banka doğrulama, çark kuralları
+150×3 tohum, denge, kaçınma, günlük belirlenimcilik, run durum makinesi, süre, sıralama), `tests/security/sec-harfcarki.test.mjs`
+(bitmeden hiçbir yanıtta cevap/alt/yazılan yok, tek deneme, eski harf, bozuk girdi, gövde sınırı, sunucu saati, sıralama gizliliği +
+🆕, sınırsız tekrar önleme + başkasının oyunu), `tests/swarm/harfcarki-lobby.test.mjs` (3 kişi kapışma + sızıntı taraması +
+sıralama, süre dolunca biter, erken/bozuk eylem, yeniden bağlanma + izleyici + ayrılma, ayar temizliği + tek kişi),
+`tests/e2e/harfcarki.test.mjs` (günlük telefonda doğru/yanlış/pas/geri gelen pas/döküm/sıralama; 3 telefon lobi canlı mini çarklar +
+sonuç). Test gizli verisi: `/api/_test/secret?harfcarki=1&gameId=…` ve `?room=KOD` (`targets` = cevaplar).

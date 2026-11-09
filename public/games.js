@@ -88,4 +88,12 @@ export const GAMES = [
     categories: ['single', 'multi'],
     load: () => import('./games/whenwhere.js'),
   },
+  {
+    id: 'harfcarki',
+    name: 'Harf Çarkı',
+    icon: '🔤',
+    desc: '28 harf, 5 dakika: her harfe bir ipucu',
+    categories: ['single', 'multi'],
+    load: () => import('./games/harfcarki.js'),
+  },
 ];

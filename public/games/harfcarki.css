@@ -1,0 +1,113 @@
+/* 🔤 Harf Çarkı — sadece bu oyunda yüklenir (public/games/harfcarki-ui.js ensureCss). */
+
+.hc { --hc-ok: var(--good); --hc-bad: var(--bad); --hc-pass: var(--accent2); }
+.hc-play { display: flex; flex-direction: column; gap: 12px; }
+
+/* Çark */
+.hc-wheel-wrap { position: relative; width: min(100%, 340px); margin: 0 auto; transition: width .2s ease; }
+.hc-wheel { display: block; width: 100%; height: auto; user-select: none; }
+.hc-ring-bg { fill: none; stroke: var(--line); stroke-width: 8; }
+.hc-ring-fill { fill: none; stroke: var(--accent2); stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset .25s linear, stroke .3s; }
+.hc-wheel.urgent .hc-ring-fill { stroke: var(--bad); }
+.hc-wheel.urgent .hc-time { fill: var(--bad); }
+.hc-big { font: 900 72px 'Rubik', system-ui, sans-serif; fill: var(--text); }
+.hc-time { font: 700 24px 'Rubik', system-ui, sans-serif; fill: var(--muted); font-variant-numeric: tabular-nums; }
+.hc-dot circle { fill: var(--card2); stroke: var(--line); stroke-width: 2; transition: fill .25s, stroke .25s; }
+.hc-dot text { font: 800 15px 'Rubik', system-ui, sans-serif; fill: #fff; pointer-events: none; paint-order: stroke; stroke: #120a1f; stroke-width: 2.5px; stroke-linejoin: round; }
+.hc-dot.hc-ok circle { fill: var(--hc-ok); stroke: var(--hc-ok); }
+.hc-dot.hc-ok text { fill: #062015; stroke: none; }
+.hc-dot.hc-bad circle { fill: var(--hc-bad); stroke: var(--hc-bad); }
+.hc-dot.hc-pass circle { fill: #4a3a1a; stroke: var(--hc-pass); }
+.hc-dot.hc-pass text { fill: #ffd27a; }
+.hc-dot.hc-bad text { stroke: #5a0f0f; }
+.hc-dot.hc-cur circle { stroke: #fff; stroke-width: 3.5; fill: var(--accent); }
+.hc-dot.hc-cur text { fill: #fff; stroke: #5a1030; }
+.hc-dot { transform-box: fill-box; transform-origin: center; }
+.hc-dot.hc-pulse circle { animation: hc-pulse .6s ease-out; }
+.hc-dot.hc-wrong circle { animation: hc-red .6s ease-out; }
+@keyframes hc-pulse { 0% { r: 13px; } 40% { r: 17px; } 100% { r: 13px; } }
+@keyframes hc-red { 0%, 100% { r: 13px; } 30% { r: 10px; } 60% { r: 15px; } }
+
+.hc-countdown {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font: 900 96px 'Rubik', system-ui, sans-serif; color: var(--accent2); background: #120a1fcc; border-radius: 50%;
+}
+.hc-countdown.hidden, .hc .hidden { display: none; }
+
+/* İpucu */
+.hc-clue-card { background: linear-gradient(180deg, var(--card), var(--bg2)); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+.hc-clue-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.hc-rule { font-weight: 800; color: var(--accent2); font-size: 15px; }
+.hc-rule.contains { color: #7ec8ff; }
+.hc-cat { font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; }
+.hc-clue { margin: 8px 0 0; font-size: 21px; line-height: 1.35; font-weight: 500; min-height: 2.7em; }
+.hc-clue-card.hc-ok-flash { animation: hc-okf .5s ease-out; }
+.hc-clue-card.hc-bad-flash { animation: hc-shake .45s ease-in-out; border-color: var(--bad); }
+.hc-clue-card.hc-pass-slide .hc-clue { animation: hc-slide .35s ease-out; }
+@keyframes hc-okf { 0% { box-shadow: 0 0 0 0 #3ee08f88; border-color: var(--good); } 100% { box-shadow: 0 0 0 14px #3ee08f00; } }
+@keyframes hc-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-9px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-6px); } 80% { transform: translateX(4px); } }
+@keyframes hc-slide { 0% { transform: translateX(40px); opacity: 0; } 100% { transform: none; opacity: 1; } }
+
+/* Girdi */
+.hc-form { display: flex; flex-direction: column; gap: 8px; }
+.hc-input { width: 100%; font-size: 20px; padding: 12px 14px; min-height: 52px; border-radius: 12px; }
+.hc-actions { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; }
+.hc-actions .btn { min-height: 48px; font-size: 17px; }
+.hc-pass-btn { border-color: var(--accent2); }
+.hc-stats { text-align: center; color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+.hc-quit { min-height: 44px; }
+
+/* Klavye açıkken (visualViewport küçüldü): çark küçülür, ipucu + kutu görünür kalır */
+.hc.hc-kb .hc-wheel-wrap { width: min(46vw, 170px); }
+.hc.hc-kb .hc-big { font-size: 64px; }
+.hc.hc-kb .hc-clue { font-size: 18px; min-height: 0; }
+.hc.hc-kb .hc-stats, .hc.hc-kb .hc-quit { display: none; }
+.hc.hc-kb .tabs { display: none; }
+
+/* Sonuç */
+.hc-score { font: 900 64px 'Rubik', system-ui, sans-serif; line-height: 1; }
+.hc-score small { font-size: 24px; color: var(--muted); }
+.hc-summary { font-weight: 700; margin: 8px 0 0; }
+.hc-grid { font-size: 22px; line-height: 1.15; letter-spacing: 2px; margin: 12px auto 4px; font-family: inherit; }
+.hc-recap { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.hc-recap li { display: flex; gap: 10px; align-items: flex-start; padding: 8px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); }
+.hc-r-letter { flex: 0 0 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; background: var(--card2); }
+.hc-r-ok .hc-r-letter { background: var(--good); color: #08261a; }
+.hc-r-bad .hc-r-letter { background: var(--bad); }
+.hc-r-pass .hc-r-letter, .hc-r-todo .hc-r-letter { background: #4a3a1a; border: 2px solid var(--accent2); }
+.hc-r-body { min-width: 0; }
+.hc-r-clue { font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+.hc-r-answer { margin-top: 2px; overflow-wrap: anywhere; }
+.hc-r-typed { color: var(--muted); font-size: 14px; }
+.hc-b-score small { color: var(--muted); }
+
+/* Lobi */
+.hc-opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.hc-minis { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.hc-minis li { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); text-align: center; min-width: 0; }
+.hc-minis li.me { border-color: var(--accent2); }
+.hc-minis li.offline { opacity: .55; }
+.hc-minis .player-name { font-size: 13px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hc-mini { width: 56px; height: 56px; }
+.hc-mini circle { fill: var(--card2); }
+.hc-mini .hc-m-ok { fill: var(--good); }
+.hc-mini .hc-m-bad { fill: var(--bad); }
+.hc-mini .hc-m-pass { fill: var(--accent2); }
+.hc-mini .hc-m-cur { fill: #fff; }
+.hc-mini-score { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.hc-clock { font: 800 28px 'Rubik', system-ui, sans-serif; margin-top: 8px; font-variant-numeric: tabular-nums; }
+.hc-rank { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.hc-rank li { display: grid; grid-template-columns: 36px 44px 1fr auto; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); }
+.hc-rank li.me { border-color: var(--accent2); }
+.hc-rank .hc-mini { width: 40px; height: 40px; }
+.hc-rank .player-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hc-medal { font-size: 20px; text-align: center; }
+.hc-rank-score { font-weight: 700; font-variant-numeric: tabular-nums; }
+.hc-rank-score small { color: var(--muted); font-weight: 400; }
+.hc-who { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hc-dot.hc-pulse circle, .hc-dot.hc-wrong circle, .hc-clue-card.hc-ok-flash, .hc-clue-card.hc-bad-flash,
+  .hc-clue-card.hc-pass-slide .hc-clue { animation: none; }
+  .hc-ring-fill, .hc-wheel-wrap, .hc-dot circle { transition: none; }
+}

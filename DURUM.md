@@ -214,3 +214,27 @@ Açık küçük notlar:
   testi tek başına 2/2, whenwhere günlük testi (yatay çizgi "görünmez" sayıldı) düzeltildi → 3/3.
 - Kullanıcı denemeli: telefonda harita hissi (iki parmak yakınlaştırma, iğne sürükleme), puan ölçekleri (özellikle İstanbul 3 km sert mi),
   60 sn tur süresi, fotoğraf kalitesi (görmediğim fotoğraflar kötü çıkarsa `rejected` listesine dosya adı eklenip betik yeniden çalıştırılır).
+
+## 🔤 Harf Çarkı — game/harfcarki dalında (main'e BİRLEŞTİRİLMEDİ, 2026-11-09)
+
+- Alfabe bilgi yarışması (kendi tasarımımız): 28 harflik çark (Ğ yok), harf başına ipucu, cevap o harfle başlar (I, J, Ö, Ü, V, Z'de
+  bazıları "… harfini içerir"), tüm çark için süre; Gönder / Pas (paslananlar ilk turdan sonra döner), yanlışta ikinci hak yok.
+  Tek oyunculu 📅 Günlük (herkese aynı çark, tek deneme, sıralama + 🆕 kuralı) + ♾️ Sınırsız (Kolay/Karışık/Zor, 3/5/7 dk, yakında
+  görülen ipucu gelmez); lobili kapışma 1–12 kişi (aynı çark + aynı saat, kendi hızında, canlı mini çarklar, sonda sıralama + herkesin
+  harf harf sonucu). Kurallar, eşleştirme, çark kurma ve güvenlik PLAN.md §4.13.
+- İçerik: `content/harfcarki/clues.json` 2777 özgün ipucu (harf başına 87–110), `validate.mjs` 0 hata; şema + Kaynaklar README'de.
+  7 paralel içerik ajanı yazdı (harf başına brif + doğrulayıcı), sonra rastgele %10 (278) elle okundu: 3 düzeltme (Yüz Yıl Savaşı
+  yazımı, "börek"/"gözleme" belirsizliği, "Ülke olarak Japonya" ifadesi); e2e "coğrafya" cevabının kategori etiketiyle aynı olduğunu
+  yakaladı → 2 ipucu değişti + doğrulayıcıya kural. Bir ipucu başka harfin cevabını ele verebiliyordu (Jagger ↔ Rolling Stones) →
+  çark kurarken bu çiftler aynı çarka girmez.
+- Cevaplar/alt/yazılanlar oyun bitene kadar hiçbir HTTP yanıtında / WS görünümünde yok (lobide erken bitiren de görmez); saat sunucuda.
+- Kullanıcı denemeli: telefonda klavye açıkken düzen (iOS Safari visualViewport), 5 dk süre ve zorluk dengesi, ipucu kalitesi
+  (şüpheli bulunanları `clues.json`'da düzeltip `node content/harfcarki/validate.mjs`), yazım payının (6+ harfte 1 hata) yeterliliği.
+- Açık sorular: soyadıyla bilinen kişilerde (ör. "Mourinho" J için "José Mourinho") oyuncu farklı biçim yazabilir — alt'a sadece
+  aynı harfle başlayan biçim girebiliyor; çok kelimeli cevaplarda (ör. "Selvi Boylum Al Yazmalım") kısmi cevap yanlış sayılır.
+- Dosyalar: server/harfcarki(-text).js, server/games/harfcarki.js, public/games/harfcarki(-ui|-lobby).js + harfcarki.css,
+  content/harfcarki/{clues.json, validate.mjs, README.md}; ortak dosyalara küçük ekler (server.js uçlar + test sırrı,
+  server/games/index.js, public/games.js, public/index.html). style.css değişmedi.
+- Testler (yeni): birim 14, güvenlik 5, sürü 5, e2e 2 (ekranlar test-results/harfcarki/). Tam çalıştırma (2026-11-09): npm test
+  455/459 + 3 atlandı (SOAK); düşen swarm-vampir-chaos "yeniden bağlanma fırtınası" tek başına 17/17 (bilinen kararsız).
+  npm run e2e 77/77.
