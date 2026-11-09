@@ -238,3 +238,34 @@ Açık küçük notlar:
 - Testler (yeni): birim 14, güvenlik 5, sürü 5, e2e 2 (ekranlar test-results/harfcarki/). Tam çalıştırma (2026-11-09): npm test
   455/459 + 3 atlandı (SOAK); düşen swarm-vampir-chaos "yeniden bağlanma fırtınası" tek başına 17/17 (bilinen kararsız).
   npm run e2e 77/77.
+
+## 🔗 Bağlantı Avı — game/baglanti dalında (main'e BİRLEŞTİRİLMEDİ, 2026-11-09)
+
+- "Altı derece" türünde kendi tasarımımız: iki ünlü (fotoğraflı kart), arada her biri bir öncekiyle BAĞLANTILI kişilerden zincir
+  kurulur; her kartta bağlantının nedeni ("💍 eşi", "⚽ takım arkadaşı: Fenerbahçe (2019–2020)", "🎬 aynı filmde: …", "👑 tahtta
+  ardılı: …"). Tek oyunculu 📅 Günlük (herkese aynı Orta yapboz, tek deneme, sıralama + 🆕 kuralı) ve ♾️ Sınırsız (Kolay/Orta/Zor =
+  2/3/4 ara kişi, tekrar yok); lobili çok oyunculu yarış (1–12 kişi; zorluk, 1/3/5 tur, 3/5/8 dk; canlıda sadece "Ayşe: 2 adım",
+  tur sonunda herkesin zinciri yan yana + en kısa yol). Kurallar, puan, veri hattı PLAN.md §4.12.
+- Puan: en kısa = 1000, fazladan ara kişi −150 (taban 300), yanlış −25 (≤ −250), ipucu −100 (baş harf) / −50 (alan), ilk dakikadan
+  sonra 10 sn'de −5 (≤ −200), bitiren ≥ 50, pes/süre bitti 0.
+- Adalet: komşu listesi ve en kısa yol hiçbir yanıtta yok; her adım sunucuda doğrulanır, sadece o kenarın etiketi döner.
+  İstemci sadece kişi dizinini (ad/yıl/açıklama/alan; ~470 KB, gzip ~150 KB) alır.
+- Veri (Wikidata CC0, `node scripts/baglanti-build.mjs`, QLever Wikidata aynası; önbellekli): 3656 kişi (Türkiye/Osmanlı 1129
+  = %31; 126'sı ana ağa bağlı olmayan Türk isimler için gerçek komşulardan "köprü"), fotoğraflı 3346 (%92), 28102 bağlantı (takım 12477,
+  film/dizi 9687, etkilenme 1610, yönetmen 1308, ardıl 690, teknik direktör 572, ebeveyn 311, hoca 298, düet 196, kardeş 175, eş 156,
+  akraba 133, kurucu 105, partner 97, seçim 92, grup 69, şarkı yazarı 63, "önemli kişi" 50, muharebe 7, ortak 6); dev bileşen 3233.
+  Kadrodan "kendisi"/arşiv/kamera önü rolleri (P453/P1932/P3831) ve oyunculuk dışı yapımlar (belgesel, TV özel bölümü, ödül töreni,
+  talk show, realite, konser filmi, müzik videosu, varyete, yarışma, haber) ayıklanır. Yapboz 3 × 600 (yarısı Türkiye'den uçlu);
+  saklanan en kısa yol, tüm en kısa yollar arasından en az film/etkilenme içereni (en çok 2 film, 1 etkilenme, en az 1 film dışı).
+  Fotoğraflar sunucu vekiliyle (upload.wikimedia.org 330 px, üst veri silinir, `data/baglanti-cache`).
+- Dosyalar: server/baglanti.js, server/games/baglanti.js, public/baglanti-math.js, public/games/baglanti(-lobby|-ui).js + baglanti.css,
+  scripts/baglanti-build.mjs, content/baglanti/; ortak dosyalara küçük ekler (server.js uçlar, server/games/index.js, public/games.js,
+  public/index.html). style.css değişmedi.
+- Testler: tests/unit/baglanti.test.mjs (17), tests/unit/baglanti-data.test.mjs (3), tests/security/sec-baglanti.test.mjs (7),
+  tests/swarm/baglanti-lobby.test.mjs (5), tests/e2e/baglanti.test.mjs (2; ekranlar test-results/baglanti/; `BG_DATA=real` gerçek veri +
+  fotoğraflarla). TEST_MODE: content/baglanti/test-graph.json (gerçek verinin 57 kişilik alt grafiği) + yer tutucu görsel.
+- Kullanıcı denemeli: yapbozların zorluğu/eğlencesi (film kadrosu ağırlıklı; "etkilendi" zincirleri yapbozda en çok 1 kez), aramada
+  bulunamayan isimler, puan ölçeği, telefonda arama klavyesi.
+- Bilinen veri kusurları (Wikidata): bozuk hükümdar adları İngilizce etiketten onarılır ("X. LouisVI" → "XVI. Louis"), yaygın makam
+  kalıpları çevrilir, kalanlar İngilizce kalabilir. Siyasetçi/hükümdar/asker/din insanı film bağlantısına girmez (arşiv
+  görüntüsü). Barış Manço gibi bazı Türk isimleri (121 kişi) Wikidata'da ana ağa bağlanan gerçek ilişkisi olmadığından ana ağın dışında (yapbozda çıkmaz).
